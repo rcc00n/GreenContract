@@ -1,4 +1,5 @@
 import csv
+import logging
 import os
 import re
 from datetime import datetime
@@ -8,6 +9,11 @@ try:
     import xlrd
 except ImportError:  # pragma: no cover - dependency installed via requirements
     xlrd = None
+
+try:
+    import openpyxl
+except ImportError:  # pragma: no cover - optional dependency for .xlsx
+    openpyxl = None
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -36,6 +42,8 @@ LICENSE_MAX_LEN = Customer._meta.get_field("license_number").max_length
 NAME_MAX_LEN = Customer._meta.get_field("full_name").max_length
 EMAIL_MAX_LEN = Customer._meta.get_field("email").max_length
 IMPORT_BATCH_SIZE = max(1, int(os.environ.get("IMPORT_BULK_BATCH_SIZE", "5000")))
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_bool(value):
@@ -166,9 +174,36 @@ def _read_excel_rows(upload):
     return rows
 
 
+def _read_xlsx_rows(upload):
+    if openpyxl is None:
+        raise ImportError("openpyxl is required to read .xlsx files.")
+
+    upload.seek(0)
+    wb = openpyxl.load_workbook(upload, read_only=True, data_only=True)
+    ws = wb.active
+    rows = []
+    header = []
+    for idx, row in enumerate(ws.iter_rows(values_only=True)):
+        if idx == 0:
+            header = [str(cell).strip() if cell is not None else "" for cell in row]
+            continue
+        if not header:
+            break
+        data = {}
+        for col_idx, header_name in enumerate(header):
+            value = row[col_idx] if col_idx < len(row) else ""
+            if isinstance(value, float) and value.is_integer():
+                value = int(value)
+            data[header_name] = value
+        rows.append(data)
+    return rows
+
+
 def _load_rows(upload):
     filename = (upload.name or "").lower()
-    if filename.endswith((".xls", ".xlsx")):
+    if filename.endswith(".xlsx"):
+        return _read_xlsx_rows(upload)
+    if filename.endswith(".xls"):
         return _read_excel_rows(upload)
     return _read_csv_rows(upload)
 
@@ -791,6 +826,7 @@ def import_customers_csv(request):
             try:
                 rows = _load_rows(upload)
             except Exception as exc:  # noqa: BLE001 - show error to user
+                logger.exception("Customer import: failed to read file %s", upload.name)
                 messages.error(request, f"Could not read file: {exc}")
                 return redirect("rentals:import_customers_csv")
 
@@ -874,6 +910,18 @@ def import_customers_csv(request):
                     request,
                     f"Deduplicated {duplicate_rows} rows with the same license number inside the file.",
                 )
+
+            logger.info(
+                "Customer import finished",
+                extra={
+                    "imported": imported,
+                    "created": created_count,
+                    "updated": updated_count,
+                    "skipped_empty": skipped_empty,
+                    "duplicate_rows": duplicate_rows,
+                    "file": upload.name,
+                },
+            )
 
             return redirect("rentals:customer_list")
 

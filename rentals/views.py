@@ -17,7 +17,7 @@ except ImportError:  # pragma: no cover - optional dependency for .xlsx
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
 from django.db import transaction
 from django.db.models import F, Q, Value
@@ -27,6 +27,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.decorators import method_decorator
 from django.utils.encoding import smart_str
+from django.core.exceptions import PermissionDenied
 from django.views.generic import CreateView, ListView, UpdateView
 from django.views.decorators.http import require_POST
 
@@ -501,8 +502,9 @@ def _normalize_customer_row(row, row_index: int):
 
 
 @login_required
-@user_passes_test(lambda user: user.is_superuser, raise_exception=True)
 def admin_user_list(request):
+    if not request.user.is_superuser:
+        raise PermissionDenied
     admins = User.objects.filter(is_staff=True).order_by("username")
     form = AdminUserCreationForm(request.POST or None)
 

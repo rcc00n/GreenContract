@@ -68,6 +68,7 @@ class CustomerForm(StyledModelForm):
 class RentalForm(StyledModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._limit_customer_queryset()
         if not self.is_bound:
             today = date.today()
             self.initial.setdefault("start_date", today)
@@ -82,6 +83,7 @@ class RentalForm(StyledModelForm):
             self.fields[name].widget.attrs["readonly"] = True
             self.fields[name].widget.attrs["tabindex"] = "-1"
             self.fields[name].widget.attrs["aria-readonly"] = "true"
+        self.initial_customer_label = getattr(self, "_customer_label", "")
 
     class Meta:
         model = Rental
@@ -117,6 +119,36 @@ class RentalForm(StyledModelForm):
             cleaned_data["daily_rate"] = self.instance.daily_rate
             cleaned_data["total_price"] = self.instance.total_price
         return cleaned_data
+
+    def _limit_customer_queryset(self):
+        """
+        Keep the customer queryset tiny so rendering the form does not pull hundreds
+        of thousands of rows. Only include the selected customer (if any).
+        """
+
+        customer_field = self.fields["customer"]
+        customer_field.widget = forms.HiddenInput()
+
+        selected_id = None
+        if self.is_bound:
+            selected_id = self.data.get(self.add_prefix("customer")) or self.data.get("customer")
+        elif self.initial.get("customer"):
+            selected_id = self.initial.get("customer")
+        elif getattr(self.instance, "customer_id", None):
+            selected_id = self.instance.customer_id
+
+        queryset = Customer.objects.none()
+        label = ""
+
+        if selected_id:
+            queryset = Customer.objects.filter(pk=selected_id)
+            customer = queryset.first()
+            if customer:
+                label = f"{customer.full_name} · {customer.phone}"
+                customer_field.initial = customer.pk
+
+        customer_field.queryset = queryset
+        self._customer_label = label
 
 
 class ContractTemplateForm(StyledModelForm):

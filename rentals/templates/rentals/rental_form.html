@@ -26,8 +26,31 @@
                 {% for error in form.car.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
               <div class="col-md-6">
-                <label class="form-label" for="{{ form.customer.id_for_label }}">Customer</label>
+                <label class="form-label" for="customer-search">Customer</label>
                 {{ form.customer }}
+                <div class="position-relative">
+                  <input
+                    type="search"
+                    class="form-control{% if form.customer.errors %} is-invalid{% endif %}"
+                    id="customer-search"
+                    placeholder="Начните вводить имя, телефон или email"
+                    autocomplete="off"
+                    data-search-url="{% url 'rentals:customer_search' %}"
+                    data-initial-label="{{ customer_initial_label|default_if_none:'' }}"
+                  >
+                  <div
+                    class="dropdown-menu w-100 shadow-sm"
+                    id="customer-search-results"
+                    aria-label="Customer search results"
+                    style="max-height: 280px; overflow-y: auto;"
+                  ></div>
+                </div>
+                <div class="form-text">
+                  Поиск по имени, телефону, email или номеру удостоверения. Минимум 2 символа.
+                </div>
+                <div class="small text-muted mt-1" id="customer-selected-summary">
+                  {% if customer_initial_label %}{{ customer_initial_label }}{% else %}Клиент не выбран{% endif %}
+                </div>
                 {% for error in form.customer.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
 
@@ -83,6 +106,158 @@
                 <div class="small text-muted" id="price-summary-text">Выберите авто и даты аренды.</div>
               </div>
             </div>
+
+            <script>
+              (function() {
+                const searchInput = document.getElementById("customer-search");
+                const resultsMenu = document.getElementById("customer-search-results");
+                const hiddenField = document.getElementById("id_customer");
+                const summary = document.getElementById("customer-selected-summary");
+                const searchUrl = searchInput?.dataset.searchUrl;
+                const initialLabel = searchInput?.dataset.initialLabel;
+                let debounceTimer = null;
+                let activeRequest = null;
+                let lastSelectedLabel = initialLabel && hiddenField?.value ? initialLabel : "";
+
+                if (!searchInput || !resultsMenu || !hiddenField || !searchUrl) {
+                  return;
+                }
+
+                function setSummary(text, highlight = false) {
+                  if (!summary) return;
+                  summary.textContent = text;
+                  summary.classList.toggle("text-danger", highlight);
+                }
+
+                function clearResults() {
+                  resultsMenu.innerHTML = "";
+                  resultsMenu.classList.remove("show");
+                }
+
+                function selectCustomer(item) {
+                  if (!item) return;
+                  hiddenField.value = item.id;
+                  const parts = [item.name, item.phone].filter(Boolean);
+                  const label = parts.join(" · ") || item.name;
+                  searchInput.value = item.name;
+                  lastSelectedLabel = label;
+                  setSummary(label);
+                  clearResults();
+                }
+
+                function renderResults(items) {
+                  clearResults();
+                  if (!items.length) {
+                    const empty = document.createElement("div");
+                    empty.className = "dropdown-item text-muted small";
+                    empty.textContent = "Ничего не найдено";
+                    resultsMenu.appendChild(empty);
+                    resultsMenu.classList.add("show");
+                    return;
+                  }
+
+                  items.forEach((item) => {
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.className = "dropdown-item text-wrap";
+                    btn.dataset.id = item.id;
+
+                    btn.addEventListener("click", () => selectCustomer(item));
+
+                    const title = document.createElement("div");
+                    title.className = "fw-semibold";
+                    title.textContent = item.name;
+
+                    const meta = document.createElement("div");
+                    meta.className = "small text-muted";
+                    const metaParts = [item.phone, item.email, item.license_number].filter(Boolean);
+                    meta.textContent = metaParts.join(" • ");
+
+                    btn.appendChild(title);
+                    btn.appendChild(meta);
+                    resultsMenu.appendChild(btn);
+                  });
+
+                  resultsMenu.classList.add("show");
+                }
+
+                function fetchResults(term) {
+                  if (!term) return;
+
+                  if (activeRequest) {
+                    activeRequest.abort();
+                  }
+
+                  const controller = new AbortController();
+                  activeRequest = controller;
+
+                  resultsMenu.innerHTML = '<span class="dropdown-item text-muted small">Ищем...</span>';
+                  resultsMenu.classList.add("show");
+
+                  fetch(`${searchUrl}?q=${encodeURIComponent(term)}`, { signal: controller.signal })
+                    .then((response) => (response.ok ? response.json() : Promise.reject()))
+                    .then((data) => {
+                      if (controller.signal.aborted) return;
+                      renderResults((data && data.results) || []);
+                    })
+                    .catch(() => {
+                      if (controller.signal.aborted) return;
+                      clearResults();
+                      setSummary("Не удалось загрузить клиентов. Попробуйте ещё раз.", true);
+                    })
+                    .finally(() => {
+                      if (activeRequest === controller) {
+                        activeRequest = null;
+                      }
+                    });
+                }
+
+                function handleInput() {
+                  const term = searchInput.value.trim();
+                  if (term !== lastSelectedLabel && hiddenField.value) {
+                    hiddenField.value = "";
+                  }
+
+                  if (term.length < 2) {
+                    clearResults();
+                    if (!hiddenField.value) {
+                      setSummary("Введите минимум 2 символа для поиска.", true);
+                    }
+                    return;
+                  }
+
+                  setSummary("Выберите клиента из результатов поиска.");
+
+                  if (debounceTimer) {
+                    window.clearTimeout(debounceTimer);
+                  }
+                  debounceTimer = window.setTimeout(() => fetchResults(term), 180);
+                }
+
+                searchInput.addEventListener("input", handleInput);
+                searchInput.addEventListener("focus", () => {
+                  if (resultsMenu.innerHTML.trim()) {
+                    resultsMenu.classList.add("show");
+                  }
+                });
+
+                document.addEventListener("click", (event) => {
+                  if (event.target === searchInput || resultsMenu.contains(event.target)) {
+                    return;
+                  }
+                  clearResults();
+                });
+
+                if (initialLabel && hiddenField.value) {
+                  searchInput.value = initialLabel;
+                  setSummary(initialLabel);
+                } else if (hiddenField.value) {
+                  setSummary("Клиент выбран");
+                } else {
+                  setSummary("Введите минимум 2 символа для поиска.", true);
+                }
+              })();
+            </script>
 
             {% if car_pricing %}
               {{ car_pricing|json_script:"car-pricing-data" }}

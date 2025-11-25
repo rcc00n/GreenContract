@@ -12,6 +12,7 @@ urlpatterns = [
     path("cars/export/", views.export_cars_csv, name="export_cars_csv"),
     path("cars/import/", views.import_cars_csv, name="import_cars_csv"),
     path("customers/", views.CustomerListView.as_view(), name="customer_list"),
+    path("customers/search/", views.customer_search, name="customer_search"),
     path("customers/new/", views.CustomerCreateView.as_view(), name="customer_create"),
     path("customers/<int:pk>/edit/", views.CustomerUpdateView.as_view(), name="customer_update"),
     path("customers/export/", views.export_customers_csv, name="export_customers_csv"),

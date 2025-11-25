@@ -10,7 +10,8 @@ except ImportError:  # pragma: no cover - dependency installed via requirements
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.decorators import method_decorator
@@ -475,6 +476,7 @@ class RentalCreateView(CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["car_pricing"] = [_serialize_car_pricing(car) for car in Car.objects.all()]
+        context["customer_initial_label"] = getattr(context.get("form"), "initial_customer_label", "")
         return context
 
 
@@ -488,6 +490,7 @@ class RentalUpdateView(UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["car_pricing"] = [_serialize_car_pricing(car) for car in Car.objects.all()]
+        context["customer_initial_label"] = getattr(context.get("form"), "initial_customer_label", "")
         return context
 
 
@@ -511,6 +514,52 @@ class ContractTemplateUpdateView(UpdateView):
     form_class = ContractTemplateForm
     template_name = "rentals/contract_template_form.html"
     success_url = reverse_lazy("rentals:contract_template_list")
+
+
+@login_required
+def customer_search(request):
+    """
+    Lightweight lookup endpoint for customer search. Returns a small JSON payload
+    with the matching customers to power the async selector on the rental form.
+    """
+
+    term = (request.GET.get("q") or "").strip()
+    try:
+        limit = int(request.GET.get("limit", 15))
+    except (TypeError, ValueError):
+        limit = 15
+
+    limit = max(1, min(limit, 50))
+
+    if not term:
+        return JsonResponse({"results": []})
+
+    matches = (
+        Customer.objects.filter(
+            Q(full_name__icontains=term)
+            | Q(phone__icontains=term)
+            | Q(email__icontains=term)
+            | Q(license_number__icontains=term)
+        )
+        .order_by("full_name")
+        [:limit]
+    )
+
+    results = []
+    for customer in matches:
+        phone = customer.phone or ""
+        label = f"{customer.full_name}{f' · {phone}' if phone else ''}"
+        results.append(
+            {
+                "id": customer.id,
+                "name": customer.full_name,
+                "phone": phone,
+                "email": customer.email or "",
+                "license_number": customer.license_number,
+                "label": label,
+            }
+        )
+    return JsonResponse({"results": results})
 
 
 @login_required

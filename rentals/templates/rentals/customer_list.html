@@ -18,6 +18,7 @@
       <table class="table align-middle mb-0">
         <thead class="table-light">
           <tr>
+            <th class="text-muted small" style="width: 70px;">#</th>
             <th>Name</th>
             <th>Email</th>
             <th>Phone</th>
@@ -29,6 +30,13 @@
         <tbody>
           {% for customer in object_list %}
             <tr>
+              {% if page_obj %}
+                {% with row_number=page_obj.start_index|add:forloop.counter0 %}
+                  <td class="text-muted small">{{ row_number }}</td>
+                {% endwith %}
+              {% else %}
+                <td class="text-muted small">{{ forloop.counter }}</td>
+              {% endif %}
               <td>{{ customer.full_name }}</td>
               <td>{{ customer.email|default:"-" }}</td>
               <td>{{ customer.phone }}</td>
@@ -40,11 +48,68 @@
             </tr>
           {% empty %}
             <tr>
-              <td colspan="6" class="text-center text-muted py-4">No customers yet. Add your first driver profile.</td>
+              <td colspan="7" class="text-center text-muted py-4">No customers yet. Add your first driver profile.</td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    {% if page_obj %}
+      <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between p-3 border-top">
+        <div class="d-flex align-items-center gap-2">
+          <span class="text-muted small">Rows per page</span>
+          <form method="get" class="d-flex align-items-center gap-2">
+            <input type="hidden" name="page" value="1">
+            <select name="page_size" class="form-select form-select-sm" onchange="this.form.submit()">
+              {% for size in page_size_options %}
+                <option value="{{ size }}" {% if size == current_page_size %}selected{% endif %}>{{ size }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-3">
+          <span class="text-muted small">
+            Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }}
+          </span>
+          {% with page_size=page_obj.paginator.per_page %}
+            <nav aria-label="Customers pagination">
+              <ul class="pagination pagination-sm mb-0">
+                <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                  {% if page_obj.has_previous %}
+                    <a class="page-link" href="?page=1&page_size={{ page_size }}" aria-label="First">&laquo;</a>
+                  {% else %}
+                    <span class="page-link">&laquo;</span>
+                  {% endif %}
+                </li>
+                <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                  {% if page_obj.has_previous %}
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}&page_size={{ page_size }}" aria-label="Previous">&lsaquo;</a>
+                  {% else %}
+                    <span class="page-link">&lsaquo;</span>
+                  {% endif %}
+                </li>
+                <li class="page-item disabled">
+                  <span class="page-link text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                </li>
+                <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                  {% if page_obj.has_next %}
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}&page_size={{ page_size }}" aria-label="Next">&rsaquo;</a>
+                  {% else %}
+                    <span class="page-link">&rsaquo;</span>
+                  {% endif %}
+                </li>
+                <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                  {% if page_obj.has_next %}
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&page_size={{ page_size }}" aria-label="Last">&raquo;</a>
+                  {% else %}
+                    <span class="page-link">&raquo;</span>
+                  {% endif %}
+                </li>
+              </ul>
+            </nav>
+          {% endwith %}
+        </div>
+      </div>
+    {% endif %}
   </div>
 {% endblock %}

@@ -14,3 +14,33 @@ body {
   font-weight: 700;
   letter-spacing: 0.3px;
 }
+
+.hero-card {
+  background: linear-gradient(135deg, #1f3b73 0%, #355ca8 55%, #4c8bf5 100%);
+  color: #fff;
+}
+
+.hero-card .btn-light {
+  color: #1f3b73;
+  font-weight: 600;
+}
+
+.hero-card .btn-outline-light {
+  border-color: rgba(255, 255, 255, 0.65);
+  color: #fff;
+}
+
+.hero-card .btn-outline-light:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.chart-wrapper {
+  position: relative;
+  min-height: 240px;
+}
+
+.badge.bg-primary-subtle,
+.badge.bg-secondary-subtle {
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}

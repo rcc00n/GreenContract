@@ -1,4 +1,5 @@
 import csv
+import re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
@@ -20,7 +21,17 @@ from .forms import CarForm, ContractTemplateForm, CustomerForm, RentalForm
 from .models import Car, ContractTemplate, Customer, Rental
 from .services.contract_renderer import render_docx, render_html_template
 from .services.pricing import calculate_rental_pricing
-from .services.stats import car_utilization, rentals_summary
+from .services.stats import (
+    car_utilization,
+    monthly_rental_performance,
+    rental_status_breakdown,
+    rentals_summary,
+)
+
+PHONE_MAX_LEN = Customer._meta.get_field("phone").max_length
+LICENSE_MAX_LEN = Customer._meta.get_field("license_number").max_length
+NAME_MAX_LEN = Customer._meta.get_field("full_name").max_length
+EMAIL_MAX_LEN = Customer._meta.get_field("email").max_length
 
 
 def _parse_bool(value):
@@ -60,6 +71,48 @@ def _pick_value(row, keys):
             if value not in ("", None):
                 return value
     return None
+
+
+def _clean_text_value(value):
+    """
+    Convert CSV/Excel cell values into cleaned strings.
+
+    Treat ".", "-" and empty cells as missing.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    text = str(value).strip()
+    return "" if text in {"", ".", "-"} else text
+
+
+def _limit_length(value: str | None, max_len: int):
+    if value is None:
+        return None
+    return str(value)[:max_len]
+
+
+def _clean_phone_value(value):
+    """
+    Normalize phone numbers:
+    - split on comma/semicolon/slash/newline, take first non-empty
+    - keep digits and leading '+'
+    - truncate to DB max length
+    """
+    raw = _clean_text_value(value)
+    if not raw:
+        return ""
+
+    parts = re.split(r"[;,/\n\r]+", raw)
+    for part in parts:
+        cleaned = re.sub(r"[^0-9+]", "", part)
+        if cleaned:
+            if cleaned[0] != "+" and part.strip().startswith("+"):
+                cleaned = "+" + cleaned
+            return _limit_length(cleaned, PHONE_MAX_LEN)
+
+    return _limit_length(raw, PHONE_MAX_LEN)
 
 
 def _serialize_car_pricing(car: Car):
@@ -217,10 +270,106 @@ def _normalize_car_row(row):
     }
 
 
+def _normalize_customer_row(row, row_index: int):
+    """Normalize AmoCRM CSV/XLSX export rows into Customer fields."""
+
+    def pick(keys):
+        for key in keys:
+            if key in row:
+                cleaned = _clean_text_value(row[key])
+                if cleaned:
+                    return cleaned
+        return ""
+
+    crm_id = pick(["ID", "Id", "id"])
+
+    full_name = pick(["full_name", "Full name", "fullname", "ФИО", "fio", "Наименование"])
+    first_name = pick(["Имя", "First name", "first_name"])
+    last_name = pick(["Фамилия", "Last name", "last_name"])
+
+    if not full_name:
+        full_name = " ".join(part for part in (first_name, last_name) if part)
+    if not full_name and crm_id:
+        full_name = f"Без имени {crm_id}"
+    if not full_name:
+        full_name = f"Без имени #{row_index}"
+    full_name = _limit_length(full_name, NAME_MAX_LEN)
+
+    raw_phone = pick(
+        [
+            "phone",
+            "Phone",
+            "Телефон",
+            "Телефон (контакт)",
+            "Мобильный телефон",
+            "Рабочий телефон",
+            "Рабочий прямой телефон",
+            "Домашний телефон",
+            "Другой телефон",
+        ]
+    )
+    cleaned_phone = _clean_phone_value(raw_phone)
+    phone = cleaned_phone or _limit_length(f"Нет телефона ({crm_id or row_index})", PHONE_MAX_LEN)
+
+    license_candidate = pick(
+        [
+            "license_number",
+            "License number",
+            "Водит. удостоверение. (контакт)",
+            "Паспорт (контакт)",
+            "Контракт (контакт)",
+        ]
+    )
+    license_number = (
+        license_candidate
+        or (crm_id and f"AMO-{crm_id}")
+        or (cleaned_phone and f"PHONE-{cleaned_phone}")
+        or f"AUTO-{row_index}"
+    )
+    license_number = _limit_length(license_number, LICENSE_MAX_LEN)
+
+    email = _limit_length(
+        pick(["email", "Email", "Рабочий email", "Личный email", "Другой email"]), EMAIL_MAX_LEN
+    )
+    address = pick(["Адрес (контакт)", "Адрес (компания)", "address", "Address"])
+
+    return {
+        "full_name": full_name,
+        "email": email or None,
+        "phone": phone,
+        "license_number": license_number,
+        "address": address or None,
+    }
+
+
 @login_required
 def dashboard(request):
     summary = rentals_summary()
     utilization = car_utilization()[:5]
+    monthly_trend = monthly_rental_performance()
+    status_counts = rental_status_breakdown()
+    status_order = [code for code, _ in Rental.STATUS_CHOICES]
+    status_labels = dict(Rental.STATUS_CHOICES)
+
+    chart_payload = {
+        "trend": {
+            "labels": [item["label"] for item in monthly_trend],
+            "revenue": [float(item["revenue"] or 0) for item in monthly_trend],
+            "counts": [item["count"] for item in monthly_trend],
+        },
+        "status": {
+            "labels": [status_labels[code] for code in status_order],
+            "counts": [status_counts.get(code, 0) for code in status_order],
+        },
+        "topCars": {
+            "labels": [
+                f"{car['car__plate_number']} | {car['car__make']} {car['car__model']}".strip()
+                for car in utilization
+            ],
+            "revenue": [float(car.get("revenue") or 0) for car in utilization],
+            "counts": [car.get("num_rentals", 0) for car in utilization],
+        },
+    }
 
     context = {
         "cars_count": Car.objects.count(),
@@ -230,6 +379,7 @@ def dashboard(request):
         "total_rentals": summary["total_rentals"],
         "completed_rentals": summary["completed_rentals"],
         "top_cars": utilization,
+        "chart_payload": chart_payload,
     }
     return render(request, "rentals/dashboard.html", context)
 
@@ -260,6 +410,28 @@ class CarUpdateView(UpdateView):
 class CustomerListView(ListView):
     model = Customer
     template_name = "rentals/customer_list.html"
+    ordering = ["id"]
+    paginate_by = 25
+    page_size_options = (25, 50)
+
+    def get_paginate_by(self, queryset):
+        if hasattr(self, "_page_size"):
+            return self._page_size
+
+        raw_size = self.request.GET.get("page_size")
+        try:
+            size = int(raw_size)
+        except (TypeError, ValueError):
+            size = None
+
+        self._page_size = size if size in self.page_size_options else self.paginate_by
+        return self._page_size
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["page_size_options"] = self.page_size_options
+        context["current_page_size"] = getattr(self, "_page_size", self.paginate_by)
+        return context
 
 
 @method_decorator(login_required, name="dispatch")
@@ -562,36 +734,90 @@ def import_customers_csv(request):
     if request.method == "POST":
         upload = request.FILES.get("file")
         if not upload:
-            messages.error(request, "Please choose a CSV file to upload.")
+            messages.error(request, "Please choose a CSV or Excel file to upload.")
         else:
-            decoded = upload.read().decode("utf-8-sig").splitlines()
-            reader = csv.DictReader(decoded)
-            imported, skipped = 0, 0
+            try:
+                rows = _load_rows(upload)
+            except Exception as exc:  # noqa: BLE001 - show error to user
+                messages.error(request, f"Could not read file: {exc}")
+                return redirect("rentals:import_customers_csv")
 
-            for row in reader:
-                full_name = (row.get("full_name") or "").strip()
-                license_number = (row.get("license_number") or "").strip()
-                phone = (row.get("phone") or "").strip()
+            if not rows:
+                messages.warning(request, "File is empty or missing rows.")
+                return redirect("rentals:import_customers_csv")
 
-                if not all([full_name, license_number, phone]):
-                    skipped += 1
+            created_count, updated_count, skipped_empty = 0, 0, 0
+            normalized_rows = []
+            for idx, row in enumerate(rows, start=1):
+                if not any(_clean_text_value(value) for value in row.values()):
+                    skipped_empty += 1
                     continue
 
-                Customer.objects.update_or_create(
-                    license_number=license_number,
-                    defaults={
-                        "full_name": full_name,
-                        "email": (row.get("email") or "").strip() or None,
-                        "phone": phone,
-                        "address": (row.get("address") or "").strip() or None,
-                    },
+                normalized = _normalize_customer_row(row, idx)
+                normalized_rows.append(normalized)
+
+            if not normalized_rows:
+                messages.warning(request, "No valid rows found in file.")
+                return redirect("rentals:import_customers_csv")
+
+            # Deduplicate by license number inside the upload.
+            by_license = {}
+            duplicate_rows = 0
+            for item in normalized_rows:
+                key = item["license_number"]
+                if key in by_license:
+                    duplicate_rows += 1
+                by_license[key] = item
+
+            licenses = list(by_license.keys())
+            existing = {
+                c.license_number: c
+                for c in Customer.objects.filter(license_number__in=licenses)
+            }
+
+            to_create = []
+            to_update = []
+            for license_number, data in by_license.items():
+                if license_number in existing:
+                    customer = existing[license_number]
+                    changed = False
+                    for field in ("full_name", "email", "phone", "address"):
+                        new_value = data[field]
+                        if getattr(customer, field) != new_value:
+                            setattr(customer, field, new_value)
+                            changed = True
+                    if changed:
+                        to_update.append(customer)
+                else:
+                    to_create.append(Customer(**data))
+
+            if to_create:
+                Customer.objects.bulk_create(to_create, batch_size=500)
+                created_count = len(to_create)
+            if to_update:
+                Customer.objects.bulk_update(
+                    to_update, ["full_name", "email", "phone", "address"], batch_size=500
                 )
-                imported += 1
+                updated_count = len(to_update)
+
+            imported = created_count + updated_count
 
             if imported:
-                messages.success(request, f"Imported {imported} customers.")
-            if skipped:
-                messages.warning(request, f"Skipped {skipped} rows due to missing required fields.")
+                messages.success(
+                    request,
+                    f"Imported {imported} customers "
+                    f"({created_count} created, {updated_count} updated). Missing fields were auto-filled.",
+                )
+            if skipped_empty:
+                messages.info(
+                    request,
+                    f"Skipped {skipped_empty} completely empty rows.",
+                )
+            if duplicate_rows:
+                messages.info(
+                    request,
+                    f"Deduplicated {duplicate_rows} rows with the same license number inside the file.",
+                )
 
             return redirect("rentals:customer_list")
 
@@ -600,8 +826,17 @@ def import_customers_csv(request):
         "rentals/import_csv.html",
         {
             "title": "Import customers",
-            "expected_headers": ["full_name", "email", "phone", "license_number", "address"],
-            "help_text": "Existing license numbers will be updated with the new values.",
+            "expected_headers": [
+                "full_name / Наименование",
+                "Имя",
+                "Фамилия",
+                "phone / Телефон (контакт) / Мобильный телефон / Рабочий телефон",
+                "license_number / Водит. удостоверение. (контакт)",
+                "email (рабочий/личный/другой)",
+                "Адрес (контакт) / Адрес (компания)",
+                "ID (используется как резервный идентификатор)",
+            ],
+            "help_text": "Upload CSV or Excel (.xls, .xlsx). Rows will be matched by license number, otherwise AmoCRM ID/phone. Missing fields are filled automatically instead of skipping rows.",
             "back_url": reverse("rentals:customer_list"),
         },
     )
@@ -711,7 +946,7 @@ def generate_contract(request, rental_id, template_id):
 
     if ct.format == "html":
         html = render_html_template(ct, rental)
-        response = HttpResponse(html, content_type="text/html")
+        response = HttpResponse(html, content_type="text/html; charset=utf-8")
         return response
 
     elif ct.format == "docx":

@@ -16,10 +16,10 @@
       <form method="post" enctype="multipart/form-data" class="d-flex flex-column gap-3">
         {% csrf_token %}
         <div>
-          <label class="form-label">CSV file</label>
+          <label class="form-label">CSV or Excel file</label>
           <input type="file" name="file" accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel" class="form-control" required>
           <div class="form-text">
-            Upload a UTF-8 CSV or Excel .xls file. Each row will create or update a record using the unique field described below.
+            Upload a UTF-8 CSV or Excel file (.xls, .xlsx). Each row will create or update a record using the unique field described below.
           </div>
         </div>
 

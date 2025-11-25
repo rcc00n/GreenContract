@@ -1,12 +1,33 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-      <h1 class="h4 mb-0">Dashboard</h1>
-      <p class="text-muted small mb-0">Snapshot of fleet health and current bookings.</p>
+  <div class="card hero-card shadow-sm mb-4">
+    <div class="card-body d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-4">
+      <div>
+        <p class="text-uppercase text-white-50 fw-semibold small mb-1">Fleet pulse</p>
+        <h1 class="h4 text-white mb-2">Dashboard</h1>
+        <p class="text-white-50 mb-0">Quick view of bookings, utilization, and revenue.</p>
+      </div>
+      <div class="d-flex gap-4 text-white">
+        <div>
+          <div class="text-uppercase small text-white-50 mb-1">Active now</div>
+          <div class="fs-3 fw-bold">{{ active_rentals }}</div>
+        </div>
+        <div>
+          <div class="text-uppercase small text-white-50 mb-1">Completed</div>
+          <div class="fs-3 fw-bold">{{ completed_rentals }}</div>
+        </div>
+        <div>
+          <div class="text-uppercase small text-white-50 mb-1">Revenue</div>
+          <div class="fs-3 fw-bold">${{ total_revenue|floatformat:2 }}</div>
+        </div>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <a href="{% url 'rentals:rental_create' %}" class="btn btn-light btn-sm">New rental</a>
+        <a href="{% url 'rentals:car_create' %}" class="btn btn-outline-light btn-sm">Add car</a>
+        <a href="{% url 'rentals:export_rentals_csv' %}" class="btn btn-outline-light btn-sm">Export CSV</a>
+      </div>
     </div>
-    <a href="{% url 'rentals:export_rentals_csv' %}" class="btn btn-outline-secondary">Export rentals CSV</a>
   </div>
 
   <div class="row g-3 mb-4">
@@ -60,6 +81,42 @@
     </div>
   </div>
 
+  <div class="row g-3 mb-4">
+    <div class="col-lg-8">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h2 class="h5 mb-0">Performance trend</h2>
+              <p class="text-muted small mb-0">Bookings and revenue by month.</p>
+            </div>
+            <span class="badge bg-primary-subtle text-primary">Last 6 months</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="trendChart" height="320" aria-label="Monthly performance chart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-body d-flex flex-column gap-3">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <h2 class="h6 mb-1">Status mix</h2>
+              <p class="text-muted small mb-0">Live split of every rental.</p>
+            </div>
+            <span class="badge bg-secondary-subtle text-secondary">Live</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="statusChart" height="260" aria-label="Rental status chart"></canvas>
+          </div>
+          <p class="text-muted small mb-0">See where to focus first: drafts to finalize, active trips, or completed hand-offs.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="row g-3">
     <div class="col-lg-8">
       <div class="card shadow-sm h-100">
@@ -70,6 +127,10 @@
               <p class="text-muted small mb-0">Last 5 by count of completed rentals.</p>
             </div>
             <a href="{% url 'rentals:car_list' %}" class="btn btn-outline-secondary btn-sm">View cars</a>
+          </div>
+
+          <div class="chart-wrapper mb-3">
+            <canvas id="topCarsChart" height="240" aria-label="Top cars chart"></canvas>
           </div>
 
           <div class="table-responsive">
@@ -132,4 +193,177 @@
       </div>
     </div>
   </div>
+
+  {{ chart_payload|json_script:"dashboard-chart-data" }}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+    (() => {
+      const chartDataEl = document.getElementById("dashboard-chart-data");
+      if (!chartDataEl) return;
+
+      const chartData = JSON.parse(chartDataEl.textContent);
+      const neutralGrid = "#eef1f7";
+      const textColor = "#4a5568";
+
+      const currency = new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 0,
+      });
+
+      const trendCtx = document.getElementById("trendChart");
+      if (trendCtx && chartData.trend) {
+        new Chart(trendCtx, {
+          type: "bar",
+          data: {
+            labels: chartData.trend.labels,
+            datasets: [
+              {
+                type: "line",
+                label: "Revenue",
+                data: chartData.trend.revenue,
+                borderColor: "#4c8bf5",
+                backgroundColor: "rgba(76, 139, 245, 0.12)",
+                tension: 0.35,
+                fill: true,
+                yAxisID: "y1",
+              },
+              {
+                label: "Bookings",
+                data: chartData.trend.counts,
+                backgroundColor: "#7bdcb5",
+                borderWidth: 0,
+                yAxisID: "y",
+                maxBarThickness: 36,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                ticks: { color: textColor },
+                grid: { display: false },
+              },
+              y: {
+                beginAtZero: true,
+                ticks: { color: textColor },
+                grid: { color: neutralGrid },
+              },
+              y1: {
+                position: "right",
+                beginAtZero: true,
+                ticks: {
+                  color: textColor,
+                  callback: (value) => currency.format(value),
+                },
+                grid: { drawOnChartArea: false },
+              },
+            },
+            plugins: {
+              legend: {
+                labels: { color: textColor },
+              },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => {
+                    if (ctx.dataset.label === "Revenue") {
+                      return `${ctx.dataset.label}: ${currency.format(ctx.parsed.y)}`;
+                    }
+                    return `${ctx.dataset.label}: ${ctx.parsed.y}`;
+                  },
+                },
+              },
+            },
+          },
+        });
+      }
+
+      const statusCtx = document.getElementById("statusChart");
+      if (statusCtx && chartData.status) {
+        new Chart(statusCtx, {
+          type: "doughnut",
+          data: {
+            labels: chartData.status.labels,
+            datasets: [
+              {
+                data: chartData.status.counts,
+                backgroundColor: ["#4c8bf5", "#7bdcb5", "#f4b000", "#ef5350"],
+                borderWidth: 0,
+              },
+            ],
+          },
+          options: {
+            cutout: "60%",
+            plugins: {
+              legend: { position: "bottom", labels: { color: textColor } },
+            },
+          },
+        });
+      }
+
+      const topCarsCtx = document.getElementById("topCarsChart");
+      if (topCarsCtx && chartData.topCars) {
+        new Chart(topCarsCtx, {
+          type: "bar",
+          data: {
+            labels: chartData.topCars.labels,
+            datasets: [
+              {
+                label: "Revenue",
+                data: chartData.topCars.revenue,
+                backgroundColor: "#4c8bf5",
+                xAxisID: "x",
+                maxBarThickness: 24,
+              },
+              {
+                label: "Completed",
+                data: chartData.topCars.counts,
+                backgroundColor: "#7bdcb5",
+                xAxisID: "x1",
+                maxBarThickness: 24,
+              },
+            ],
+          },
+          options: {
+            indexAxis: "y",
+            responsive: true,
+            scales: {
+              x: {
+                beginAtZero: true,
+                ticks: { color: textColor },
+                grid: { color: neutralGrid },
+                title: { display: true, text: "Revenue ($)", color: textColor },
+              },
+              x1: {
+                position: "top",
+                beginAtZero: true,
+                ticks: { color: textColor },
+                grid: { display: false },
+                title: { display: true, text: "Completed", color: textColor },
+              },
+              y: {
+                ticks: { color: textColor },
+                grid: { display: false },
+              },
+            },
+            plugins: {
+              legend: { labels: { color: textColor } },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => {
+                    if (ctx.dataset.label === "Revenue") {
+                      return `${ctx.dataset.label}: ${currency.format(ctx.parsed.x)}`;
+                    }
+                    return `${ctx.dataset.label}: ${ctx.parsed.x}`;
+                  },
+                },
+              },
+            },
+          },
+        });
+      }
+    })();
+  </script>
 {% endblock %}

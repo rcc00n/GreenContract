@@ -4,14 +4,83 @@
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
       <h1 class="h4 mb-0">Customers</h1>
-      <p class="text-muted small mb-0">Driver profiles with contact and license details.</p>
+      <p class="text-muted small mb-0">Driver dossiers with contacts, passport data, addresses, and tags.</p>
     </div>
     <div class="d-flex flex-wrap gap-2">
+      <form method="post" action="{% url 'rentals:customer_delete_all' %}" class="d-inline">
+        {% csrf_token %}
+        <button
+          type="submit"
+          class="btn btn-outline-danger"
+          onclick="return confirm('Delete all customers without rentals?');"
+        >
+          Delete all
+        </button>
+      </form>
       <a href="{% url 'rentals:import_customers_csv' %}" class="btn btn-outline-secondary">Import CSV</a>
       <a href="{% url 'rentals:export_customers_csv' %}" class="btn btn-outline-secondary">Export CSV</a>
       <a href="{% url 'rentals:customer_create' %}" class="btn btn-primary">Add customer</a>
     </div>
   </div>
+
+  <form method="get" id="customerFilterForm" class="card shadow-sm mb-3">
+    <div class="card-body">
+      <div class="row g-3 align-items-end">
+        <div class="col-lg-6">
+          <label class="form-label fw-semibold" for="customerSearchInput">Search</label>
+          <div class="input-group">
+            <span class="input-group-text text-muted">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="7"></circle>
+                <path d="m16.5 16.5 3.5 3.5"></path>
+              </svg>
+            </span>
+            <input
+              type="search"
+              class="form-control"
+              id="customerSearchInput"
+              name="q"
+              value="{{ search_query }}"
+              placeholder="Имя, телефон, email, права, паспорт, адрес или тег"
+              autocomplete="off"
+            >
+            <input type="hidden" name="page" value="1">
+            <input type="hidden" name="page_size" value="{{ current_page_size }}">
+          </div>
+          <div class="form-text text-muted small">
+            Поиск сразу по нескольким атрибутам: ФИО, телефон, email, номер прав, паспорт, адреса, теги и заметки.
+            Вводите несколько слов — фильтр применится автоматически.
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <label class="form-label fw-semibold">Tags</label>
+          <div class="d-flex flex-wrap gap-2">
+            {% for tag in available_tags %}
+              <div class="form-check form-check-inline">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  name="tag"
+                  id="tag-{{ tag.id }}"
+                  value="{{ tag.id }}"
+                  {% if tag.id in active_tags %}checked{% endif %}
+                >
+                <label class="form-check-label" for="tag-{{ tag.id }}">{{ tag.name }}</label>
+              </div>
+            {% empty %}
+              <div class="text-muted small">Добавьте теги в карточке клиента, чтобы строить выборки.</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="d-flex justify-content-end gap-2 mt-3">
+        {% if filters_active %}
+          <a class="btn btn-outline-secondary" href="{% url 'rentals:customer_list' %}">Сбросить</a>
+        {% endif %}
+        <button class="btn btn-primary" type="submit">Применить</button>
+      </div>
+    </div>
+  </form>
 
   <div class="card shadow-sm">
     <div class="table-responsive">
@@ -19,17 +88,27 @@
         <thead class="table-light">
           <tr>
             <th class="text-muted small" style="width: 70px;">#</th>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Phone</th>
-            <th>License #</th>
-            <th>Address</th>
+            <th>Customer</th>
+            <th>Contacts</th>
+            <th>Documents</th>
+            <th>Addresses</th>
             <th class="text-end">Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for customer in object_list %}
-            <tr>
+            {% with tags=customer.tags.all %}
+            <tr data-search-text="
+                {{ customer.full_name }}
+                {{ customer.phone }}
+                {{ customer.email }}
+                {{ customer.license_number }}
+                {{ customer.passport_series }} {{ customer.passport_number }}
+                {{ customer.passport_issued_by }}
+                {{ customer.address }} {{ customer.registration_address }} {{ customer.residence_address }}
+                {{ customer.notes }}
+                {% for tag in tags %}{{ tag.name }} {% endfor %}
+              ">
               {% if page_obj %}
                 {% with row_number=page_obj.start_index|add:forloop.counter0 %}
                   <td class="text-muted small">{{ row_number }}</td>
@@ -37,18 +116,76 @@
               {% else %}
                 <td class="text-muted small">{{ forloop.counter }}</td>
               {% endif %}
-              <td>{{ customer.full_name }}</td>
-              <td>{{ customer.email|default:"-" }}</td>
-              <td>{{ customer.phone }}</td>
-              <td>{{ customer.license_number }}</td>
-              <td class="text-muted">{{ customer.address|default:"-"|truncatechars:40 }}</td>
+              <td>
+                <div class="fw-semibold">{{ customer.full_name }}</div>
+                <div class="text-muted small">License {{ customer.license_number }}</div>
+                {% if tags %}
+                  <div class="d-flex flex-wrap gap-1 mt-1">
+                    {% for tag in tags %}
+                      <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle">{{ tag.name }}</span>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+                {% if customer.notes %}
+                  <div class="text-muted small mt-1">Note: {{ customer.notes|truncatechars:80 }}</div>
+                {% endif %}
+              </td>
+              <td>
+                <div class="fw-semibold">{{ customer.phone }}</div>
+                <div class="text-muted small">{{ customer.email|default:"—" }}</div>
+              </td>
+              <td class="small">
+                <div class="fw-semibold">
+                  Passport:
+                  {% if customer.passport_series or customer.passport_number %}
+                    {{ customer.passport_series|default:"" }} {{ customer.passport_number|default:"" }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </div>
+                <div class="text-muted">
+                  {% if customer.passport_issued_by or customer.passport_issue_date %}
+                    {{ customer.passport_issued_by|default:"Кем выдан не заполнено" }}
+                    {% if customer.passport_issue_date %} · {{ customer.passport_issue_date|date:"Y-m-d" }}{% endif %}
+                  {% else %}
+                    Issued data not set
+                  {% endif %}
+                </div>
+              </td>
+              <td class="small text-muted">
+                {% if customer.address %}<div>Адрес: {{ customer.address|truncatechars:70 }}</div>{% endif %}
+                {% if customer.residence_address %}<div>Проживание: {{ customer.residence_address|truncatechars:70 }}</div>{% endif %}
+                {% if customer.registration_address %}<div>Прописка: {{ customer.registration_address|truncatechars:70 }}</div>{% endif %}
+                {% if not customer.address and not customer.registration_address and not customer.residence_address %}
+                  <div>—</div>
+                {% endif %}
+              </td>
               <td class="text-end">
-                <a href="{% url 'rentals:customer_update' customer.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                <div class="d-inline-flex gap-2 justify-content-end">
+                  <a href="{% url 'rentals:customer_update' customer.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                  <form method="post" action="{% url 'rentals:customer_delete' customer.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <button
+                      type="submit"
+                      class="btn btn-sm btn-outline-danger"
+                      onclick="return confirm('Delete {{ customer.full_name }}?');"
+                    >
+                      Delete
+                    </button>
+                  </form>
+                </div>
               </td>
             </tr>
+            {% endwith %}
           {% empty %}
             <tr>
-              <td colspan="7" class="text-center text-muted py-4">No customers yet. Add your first driver profile.</td>
+              <td colspan="6" class="text-center text-muted py-4">
+                {% if filters_active %}
+                  No customers match current filters yet.
+                {% else %}
+                  No customers yet. Add your first driver profile.
+                {% endif %}
+              </td>
             </tr>
           {% endfor %}
         </tbody>
@@ -60,6 +197,12 @@
           <span class="text-muted small">Rows per page</span>
           <form method="get" class="d-flex align-items-center gap-2">
             <input type="hidden" name="page" value="1">
+            {% if search_query %}
+              <input type="hidden" name="q" value="{{ search_query }}">
+            {% endif %}
+            {% for tag_id in active_tags %}
+              <input type="hidden" name="tag" value="{{ tag_id }}">
+            {% endfor %}
             <select name="page_size" class="form-select form-select-sm" onchange="this.form.submit()">
               {% for size in page_size_options %}
                 <option value="{{ size }}" {% if size == current_page_size %}selected{% endif %}>{{ size }}</option>
@@ -76,14 +219,14 @@
               <ul class="pagination pagination-sm mb-0">
                 <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
                   {% if page_obj.has_previous %}
-                    <a class="page-link" href="?page=1&page_size={{ page_size }}" aria-label="First">&laquo;</a>
+                    <a class="page-link" href="?page=1&page_size={{ page_size }}{{ querystring }}" aria-label="First">&laquo;</a>
                   {% else %}
                     <span class="page-link">&laquo;</span>
                   {% endif %}
                 </li>
                 <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
                   {% if page_obj.has_previous %}
-                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}&page_size={{ page_size }}" aria-label="Previous">&lsaquo;</a>
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}&page_size={{ page_size }}{{ querystring }}" aria-label="Previous">&lsaquo;</a>
                   {% else %}
                     <span class="page-link">&lsaquo;</span>
                   {% endif %}
@@ -93,14 +236,14 @@
                 </li>
                 <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
                   {% if page_obj.has_next %}
-                    <a class="page-link" href="?page={{ page_obj.next_page_number }}&page_size={{ page_size }}" aria-label="Next">&rsaquo;</a>
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}&page_size={{ page_size }}{{ querystring }}" aria-label="Next">&rsaquo;</a>
                   {% else %}
                     <span class="page-link">&rsaquo;</span>
                   {% endif %}
                 </li>
                 <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
                   {% if page_obj.has_next %}
-                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&page_size={{ page_size }}" aria-label="Last">&raquo;</a>
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&page_size={{ page_size }}{{ querystring }}" aria-label="Last">&raquo;</a>
                   {% else %}
                     <span class="page-link">&raquo;</span>
                   {% endif %}
@@ -112,4 +255,29 @@
       </div>
     {% endif %}
   </div>
+
+  <script>
+    (() => {
+      const form = document.getElementById("customerFilterForm");
+      const searchInput = document.getElementById("customerSearchInput");
+      const tagInputs = form ? Array.from(form.querySelectorAll("input[name='tag']")) : [];
+      let timer = null;
+
+      const submitForm = () => {
+        if (!form) return;
+        form.requestSubmit ? form.requestSubmit() : form.submit();
+      };
+
+      searchInput?.addEventListener("input", () => {
+        clearTimeout(timer);
+        timer = setTimeout(submitForm, 400);
+      });
+
+      tagInputs.forEach((checkbox) => {
+        checkbox.addEventListener("change", () => {
+          submitForm();
+        });
+      });
+    })();
+  </script>
 {% endblock %}

@@ -6,7 +6,7 @@
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
           <h1 class="h4 mb-0">{% if object %}Edit car{% else %}Add car{% endif %}</h1>
-          <p class="text-muted small mb-0">Keep license plate, make, model, year, and tiered rates up to date.</p>
+          <p class="text-muted small mb-0">Keep plate, VIN/СТС данные, and tiered rates up to date.</p>
         </div>
         <a href="{% url 'rentals:car_list' %}" class="btn btn-outline-secondary">Back to list</a>
       </div>
@@ -19,19 +19,25 @@
               <div class="alert alert-danger">{{ form.non_field_errors }}</div>
             {% endif %}
             <div class="row g-3">
-              <div class="col-md-4">
+              <div class="col-md-3">
                 <label class="form-label" for="{{ form.plate_number.id_for_label }}">{{ form.plate_number.label }}</label>
                 {{ form.plate_number }}
                 {% if form.plate_number.help_text %}<div class="form-text">{{ form.plate_number.help_text }}</div>{% endif %}
                 {% for error in form.plate_number.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
-              <div class="col-md-4">
+              <div class="col-md-3">
+                <label class="form-label" for="{{ form.vin.id_for_label }}">{{ form.vin.label }}</label>
+                {{ form.vin }}
+                {% if form.vin.help_text %}<div class="form-text">{{ form.vin.help_text }}</div>{% endif %}
+                {% for error in form.vin.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-3">
                 <label class="form-label" for="{{ form.make.id_for_label }}">{{ form.make.label }}</label>
                 {{ form.make }}
                 {% if form.make.help_text %}<div class="form-text">{{ form.make.help_text }}</div>{% endif %}
                 {% for error in form.make.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
-              <div class="col-md-4">
+              <div class="col-md-3">
                 <label class="form-label" for="{{ form.model.id_for_label }}">{{ form.model.label }}</label>
                 {{ form.model }}
                 {% if form.model.help_text %}<div class="form-text">{{ form.model.help_text }}</div>{% endif %}
@@ -42,6 +48,24 @@
                 {{ form.year }}
                 {% if form.year.help_text %}<div class="form-text">{{ form.year.help_text }}</div>{% endif %}
                 {% for error in form.year.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="{{ form.sts_number.id_for_label }}">{{ form.sts_number.label }}</label>
+                {{ form.sts_number }}
+                {% if form.sts_number.help_text %}<div class="form-text">{{ form.sts_number.help_text }}</div>{% endif %}
+                {% for error in form.sts_number.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="{{ form.sts_issue_date.id_for_label }}">{{ form.sts_issue_date.label }}</label>
+                {{ form.sts_issue_date }}
+                {% if form.sts_issue_date.help_text %}<div class="form-text">{{ form.sts_issue_date.help_text }}</div>{% endif %}
+                {% for error in form.sts_issue_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="{{ form.sts_issued_by.id_for_label }}">{{ form.sts_issued_by.label }}</label>
+                {{ form.sts_issued_by }}
+                {% if form.sts_issued_by.help_text %}<div class="form-text">{{ form.sts_issued_by.help_text }}</div>{% endif %}
+                {% for error in form.sts_issued_by.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
               <div class="col-md-3">
                 <label class="form-label" for="{{ form.daily_rate.id_for_label }}">{{ form.daily_rate.label }}</label>

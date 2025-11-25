@@ -4,7 +4,7 @@
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
       <h1 class="h4 mb-0">Rentals</h1>
-      <p class="text-muted small mb-0">Upcoming and in-progress reservations.</p>
+      <p class="text-muted small mb-0">Гибкий поиск по договорам, клиентам, авто и датам.</p>
     </div>
     <div class="d-flex flex-wrap gap-2">
       <a href="{% url 'rentals:import_rentals_csv' %}" class="btn btn-outline-secondary">Import CSV</a>
@@ -13,39 +13,109 @@
     </div>
   </div>
 
+  <form method="get" class="row g-2 align-items-end mb-3" role="search">
+    <div class="col-lg-6">
+      <label class="form-label" for="rentalSearchInput">Поиск по сделкам</label>
+      <div class="input-group">
+        <span class="input-group-text text-muted">Find</span>
+        <input
+          type="search"
+          class="form-control"
+          id="rentalSearchInput"
+          name="q"
+          value="{{ search_query }}"
+          placeholder="Номер договора, фамилия, авто, VIN/СТС, дата начала"
+          autocomplete="off"
+        >
+      </div>
+      <div class="form-text text-muted">
+        Ищет по номеру договора, фамилии/телефону клиента, номеру/марке авто, VIN/СТС и датам (YYYY-MM-DD).
+        Работает на лету и по кнопке поиска.
+      </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+      <label class="form-label" for="rentalStatusFilter">Статус</label>
+      <select name="status" id="rentalStatusFilter" class="form-select">
+        <option value="">Любой статус</option>
+        {% for code, label in rental_status_choices %}
+          <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-lg-3 col-md-6 d-flex gap-2">
+      <button class="btn btn-primary" type="submit">Search</button>
+      {% if filters_active %}
+        <a class="btn btn-outline-secondary" href="{% url 'rentals:rental_list' %}">Reset</a>
+      {% endif %}
+    </div>
+  </form>
+
   <div class="card shadow-sm">
     <div class="table-responsive">
       <table class="table align-middle mb-0">
         <thead class="table-light">
           <tr>
-            <th>Car</th>
+            <th>Deal</th>
             <th>Customer</th>
-            <th>Start</th>
-            <th>End</th>
-            <th>Status</th>
+            <th>Car</th>
+            <th>Dates</th>
             <th>Total</th>
             <th class="text-end">Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for rental in object_list %}
-            <tr>
-              <td>{{ rental.car }}</td>
-              <td>{{ rental.customer }}</td>
-              <td>{{ rental.start_date|date:"Y-m-d" }}</td>
-              <td>{{ rental.end_date|date:"Y-m-d" }}</td>
+            <tr
+              data-search-text="
+                {{ rental.deal_name }}
+                {{ rental.customer.full_name }} {{ rental.customer.phone }} {{ rental.customer.email }} {{ rental.customer.license_number }}
+                {{ rental.car.plate_number }} {{ rental.car.make }} {{ rental.car.model }} {{ rental.car.vin }} {{ rental.car.sts_number }}
+                {{ rental.start_date|date:'Y-m-d' }} {{ rental.end_date|date:'Y-m-d' }} {{ rental.get_status_display }}
+              "
+              data-status="{{ rental.status }}"
+            >
               <td>
-                {% if rental.status == "active" %}
-                  <span class="badge text-bg-success">{{ rental.get_status_display }}</span>
-                {% elif rental.status == "completed" %}
-                  <span class="badge text-bg-primary">{{ rental.get_status_display }}</span>
-                {% elif rental.status == "cancelled" %}
-                  <span class="badge text-bg-danger">{{ rental.get_status_display }}</span>
-                {% else %}
-                  <span class="badge text-bg-secondary">{{ rental.get_status_display }}</span>
-                {% endif %}
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                  <div>
+                    <div class="fw-semibold">{{ rental.deal_name }}</div>
+                    <div class="text-muted small">
+                      Номер договора: {{ rental.contract_number }}<br>
+                      С {{ rental.start_date|date:"Y-m-d" }} по {{ rental.end_date|date:"Y-m-d" }}
+                    </div>
+                  </div>
+                  {% if rental.status == "active" %}
+                    <span class="badge text-bg-success">{{ rental.get_status_display }}</span>
+                  {% elif rental.status == "completed" %}
+                    <span class="badge text-bg-primary">{{ rental.get_status_display }}</span>
+                  {% elif rental.status == "cancelled" %}
+                    <span class="badge text-bg-danger">{{ rental.get_status_display }}</span>
+                  {% else %}
+                    <span class="badge text-bg-secondary">{{ rental.get_status_display }}</span>
+                  {% endif %}
+                </div>
               </td>
-              <td>${{ rental.total_price }}</td>
+              <td>
+                <div class="fw-semibold">{{ rental.customer.full_name }}</div>
+                <div class="text-muted small">
+                  {{ rental.customer.phone|default:"—" }}
+                  {% if rental.customer.license_number %} · {{ rental.customer.license_number }}{% endif %}
+                </div>
+              </td>
+              <td>
+                <div class="fw-semibold">{{ rental.car.plate_number }}</div>
+                <div class="text-muted small">{{ rental.car.make }} {{ rental.car.model }}</div>
+                <div class="text-muted small">
+                  VIN: {{ rental.car.vin|default:"—" }}{% if rental.car.sts_number %} · СТС {{ rental.car.sts_number }}{% endif %}
+                </div>
+              </td>
+              <td>
+                <div class="fw-semibold">{{ rental.start_date|date:"Y-m-d" }}</div>
+                <div class="text-muted small">до {{ rental.end_date|date:"Y-m-d" }}</div>
+              </td>
+              <td>
+                <div class="fw-semibold">₽{{ rental.total_price }}</div>
+                <div class="text-muted small">{{ rental.daily_rate }} в день</div>
+              </td>
               <td class="text-end">
                 <a href="{% url 'rentals:rental_update' rental.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
                 {% if contract_templates %}
@@ -68,11 +138,48 @@
             </tr>
           {% empty %}
             <tr>
-              <td colspan="7" class="text-center text-muted py-4">No rentals yet. Create your first booking.</td>
+              <td colspan="6" class="text-center text-muted py-4">No rentals yet. Create your first booking.</td>
             </tr>
           {% endfor %}
+          <tr id="rentalNoMatchesRow" class="d-none">
+            <td colspan="6" class="text-center text-muted py-4">Нет совпадений по фильтрам.</td>
+          </tr>
         </tbody>
       </table>
     </div>
   </div>
+
+  <script>
+    (() => {
+      const searchInput = document.getElementById("rentalSearchInput");
+      const statusSelect = document.getElementById("rentalStatusFilter");
+      const rows = Array.from(document.querySelectorAll("tr[data-search-text]"));
+      const noMatchesRow = document.getElementById("rentalNoMatchesRow");
+      const normalize = (value) => (value || "").toLowerCase();
+
+      function applyFilter() {
+        const term = normalize(searchInput?.value || "");
+        const status = normalize(statusSelect?.value || "");
+        let visible = 0;
+
+        rows.forEach((row) => {
+          const text = normalize(row.dataset.searchText || "");
+          const rowStatus = normalize(row.dataset.status || "");
+          const matchesTerm = !term || text.includes(term);
+          const matchesStatus = !status || rowStatus === status;
+          const show = matchesTerm && matchesStatus;
+          row.classList.toggle("d-none", !show);
+          if (show) visible += 1;
+        });
+
+        if (noMatchesRow) {
+          noMatchesRow.classList.toggle("d-none", visible > 0);
+        }
+      }
+
+      searchInput?.addEventListener("input", applyFilter);
+      statusSelect?.addEventListener("change", applyFilter);
+      applyFilter();
+    })();
+  </script>
 {% endblock %}

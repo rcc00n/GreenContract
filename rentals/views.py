@@ -19,15 +19,18 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import F, Q, Value
+from django.db.models.deletion import ProtectedError
+from django.db.models.functions import Replace, Upper
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.decorators import method_decorator
 from django.utils.encoding import smart_str
 from django.views.generic import CreateView, ListView, UpdateView
+from django.views.decorators.http import require_POST
 
 from .forms import CarForm, ContractTemplateForm, CustomerForm, RentalForm
-from .models import Car, ContractTemplate, Customer, Rental
+from .models import Car, ContractTemplate, Customer, CustomerTag, Rental
 from .services.contract_renderer import render_docx, render_html_template
 from .services.pricing import calculate_rental_pricing
 from .services.stats import (
@@ -61,10 +64,15 @@ def _parse_decimal(value):
 def _parse_date(value):
     if not value:
         return None
-    try:
-        return datetime.strptime(value.strip(), "%Y-%m-%d").date()
-    except ValueError:
-        return None
+    if isinstance(value, datetime):
+        return value.date()
+    text = str(value).strip()
+    for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(text, fmt).date()
+        except ValueError:
+            continue
+    return None
 
 
 def _clean_status(value):
@@ -127,6 +135,54 @@ def _clean_phone_value(value):
     return _limit_length(raw, PHONE_MAX_LEN)
 
 
+def _split_tags(raw: str | None) -> list[str]:
+    """Split a raw tag string (comma/semicolon/pipe) into unique tag names."""
+    if not raw:
+        return []
+
+    tags = []
+    for piece in re.split(r"[;,#/|\n\r]+", str(raw)):
+        normalized = piece.strip()
+        if normalized and normalized not in tags:
+            tags.append(normalized)
+    return tags
+
+
+def _sync_customer_tags(customers_by_license: dict[str, Customer], tags_by_license: dict[str, list[str] | None]):
+    """
+    Apply tag lists (by license number) to customer objects efficiently.
+
+    tags_by_license may contain None to skip updates for that row.
+    """
+    tag_names = set()
+    for tags in tags_by_license.values():
+        if tags:
+            for tag in tags:
+                tag_names.add(tag)
+
+    if not tag_names:
+        return
+
+    existing_tags = {
+        tag.name.lower(): tag for tag in CustomerTag.objects.filter(name__in=tag_names)
+    }
+    missing = [name for name in tag_names if name.lower() not in existing_tags]
+    if missing:
+        CustomerTag.objects.bulk_create([CustomerTag(name=name) for name in missing], ignore_conflicts=True)
+        existing_tags.update(
+            {tag.name.lower(): tag for tag in CustomerTag.objects.filter(name__in=tag_names)}
+        )
+
+    for license_number, tags in tags_by_license.items():
+        if not tags:
+            continue
+        customer = customers_by_license.get(license_number)
+        if not customer:
+            continue
+        tag_objs = [existing_tags.get(tag.lower()) for tag in tags]
+        customer.tags.set([tag for tag in tag_objs if tag])
+
+
 def _serialize_car_pricing(car: Car):
     """Prepare car pricing info for the rental form JS helper."""
 
@@ -144,6 +200,14 @@ def _serialize_car_pricing(car: Car):
         "rate_1_4_low": _num(car.rate_1_4_low),
         "rate_5_14_low": _num(car.rate_5_14_low),
         "rate_15_plus_low": _num(car.rate_15_plus_low),
+        "make": car.make,
+        "model": car.model,
+        "year": car.year,
+        "vin": car.vin or "",
+        "sts_number": car.sts_number or "",
+        "sts_issue_date": car.sts_issue_date.isoformat() if car.sts_issue_date else "",
+        "sts_issued_by": car.sts_issued_by or "",
+        "edit_url": reverse("rentals:car_update", args=[car.pk]),
     }
 
 
@@ -253,6 +317,20 @@ def _normalize_car_row(row):
     except (TypeError, ValueError):
         year = None
 
+    vin = _pick_value(row, ["vin", "VIN", "vin_code", "Vin", "ВИН", "Вин"])
+    sts_number = _pick_value(
+        row,
+        [
+            "sts_number",
+            "СТС",
+            "Свидетельство",
+            "СТС номер",
+            "номер СТС",
+        ],
+    )
+    sts_issue_date_raw = _pick_value(row, ["sts_issue_date", "дата выдачи стс", "СТС выдано"])
+    sts_issued_by = _pick_value(row, ["sts_issued_by", "кем выдано стс", "кем выдано"])
+
     rate_1_4_high = _pick_value(row, ["rate_1_4_high", "1-4 дней(вс)", "1-4 дней (вс)"])
     rate_5_14_high = _pick_value(row, ["rate_5_14_high", "5-14 дней(вс)", "5-14 дней (вс)"])
     rate_15_high = _pick_value(
@@ -298,6 +376,10 @@ def _normalize_car_row(row):
         "make": str(make).strip() if make else "",
         "model": str(model).strip() if model else "",
         "year": year,
+        "vin": _clean_text_value(vin),
+        "sts_number": _clean_text_value(sts_number),
+        "sts_issue_date": _parse_date(sts_issue_date_raw),
+        "sts_issued_by": _clean_text_value(sts_issued_by),
         "daily_rate": base_rate,
         "rate_1_4_high": rate_1_4_high,
         "rate_5_14_high": rate_5_14_high,
@@ -371,6 +453,32 @@ def _normalize_customer_row(row, row_index: int):
         pick(["email", "Email", "Рабочий email", "Личный email", "Другой email"]), EMAIL_MAX_LEN
     )
     address = pick(["Адрес (контакт)", "Адрес (компания)", "address", "Address"])
+    passport_series = pick(["passport_series", "Паспорт серия", "Серия паспорта", "серия паспорта"])
+    passport_number = pick(["passport_number", "Паспорт номер", "Номер паспорта", "номер паспорта"])
+    passport_issued_by = pick(
+        ["passport_issued_by", "Кем выдан паспорт", "кем выдан паспорт", "Паспорт кем выдан"]
+    )
+    passport_issue_date_raw = pick(
+        ["passport_issue_date", "Дата выдачи паспорта", "дата выдачи паспорта", "Паспорт выдан"]
+    )
+    registration_address = pick(
+        ["registration_address", "Адрес прописки", "адрес прописки", "Прописка", "прописка"]
+    )
+    residence_address = pick(
+        [
+            "residence_address",
+            "Адрес проживания",
+            "адрес проживания",
+            "Фактический адрес",
+            "фактический адрес",
+        ]
+    )
+    notes = pick(["notes", "Notes", "заметки", "Заметки"])
+    tags_raw = pick(["tags", "Tags", "теги", "Теги"])
+    tags = _split_tags(tags_raw) if tags_raw else None
+    passport_series = _limit_length(passport_series, 10) or None
+    passport_number = _limit_length(passport_number, 20) or None
+    passport_issued_by = _limit_length(passport_issued_by, 255) or None
 
     return {
         "full_name": full_name,
@@ -378,6 +486,14 @@ def _normalize_customer_row(row, row_index: int):
         "phone": phone,
         "license_number": license_number,
         "address": address or None,
+        "registration_address": registration_address or None,
+        "residence_address": residence_address or None,
+        "passport_series": passport_series,
+        "passport_number": passport_number,
+        "passport_issued_by": passport_issued_by,
+        "passport_issue_date": _parse_date(passport_issue_date_raw),
+        "notes": notes or None,
+        "tags": tags,
     }
 
 
@@ -428,6 +544,33 @@ class CarListView(ListView):
     model = Car
     template_name = "rentals/car_list.html"
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        self.search_query = (self.request.GET.get("q") or "").strip()
+
+        if self.search_query:
+            normalized_query = re.sub(r"[^0-9A-Za-zА-Яа-яЁё]", "", self.search_query).upper()
+            if normalized_query:
+                plate_normalized = Upper(
+                    Replace(
+                        Replace(Replace(F("plate_number"), Value(" "), Value("")), Value("-"), Value("")),
+                        Value("_"),
+                        Value(""),
+                    )
+                )
+                queryset = queryset.annotate(plate_normalized=plate_normalized).filter(
+                    plate_normalized__icontains=normalized_query
+                )
+            else:
+                queryset = queryset.filter(plate_number__icontains=self.search_query)
+
+        return queryset.order_by("plate_number")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["search_query"] = getattr(self, "search_query", "")
+        return context
+
 
 @method_decorator(login_required, name="dispatch")
 class CarCreateView(CreateView):
@@ -445,13 +588,123 @@ class CarUpdateView(UpdateView):
     success_url = reverse_lazy("rentals:car_list")
 
 
+@login_required
+@require_POST
+def car_delete(request, pk: int):
+    car = get_object_or_404(Car, pk=pk)
+    try:
+        car.delete()
+        messages.success(request, f"Deleted car {car.plate_number}.")
+    except ProtectedError:
+        messages.error(
+            request,
+            "Cannot delete this car because it is linked to existing rentals.",
+        )
+    return redirect("rentals:car_list")
+
+
+@login_required
+@require_POST
+def car_delete_all(request):
+    with_rentals = Car.objects.filter(rental__isnull=False).distinct()
+    deletable = Car.objects.exclude(pk__in=with_rentals.values_list("pk", flat=True))
+    deletable_count = deletable.count()
+
+    if deletable_count:
+        deletable.delete()
+        messages.success(request, f"Deleted {deletable_count} cars.")
+
+    locked_count = with_rentals.count()
+    if locked_count:
+        messages.warning(
+            request,
+            f"Skipped {locked_count} car(s) that are linked to rentals.",
+        )
+    elif deletable_count == 0:
+        messages.info(request, "No cars to delete.")
+
+    return redirect("rentals:car_list")
+
+
+@login_required
+@require_POST
+def customer_delete(request, pk: int):
+    customer = get_object_or_404(Customer, pk=pk)
+    try:
+        customer.delete()
+        messages.success(request, f"Deleted customer {customer.full_name}.")
+    except ProtectedError:
+        messages.error(
+            request,
+            "Cannot delete this customer because they are linked to existing rentals.",
+        )
+    return redirect("rentals:customer_list")
+
+
+@login_required
+@require_POST
+def customer_delete_all(request):
+    with_rentals = Customer.objects.filter(rental__isnull=False).distinct()
+    deletable = Customer.objects.exclude(pk__in=with_rentals.values_list("pk", flat=True))
+    deletable_count = deletable.count()
+
+    if deletable_count:
+        deletable.delete()
+        messages.success(request, f"Deleted {deletable_count} customers.")
+
+    locked_count = with_rentals.count()
+    if locked_count:
+        messages.warning(
+            request,
+            f"Skipped {locked_count} customer(s) that are linked to rentals.",
+        )
+    elif deletable_count == 0:
+        messages.info(request, "No customers to delete.")
+
+    return redirect("rentals:customer_list")
+
+
 @method_decorator(login_required, name="dispatch")
 class CustomerListView(ListView):
     model = Customer
     template_name = "rentals/customer_list.html"
-    ordering = ["id"]
+    ordering = ["full_name", "id"]
     paginate_by = 25
-    page_size_options = (25, 50)
+    page_size_options = (25, 50, 100)
+
+    def get_queryset(self):
+        queryset = super().get_queryset().prefetch_related("tags")
+        self.search_query = (self.request.GET.get("q") or "").strip()
+        raw_tags = self.request.GET.getlist("tag") or self.request.GET.getlist("tags")
+        self.active_tags = []
+        for tag_id in raw_tags:
+            try:
+                self.active_tags.append(int(tag_id))
+            except (TypeError, ValueError):
+                continue
+
+        if self.search_query:
+            terms = [term for term in re.split(r"\s+", self.search_query) if term]
+            for term in terms:
+                queryset = queryset.filter(
+                    Q(full_name__icontains=term)
+                    | Q(phone__icontains=term)
+                    | Q(email__icontains=term)
+                    | Q(license_number__icontains=term)
+                    | Q(address__icontains=term)
+                    | Q(registration_address__icontains=term)
+                    | Q(residence_address__icontains=term)
+                    | Q(passport_series__icontains=term)
+                    | Q(passport_number__icontains=term)
+                    | Q(passport_issued_by__icontains=term)
+                    | Q(notes__icontains=term)
+                    | Q(tags__name__icontains=term)
+                )
+
+        if self.active_tags:
+            queryset = queryset.filter(tags__id__in=self.active_tags)
+
+        return queryset.distinct().order_by(*self.ordering)
 
     def get_paginate_by(self, queryset):
         if hasattr(self, "_page_size"):
@@ -470,6 +723,14 @@ class CustomerListView(ListView):
         context = super().get_context_data(**kwargs)
         context["page_size_options"] = self.page_size_options
         context["current_page_size"] = getattr(self, "_page_size", self.paginate_by)
+        context["search_query"] = getattr(self, "search_query", "")
+        context["available_tags"] = CustomerTag.objects.all()
+        context["active_tags"] = getattr(self, "active_tags", [])
+        query_params = self.request.GET.copy()
+        query_params.pop("page", None)
+        query_params.pop("page_size", None)
+        context["querystring"] = f"&{query_params.urlencode()}" if query_params else ""
+        context["filters_active"] = bool(self.search_query or self.active_tags)
         return context
 
 
@@ -494,9 +755,42 @@ class RentalListView(ListView):
     model = Rental
     template_name = "rentals/rental_list.html"
 
+    def get_queryset(self):
+        queryset = super().get_queryset().select_related("car", "customer")
+        self.search_query = (self.request.GET.get("q") or "").strip()
+        self.status_filter = (self.request.GET.get("status") or "").strip()
+
+        if self.status_filter:
+            queryset = queryset.filter(status=self.status_filter)
+
+        if self.search_query:
+            terms = [term for term in re.split(r"\s+", self.search_query) if term]
+            for term in terms:
+                date_value = _parse_date(term)
+                condition = (
+                    Q(contract_number__icontains=term)
+                    | Q(customer__full_name__icontains=term)
+                    | Q(customer__phone__icontains=term)
+                    | Q(customer__email__icontains=term)
+                    | Q(customer__license_number__icontains=term)
+                    | Q(car__plate_number__icontains=term)
+                    | Q(car__make__icontains=term)
+                    | Q(car__model__icontains=term)
+                    | Q(status__icontains=term)
+                )
+                if date_value:
+                    condition = condition | Q(start_date=date_value) | Q(end_date=date_value)
+                queryset = queryset.filter(condition)
+
+        return queryset.order_by("-start_date", "-id")
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["contract_templates"] = ContractTemplate.objects.all()
+        context["search_query"] = getattr(self, "search_query", "")
+        context["status_filter"] = getattr(self, "status_filter", "")
+        context["filters_active"] = bool(getattr(self, "search_query", "") or getattr(self, "status_filter", ""))
+        context["rental_status_choices"] = Rental.STATUS_CHOICES
         return context
 
 
@@ -578,8 +872,15 @@ def customer_search(request):
             | Q(phone__icontains=term)
             | Q(email__icontains=term)
             | Q(license_number__icontains=term)
+            | Q(passport_number__icontains=term)
+            | Q(passport_series__icontains=term)
+            | Q(tags__name__icontains=term)
+            | Q(address__icontains=term)
+            | Q(registration_address__icontains=term)
+            | Q(residence_address__icontains=term)
         )
         .order_by("full_name")
+        .distinct()
         [:limit]
     )
 
@@ -612,6 +913,10 @@ def export_cars_csv(request):
             "make",
             "model",
             "year",
+            "vin",
+            "sts_number",
+            "sts_issue_date",
+            "sts_issued_by",
             "daily_rate",
             "rate_1_4_high",
             "rate_5_14_high",
@@ -630,6 +935,10 @@ def export_cars_csv(request):
                 smart_str(car.make),
                 smart_str(car.model),
                 car.year,
+                smart_str(car.vin),
+                smart_str(car.sts_number),
+                car.sts_issue_date.isoformat() if car.sts_issue_date else "",
+                smart_str(car.sts_issued_by),
                 car.daily_rate,
                 car.rate_1_4_high,
                 car.rate_5_14_high,
@@ -650,16 +959,41 @@ def export_customers_csv(request):
     response["Content-Disposition"] = 'attachment; filename="customers.csv"'
 
     writer = csv.writer(response)
-    writer.writerow(["full_name", "email", "phone", "license_number", "address"])
+    writer.writerow(
+        [
+            "full_name",
+            "email",
+            "phone",
+            "license_number",
+            "passport_series",
+            "passport_number",
+            "passport_issue_date",
+            "passport_issued_by",
+            "address",
+            "registration_address",
+            "residence_address",
+            "notes",
+            "tags",
+        ]
+    )
 
-    for customer in Customer.objects.all():
+    for customer in Customer.objects.prefetch_related("tags"):
+        tags = "; ".join(customer.tags.values_list("name", flat=True))
         writer.writerow(
             [
                 smart_str(customer.full_name),
                 smart_str(customer.email),
                 smart_str(customer.phone),
                 smart_str(customer.license_number),
+                smart_str(customer.passport_series),
+                smart_str(customer.passport_number),
+                customer.passport_issue_date.isoformat() if customer.passport_issue_date else "",
+                smart_str(customer.passport_issued_by),
                 smart_str(customer.address),
+                smart_str(customer.registration_address),
+                smart_str(customer.residence_address),
+                smart_str(customer.notes),
+                smart_str(tags),
             ]
         )
 
@@ -674,6 +1008,7 @@ def export_rentals_csv(request):
     writer = csv.writer(response)
     writer.writerow(
         [
+            "contract_number",
             "car_plate_number",
             "customer_license_number",
             "customer_name",
@@ -688,6 +1023,7 @@ def export_rentals_csv(request):
     for rental in Rental.objects.select_related("car", "customer"):
         writer.writerow(
             [
+                smart_str(rental.contract_number),
                 smart_str(rental.car.plate_number),
                 smart_str(rental.customer.license_number),
                 smart_str(rental.customer.full_name),
@@ -728,6 +1064,10 @@ def import_cars_csv(request):
                 make = normalized["make"]
                 model = normalized["model"]
                 year = normalized["year"]
+                vin = normalized["vin"]
+                sts_number = normalized["sts_number"]
+                sts_issue_date = normalized["sts_issue_date"]
+                sts_issued_by = normalized["sts_issued_by"]
                 daily_rate = normalized["daily_rate"]
                 rate_1_4_high = normalized["rate_1_4_high"]
                 rate_5_14_high = normalized["rate_5_14_high"]
@@ -761,6 +1101,10 @@ def import_cars_csv(request):
                         "make": make,
                         "model": model,
                         "year": year,
+                        "vin": vin or None,
+                        "sts_number": sts_number or None,
+                        "sts_issue_date": sts_issue_date,
+                        "sts_issued_by": sts_issued_by or None,
                         "daily_rate": base_daily_rate,
                         "rate_1_4_high": rate_1_4_high or Decimal("0"),
                         "rate_5_14_high": rate_5_14_high or Decimal("0"),
@@ -787,9 +1131,13 @@ def import_cars_csv(request):
             "title": "Import cars",
             "expected_headers": [
                 "plate_number",
+                "vin",
                 "make",
                 "model",
                 "year",
+                "sts_number",
+                "sts_issue_date (YYYY-MM-DD)",
+                "sts_issued_by",
                 "daily_rate",
                 "rate_1_4_high",
                 "rate_5_14_high",
@@ -801,8 +1149,10 @@ def import_cars_csv(request):
             ],
             "xls_headers": [
                 "Регистрационный знак",
+                "VIN / ВИН",
                 "Марка",
                 "Год выпуска",
+                "СТС",
                 "1-4 дней(вс)",
                 "5-14 дней(вс)",
                 "15 дней и более(вс)",
@@ -810,7 +1160,7 @@ def import_cars_csv(request):
                 "5-14 дней(нс)",
                 "15 дней и более(нс)",
             ],
-            "help_text": "Upload CSV or Excel (.xls). The Russian XLS template is supported, and tiered prices for высокий/низкий сезон will be imported. Existing plate numbers will be updated.",
+            "help_text": "Upload CSV or Excel (.xls). The Russian XLS template is supported, and tiered prices for высокий/низкий сезон will be imported. Existing plate numbers will be updated. Optional VIN/СТС columns will also be stored.",
             "back_url": reverse("rentals:car_list"),
         },
     )
@@ -851,11 +1201,14 @@ def import_customers_csv(request):
             # Deduplicate by license number inside the upload.
             by_license = {}
             duplicate_rows = 0
+            tags_by_license = {}
             for item in normalized_rows:
                 key = item["license_number"]
                 if key in by_license:
                     duplicate_rows += 1
                 by_license[key] = item
+                if item.get("tags") is not None:
+                    tags_by_license[key] = item["tags"]
 
             licenses = list(by_license.keys())
             existing = {
@@ -865,32 +1218,54 @@ def import_customers_csv(request):
 
             to_create = []
             to_update = []
+            update_fields = (
+                "full_name",
+                "email",
+                "phone",
+                "address",
+                "registration_address",
+                "residence_address",
+                "passport_series",
+                "passport_number",
+                "passport_issued_by",
+                "passport_issue_date",
+                "notes",
+            )
             for license_number, data in by_license.items():
                 if license_number in existing:
                     customer = existing[license_number]
                     changed = False
-                    for field in ("full_name", "email", "phone", "address"):
-                        new_value = data[field]
+                    for field in update_fields:
+                        new_value = data.get(field)
                         if getattr(customer, field) != new_value:
                             setattr(customer, field, new_value)
                             changed = True
                     if changed:
                         to_update.append(customer)
                 else:
-                    to_create.append(Customer(**data))
+                    payload = {key: value for key, value in data.items() if key != "tags"}
+                    to_create.append(Customer(**payload))
 
             if to_create or to_update:
                 with transaction.atomic():
                     if to_create:
-                        Customer.objects.bulk_create(to_create, batch_size=IMPORT_BATCH_SIZE)
-                        created_count = len(to_create)
+                        created = Customer.objects.bulk_create(to_create, batch_size=IMPORT_BATCH_SIZE)
+                        created_count = len(created)
+                        for customer in created:
+                            existing[customer.license_number] = customer
                     if to_update:
                         Customer.objects.bulk_update(
                             to_update,
-                            ["full_name", "email", "phone", "address"],
+                            update_fields,
                             batch_size=IMPORT_BATCH_SIZE,
                         )
                         updated_count = len(to_update)
+
+                if tags_by_license:
+                    _sync_customer_tags(
+                        {license_number: existing.get(license_number) for license_number in licenses},
+                        tags_by_license,
+                    )
 
             imported = created_count + updated_count
 
@@ -938,9 +1313,17 @@ def import_customers_csv(request):
                 "license_number / Водит. удостоверение. (контакт)",
                 "email (рабочий/личный/другой)",
                 "Адрес (контакт) / Адрес (компания)",
+                "registration_address / Адрес прописки",
+                "residence_address / Адрес проживания",
+                "passport_series / Серия паспорта",
+                "passport_number / Номер паспорта",
+                "passport_issued_by / Кем выдан паспорт",
+                "passport_issue_date (YYYY-MM-DD / ДД.ММ.ГГГГ)",
+                "notes / Заметки",
+                "tags / теги через запятую",
                 "ID (используется как резервный идентификатор)",
             ],
-            "help_text": "Upload CSV or Excel (.xls, .xlsx). Rows will be matched by license number, otherwise AmoCRM ID/phone. Missing fields are filled automatically instead of skipping rows.",
+            "help_text": "Upload CSV or Excel (.xls, .xlsx). Rows will be matched by license number, otherwise AmoCRM ID/phone. Missing fields are filled automatically instead of skipping rows. Паспортные данные, адреса и теги подхватываются при наличии колонок.",
             "back_url": reverse("rentals:customer_list"),
         },
     )
@@ -998,6 +1381,14 @@ def import_rentals_csv(request):
                     else daily_rate * Decimal(rental_days)
                 )
 
+                contract_number = (row.get("contract_number") or "").strip()
+                if contract_number:
+                    exists_conflict = Rental.objects.exclude(
+                        car=car, customer=customer, start_date=start_date, end_date=end_date
+                    ).filter(contract_number=contract_number)
+                    if exists_conflict.exists():
+                        contract_number = ""
+
                 Rental.objects.update_or_create(
                     car=car,
                     customer=customer,
@@ -1007,6 +1398,7 @@ def import_rentals_csv(request):
                         "daily_rate": daily_rate,
                         "total_price": total_price,
                         "status": _clean_status(row.get("status")),
+                        **({"contract_number": contract_number} if contract_number else {}),
                     },
                 )
                 imported += 1
@@ -1031,16 +1423,17 @@ def import_rentals_csv(request):
             "expected_headers": [
                 "car_plate_number",
                 "customer_license_number",
-                "start_date",
-                "end_date",
-                "daily_rate",
-                "total_price",
-                "status",
-            ],
-            "help_text": "Cars and customers must exist before importing rentals.",
-            "back_url": reverse("rentals:rental_list"),
-        },
-    )
+            "start_date",
+            "end_date",
+            "daily_rate",
+            "total_price",
+            "status",
+            "contract_number (optional)",
+        ],
+        "help_text": "Cars and customers must exist before importing rentals.",
+        "back_url": reverse("rentals:rental_list"),
+    },
+)
 
 
 @login_required

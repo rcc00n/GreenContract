@@ -15,7 +15,7 @@ class CarAdmin(admin.ModelAdmin):
         "rate_15_plus_high",
         "is_active",
     )
-    search_fields = ("plate_number", "make", "model")
+    search_fields = ("plate_number", "make", "model", "vin", "sts_number")
 
 
 @admin.register(Customer)
@@ -26,9 +26,9 @@ class CustomerAdmin(admin.ModelAdmin):
 
 @admin.register(Rental)
 class RentalAdmin(admin.ModelAdmin):
-    list_display = ("id", "car", "customer", "start_date", "end_date", "total_price", "status")
+    list_display = ("contract_number", "car", "customer", "start_date", "end_date", "total_price", "status")
     list_filter = ("status", "start_date", "end_date")
-    search_fields = ("car__plate_number", "customer__full_name")
+    search_fields = ("contract_number", "car__plate_number", "car__make", "car__model", "customer__full_name")
 
 
 @admin.register(ContractTemplate)

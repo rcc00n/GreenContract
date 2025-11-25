@@ -7,9 +7,39 @@
       <p class="text-muted small mb-0">Vehicles available for rental.</p>
     </div>
     <div class="d-flex flex-wrap gap-2">
+      <form method="post" action="{% url 'rentals:car_delete_all' %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Delete all cars without rentals?');">
+          Delete all
+        </button>
+      </form>
       <a href="{% url 'rentals:import_cars_csv' %}" class="btn btn-outline-secondary">Import CSV</a>
       <a href="{% url 'rentals:export_cars_csv' %}" class="btn btn-outline-secondary">Export CSV</a>
       <a href="{% url 'rentals:car_create' %}" class="btn btn-primary">Add car</a>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-lg-6 col-xl-5 ms-auto">
+      <form method="get" class="input-group" role="search">
+        <span class="input-group-text text-muted">Plate</span>
+        <input
+          type="search"
+          class="form-control"
+          id="carSearchInput"
+          name="q"
+          placeholder="Поиск по номеру авто"
+          value="{{ search_query }}"
+          autocomplete="off"
+        >
+        <button class="btn btn-outline-secondary" type="submit">Search</button>
+        {% if search_query %}
+          <a class="btn btn-outline-secondary" href="{% url 'rentals:car_list' %}">Reset</a>
+        {% endif %}
+      </form>
+      <div class="form-text text-muted small mt-1">
+        Работает по подстроке и игнорирует пробелы и тире. Можно искать в реальном времени без отправки формы.
+      </div>
     </div>
   </div>
 
@@ -27,10 +57,13 @@
         </thead>
         <tbody>
           {% for car in object_list %}
-            <tr>
+            <tr data-plate="{{ car.plate_number }}" data-plate-normalized="{{ car.plate_number|cut:' '|cut:'-'|cut:'_'|upper }}">
               <td>
                 <div class="fw-semibold">{{ car.plate_number }}</div>
                 <div class="text-muted small">{{ car.make }} {{ car.model }} · {{ car.year }}</div>
+                {% if car.vin or car.sts_number %}
+                  <div class="text-muted small">VIN: {{ car.vin|default:"—" }}{% if car.sts_number %} · СТС {{ car.sts_number }}{% endif %}</div>
+                {% endif %}
               </td>
               <td class="small">
                 <div class="fw-semibold">1-4: {% if car.rate_1_4_high %}₽{{ car.rate_1_4_high }}{% else %}—{% endif %}</div>
@@ -50,16 +83,65 @@
                 {% endif %}
               </td>
               <td class="text-end">
-                <a href="{% url 'rentals:car_update' car.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                <div class="d-inline-flex gap-2 justify-content-end">
+                  <a href="{% url 'rentals:car_update' car.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                  <form method="post" action="{% url 'rentals:car_delete' car.pk %}" class="d-inline">
+                    {% csrf_token %}
+                    <button
+                      type="submit"
+                      class="btn btn-sm btn-outline-danger"
+                      onclick="return confirm('Delete {{ car.plate_number }}?');"
+                    >
+                      Delete
+                    </button>
+                  </form>
+                </div>
               </td>
             </tr>
           {% empty %}
             <tr>
-              <td colspan="7" class="text-center text-muted py-4">No cars yet. Add your first car to start renting.</td>
+              <td colspan="5" class="text-center text-muted py-4">
+                {% if search_query %}
+                  No cars match this plate number yet.
+                {% else %}
+                  No cars yet. Add your first car to start renting.
+                {% endif %}
+              </td>
             </tr>
           {% endfor %}
+          <tr id="carNoMatchesRow" class="d-none">
+            <td colspan="5" class="text-center text-muted py-4">Нет совпадений по номеру.</td>
+          </tr>
         </tbody>
       </table>
     </div>
   </div>
+
+  <script>
+    (() => {
+      const input = document.getElementById("carSearchInput");
+      const rows = Array.from(document.querySelectorAll("tr[data-plate-normalized]"));
+      const noMatchesRow = document.getElementById("carNoMatchesRow");
+      const normalize = (value) => (value || "").replace(/[^0-9A-Za-zА-Яа-яЁё]/g, "").toUpperCase();
+
+      const applyFilter = () => {
+        if (!rows.length) return;
+        const term = normalize(input?.value || "");
+        let visible = 0;
+        rows.forEach((row) => {
+          const plate = row.dataset.plateNormalized || "";
+          const matches = !term || plate.includes(term);
+          row.classList.toggle("d-none", !matches);
+          if (matches) visible += 1;
+        });
+        if (noMatchesRow) {
+          const showNoMatches = visible === 0 && rows.length > 0;
+          noMatchesRow.classList.toggle("d-none", !showNoMatches);
+        }
+      };
+
+      input?.addEventListener("input", applyFilter);
+      applyFilter();
+    })();
+  </script>
 {% endblock %}

@@ -19,6 +19,27 @@
               <div class="alert alert-danger">{{ form.non_field_errors }}</div>
             {% endif %}
             <div class="row g-3">
+              <div class="col-md-4 col-lg-3">
+                <label class="form-label" for="{{ form.contract_number.id_for_label }}">Contract number</label>
+                {{ form.contract_number }}
+                <div class="form-text">
+                  5-значный номер генерируется автоматически и попадёт в название сделки.
+                </div>
+                <div class="small text-muted" id="deal-name-preview">
+                  Пример: 12345/Фамилия/A123BC Toyota/2025-01-01
+                </div>
+                {% for error in form.contract_number.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-8 col-lg-9">
+                <div class="alert alert-light border small mb-0">
+                  <div class="fw-semibold">Формат названия сделки</div>
+                  <div class="text-muted">
+                    {номер договора}/{Фамилия}/{Номер машины + марка}/{Дата начала аренды}.<br>
+                    Фамилия берётся из клиента, авто — из гос. номера и марки, дата — из начала аренды.
+                  </div>
+                </div>
+              </div>
+
               <div class="col-md-6">
                 <label class="form-label" for="{{ form.car.id_for_label }}">Car</label>
                 {{ form.car }}
@@ -52,6 +73,36 @@
                   {% if customer_initial_label %}{{ customer_initial_label }}{% else %}Клиент не выбран{% endif %}
                 </div>
                 {% for error in form.customer.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+
+              <div class="col-12">
+                <div class="border rounded p-3 bg-light">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                      <div class="fw-semibold">Данные выбранного авто</div>
+                      <div class="text-muted small">VIN, СТС и год подтягиваются автоматически.</div>
+                    </div>
+                    <a href="#" class="btn btn-sm btn-outline-secondary d-none" id="car-edit-link" target="_blank" rel="noopener">
+                      Edit car
+                    </a>
+                  </div>
+                  <div id="car-details" class="row small gy-1">
+                    <div class="col-md-4">
+                      <div class="fw-semibold" data-field="plate">—</div>
+                      <div class="text-muted" data-field="makeModel">—</div>
+                      <div>Год: <span data-field="year">—</span></div>
+                    </div>
+                    <div class="col-md-4">
+                      <div>VIN: <span data-field="vin">—</span></div>
+                      <div>СТС: <span data-field="sts_number">—</span></div>
+                    </div>
+                    <div class="col-md-4">
+                      <div>СТС выдана: <span data-field="sts_issue_date">—</span></div>
+                      <div>Кем: <span data-field="sts_issued_by">—</span></div>
+                    </div>
+                  </div>
+                  <div class="text-muted small" id="car-details-empty">Выберите авто, чтобы увидеть VIN и СТС.</div>
+                </div>
               </div>
 
               <div class="col-md-6">
@@ -142,6 +193,9 @@
                   searchInput.value = item.name;
                   lastSelectedLabel = label;
                   setSummary(label);
+                  document.dispatchEvent(
+                    new CustomEvent("rental:customer-change", { detail: { name: item.name } })
+                  );
                   clearResults();
                 }
 
@@ -251,6 +305,9 @@
                 if (initialLabel && hiddenField.value) {
                   searchInput.value = initialLabel;
                   setSummary(initialLabel);
+                  document.dispatchEvent(
+                    new CustomEvent("rental:customer-change", { detail: { name: searchInput.value || initialLabel } })
+                  );
                 } else if (hiddenField.value) {
                   setSummary("Клиент выбран");
                 } else {
@@ -272,6 +329,14 @@
                 const totalInput = document.getElementById("id_total_price");
                 const summaryText = document.getElementById("price-summary-text");
                 const quickButtons = document.querySelectorAll("button[data-days]");
+                const contractInput = document.getElementById("id_contract_number");
+                const dealPreview = document.getElementById("deal-name-preview");
+                const carDetails = document.getElementById("car-details");
+                const carDetailsEmpty = document.getElementById("car-details-empty");
+                const carEditLink = document.getElementById("car-edit-link");
+                const customerSearchInput = document.getElementById("customer-search");
+                let selectedCustomerName = (customerSearchInput?.value || "").trim();
+                let currentCar = null;
                 const carPricingData = window.JSON.parse(
                   (document.getElementById("car-pricing-data") || { textContent: "[]" }).textContent
                 );
@@ -314,6 +379,62 @@
                   return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB" }).format(value || 0);
                 }
 
+                function setCarDetail(field, value) {
+                  const el = carDetails?.querySelector(`[data-field="${field}"]`);
+                  if (el) {
+                    el.textContent = value || "—";
+                  }
+                }
+
+                function updateCarDetails(car) {
+                  if (!carDetails || !carDetailsEmpty) return;
+                  if (!car) {
+                    setCarDetail("plate", "—");
+                    setCarDetail("makeModel", "—");
+                    setCarDetail("year", "—");
+                    setCarDetail("vin", "—");
+                    setCarDetail("sts_number", "—");
+                    setCarDetail("sts_issue_date", "—");
+                    setCarDetail("sts_issued_by", "—");
+                    carDetailsEmpty.classList.remove("d-none");
+                    carDetails.classList.add("opacity-50");
+                    carEditLink?.classList.add("d-none");
+                    return;
+                  }
+
+                  setCarDetail("plate", car.plate_number || "—");
+                  setCarDetail("makeModel", [car.make, car.model].filter(Boolean).join(" ").trim() || "—");
+                  setCarDetail("year", car.year || "—");
+                  setCarDetail("vin", car.vin || "—");
+                  setCarDetail("sts_number", car.sts_number || "—");
+                  setCarDetail("sts_issue_date", car.sts_issue_date || "—");
+                  setCarDetail("sts_issued_by", car.sts_issued_by || "—");
+                  carDetailsEmpty.classList.add("d-none");
+                  carDetails.classList.remove("opacity-50");
+                  if (carEditLink) {
+                    if (car.edit_url) {
+                      carEditLink.href = car.edit_url;
+                      carEditLink.classList.remove("d-none");
+                    } else {
+                      carEditLink.classList.add("d-none");
+                    }
+                  }
+                }
+
+                function extractLastName(name) {
+                  const parts = (name || "").trim().split(/\s+/);
+                  return parts.length ? parts[0] : "";
+                }
+
+                function updateDealPreview(car) {
+                  if (!dealPreview) return;
+                  const contract = (contractInput?.value || "").trim() || "#####";
+                  const lastName = extractLastName(selectedCustomerName) || "Фамилия";
+                  const carPart = car ? `${car.plate_number} ${car.make}`.trim() : "Авто";
+                  const datePart = startInput?.value || "дата";
+                  dealPreview.textContent = `${contract}/${lastName}/${carPart}/${datePart}`;
+                }
+
                 const initialValues = {
                   car: carSelect ? carSelect.value : "",
                   start: startInput ? startInput.value : "",
@@ -324,7 +445,7 @@
 
                 function updatePricing(forceWrite = false) {
                   const carId = Number(carSelect?.value);
-                  const car = carPricingData.find((item) => item.id === carId);
+                  currentCar = carPricingData.find((item) => item.id === carId);
                   const startDate = parseDate(startInput?.value);
                   const endDate = parseDate(endInput?.value);
                   const days = diffDays(startDate, endDate);
@@ -335,7 +456,10 @@
                     initialValues.end !== (endInput ? endInput.value : "");
                   const shouldWrite = forceWrite || !hasExistingPrice || inputsChanged;
 
-                  if (!car || !days) {
+                  updateCarDetails(currentCar);
+                  updateDealPreview(currentCar);
+
+                  if (!currentCar || !days) {
                     if (shouldWrite && dailyRateInput) dailyRateInput.value = "";
                     if (shouldWrite && totalInput) totalInput.value = "";
                     if (hasExistingPrice && !shouldWrite) {
@@ -351,7 +475,7 @@
                     return;
                   }
 
-                  const rate = pickRate(car, days);
+                  const rate = pickRate(currentCar, days);
                   const total = rate * days;
 
                   if (shouldWrite && dailyRateInput) dailyRateInput.value = rate ? rate.toFixed(2) : "";
@@ -387,6 +511,18 @@
                     el.addEventListener("input", () => updatePricing(true));
                   }
                 });
+
+                customerSearchInput?.addEventListener("input", () => {
+                  selectedCustomerName = customerSearchInput.value.trim();
+                  updateDealPreview(currentCar);
+                });
+
+                document.addEventListener("rental:customer-change", (event) => {
+                  selectedCustomerName = (event.detail?.name || "").trim();
+                  updateDealPreview(currentCar);
+                });
+
+                contractInput?.addEventListener("input", () => updateDealPreview(currentCar));
 
                 updatePricing(false);
               })();

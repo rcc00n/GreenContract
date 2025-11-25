@@ -46,7 +46,9 @@ body[data-theme="light"] {
   --bs-link-color: var(--brand);
   --bs-link-hover-color: var(--brand-strong);
   --bs-light: #f1f7f2;
+  --bs-light-rgb: 241, 247, 242;
   --bs-dark: #0f2f1e;
+  --bs-dark-rgb: 15, 47, 30;
   --bs-table-bg: var(--surface-1);
   --bs-table-striped-bg: color-mix(in srgb, var(--brand-contrast) 30%, var(--surface-1));
   --bs-table-border-color: color-mix(in srgb, var(--border-subtle) 85%, transparent);
@@ -90,7 +92,9 @@ body[data-theme="dark"] {
   --bs-link-color: var(--brand);
   --bs-link-hover-color: var(--brand-soft);
   --bs-light: #13261c;
+  --bs-light-rgb: 19, 38, 28;
   --bs-dark: #e7f4eb;
+  --bs-dark-rgb: 231, 244, 235;
   --bs-table-bg: var(--surface-1);
   --bs-table-striped-bg: color-mix(in srgb, var(--brand-contrast) 30%, var(--surface-1));
   --bs-table-border-color: color-mix(in srgb, var(--border-subtle) 85%, transparent);
@@ -304,6 +308,21 @@ main.container {
 .form-select:focus {
   border-color: color-mix(in srgb, var(--brand) 75%, var(--border-subtle));
   box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--brand) 25%, transparent);
+}
+
+body[data-theme="dark"] .bg-light {
+  color: var(--text-primary);
+}
+
+body[data-theme="dark"] .text-bg-light {
+  color: var(--text-primary) !important;
+  background-color: rgba(var(--bs-light-rgb), var(--bs-bg-opacity, 1)) !important;
+}
+
+body[data-theme="dark"] .alert-light {
+  --bs-alert-color: var(--text-primary);
+  --bs-alert-bg: color-mix(in srgb, var(--surface-2) 82%, transparent);
+  --bs-alert-border-color: color-mix(in srgb, var(--border-subtle) 80%, transparent);
 }
 
 .chart-wrapper {

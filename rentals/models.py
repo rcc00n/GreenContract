@@ -1,6 +1,7 @@
+import random
 from decimal import Decimal
 
-from django.db import models
+from django.db import IntegrityError, models
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -11,6 +12,20 @@ class Car(models.Model):
     make = models.CharField(max_length=50)
     model = models.CharField(max_length=50)
     year = models.PositiveIntegerField()
+    vin = models.CharField(max_length=50, blank=True, null=True, help_text="VIN / номер кузова.")
+    sts_number = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text="Registration certificate (СТС) number.",
+    )
+    sts_issue_date = models.DateField(blank=True, null=True)
+    sts_issued_by = models.CharField(
+        max_length=120,
+        blank=True,
+        null=True,
+        help_text="Кем выдано СТС.",
+    )
     daily_rate = models.DecimalField(max_digits=8, decimal_places=2)
     rate_1_4_high = models.DecimalField(
         max_digits=8,
@@ -84,10 +99,33 @@ class Customer(models.Model):
     email = models.EmailField(blank=True, null=True)
     phone = models.CharField(max_length=30)
     license_number = models.CharField(max_length=50)
+    passport_series = models.CharField(max_length=10, blank=True, null=True)
+    passport_number = models.CharField(max_length=20, blank=True, null=True)
+    passport_issue_date = models.DateField(blank=True, null=True)
+    passport_issued_by = models.CharField(max_length=255, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
+    registration_address = models.TextField(blank=True, null=True, help_text="Адрес прописки / регистрации.")
+    residence_address = models.TextField(blank=True, null=True, help_text="Адрес фактического проживания.")
+    notes = models.TextField(blank=True, null=True)
+    tags = models.ManyToManyField(
+        "CustomerTag",
+        blank=True,
+        related_name="customers",
+        help_text="Гибкие теги, например VIP, проблемный, корпоративный.",
+    )
 
     def __str__(self):
         return self.full_name
+
+
+class CustomerTag(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
 
 
 class Rental(models.Model):
@@ -100,6 +138,13 @@ class Rental(models.Model):
 
     car = models.ForeignKey(Car, on_delete=models.PROTECT)
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
+    contract_number = models.CharField(
+        max_length=5,
+        unique=True,
+        blank=True,
+        null=True,
+        help_text="Автоматически сгенерированный 5-значный номер договора.",
+    )
     start_date = models.DateField()
     end_date = models.DateField()
     daily_rate = models.DecimalField(max_digits=8, decimal_places=2)
@@ -108,7 +153,63 @@ class Rental(models.Model):
     created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
 
     def __str__(self):
-        return f"Rental #{self.id} - {self.customer} / {self.car}"
+        return self.deal_name
+
+    @staticmethod
+    def _generate_contract_number() -> str:
+        return f"{random.randint(10000, 99999):05d}"
+
+    @classmethod
+    def generate_unique_contract_number(cls) -> str:
+        """
+        Generate a 5-digit number and retry if the candidate already exists.
+        """
+        for _ in range(50):
+            candidate = cls._generate_contract_number()
+            if not cls.objects.filter(contract_number=candidate).exists():
+                return candidate
+        raise RuntimeError("Could not generate a unique contract number.")
+
+    def ensure_contract_number(self, force: bool = False):
+        """
+        Make sure the rental has a contract number before saving.
+        """
+        if self.contract_number and not force:
+            return
+        self.contract_number = self.generate_unique_contract_number()
+
+    @property
+    def customer_last_name(self) -> str:
+        parts = (self.customer.full_name or "").strip().split()
+        return parts[0] if parts else (self.customer.full_name or "")
+
+    @property
+    def deal_name(self) -> str:
+        """
+        Build a human-friendly deal name:
+        {contract}/{last name}/{plate + make}/{start date}
+        """
+        contract = self.contract_number or "-----"
+        last_name = self.customer_last_name or "—"
+        car_piece = ""
+        if self.car_id:
+            car_piece = f"{self.car.plate_number} {self.car.make}".strip()
+        date_piece = self.start_date.strftime("%Y-%m-%d") if self.start_date else ""
+        return f"{contract}/{last_name}/{car_piece}/{date_piece}"
+
+    def save(self, *args, **kwargs):
+        attempts = 0
+        while attempts < 3:
+            if not self.contract_number:
+                self.ensure_contract_number()
+            try:
+                return super().save(*args, **kwargs)
+            except IntegrityError:
+                # Contract number collision, try again with a fresh number.
+                self.contract_number = None
+                attempts += 1
+        # If we exhausted retries, raise the last IntegrityError.
+        return super().save(*args, **kwargs)
 
 
 class ContractTemplate(models.Model):

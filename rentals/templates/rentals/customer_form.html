@@ -20,7 +20,7 @@
             {% endif %}
             <div class="row g-3">
               {% for field in form %}
-                <div class="{% if field.name in ('address','registration_address','residence_address','notes','tags_text') %}col-12{% else %}col-md-6{% endif %}">
+                <div class="{% if field.name == 'address' or field.name == 'registration_address' or field.name == 'residence_address' or field.name == 'notes' or field.name == 'tags_text' %}col-12{% else %}col-md-6{% endif %}">
                   <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                   {{ field }}
                   {% if field.help_text %}

@@ -13,6 +13,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+RUN chmod +x docker/run_web.sh
 
 # For Dokku: uses $PORT
-CMD ["sh", "-c", "gunicorn car_rental.wsgi:application --bind 0.0.0.0:${PORT:-8000} --timeout ${GUNICORN_TIMEOUT:-120} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-120} --access-logfile - --error-logfile - --log-level ${GUNICORN_LOG_LEVEL:-info}"]
+CMD ["sh", "/app/docker/run_web.sh"]

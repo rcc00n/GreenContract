@@ -1,1 +1,1 @@
-web: sh -c "gunicorn car_rental.wsgi:application --bind 0.0.0.0:$PORT --timeout ${GUNICORN_TIMEOUT:-120} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-120} --access-logfile - --log-level ${GUNICORN_LOG_LEVEL:-info}"
+web: sh /app/docker/run_web.sh

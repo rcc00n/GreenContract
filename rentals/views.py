@@ -915,7 +915,7 @@ def import_customers_csv(request):
                 "Customer import finished",
                 extra={
                     "imported": imported,
-                    "created": created_count,
+                    "created_count": created_count,
                     "updated": updated_count,
                     "skipped_empty": skipped_empty,
                     "duplicate_rows": duplicate_rows,

@@ -1,4 +1,5 @@
 import csv
+import os
 import re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
@@ -11,6 +12,7 @@ except ImportError:  # pragma: no cover - dependency installed via requirements
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
@@ -33,6 +35,7 @@ PHONE_MAX_LEN = Customer._meta.get_field("phone").max_length
 LICENSE_MAX_LEN = Customer._meta.get_field("license_number").max_length
 NAME_MAX_LEN = Customer._meta.get_field("full_name").max_length
 EMAIL_MAX_LEN = Customer._meta.get_field("email").max_length
+IMPORT_BATCH_SIZE = max(1, int(os.environ.get("IMPORT_BULK_BATCH_SIZE", "5000")))
 
 
 def _parse_bool(value):
@@ -840,14 +843,18 @@ def import_customers_csv(request):
                 else:
                     to_create.append(Customer(**data))
 
-            if to_create:
-                Customer.objects.bulk_create(to_create, batch_size=500)
-                created_count = len(to_create)
-            if to_update:
-                Customer.objects.bulk_update(
-                    to_update, ["full_name", "email", "phone", "address"], batch_size=500
-                )
-                updated_count = len(to_update)
+            if to_create or to_update:
+                with transaction.atomic():
+                    if to_create:
+                        Customer.objects.bulk_create(to_create, batch_size=IMPORT_BATCH_SIZE)
+                        created_count = len(to_create)
+                    if to_update:
+                        Customer.objects.bulk_update(
+                            to_update,
+                            ["full_name", "email", "phone", "address"],
+                            batch_size=IMPORT_BATCH_SIZE,
+                        )
+                        updated_count = len(to_update)
 
             imported = created_count + updated_count
 

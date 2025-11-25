@@ -15,4 +15,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # For Dokku: uses $PORT
-CMD ["sh", "-c", "gunicorn car_rental.wsgi:application --bind 0.0.0.0:${PORT:-8000}"]
+CMD ["sh", "-c", "gunicorn car_rental.wsgi:application --bind 0.0.0.0:${PORT:-8000} --timeout ${GUNICORN_TIMEOUT:-120} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-120} --access-logfile - --error-logfile - --log-level ${GUNICORN_LOG_LEVEL:-info}"]

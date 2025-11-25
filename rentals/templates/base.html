@@ -24,6 +24,9 @@
             <li class="nav-item"><a class="nav-link" href="{% url 'rentals:customer_list' %}">Customers</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'rentals:rental_list' %}">Rentals</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'rentals:contract_template_list' %}">Contract templates</a></li>
+            {% if user.is_superuser %}
+              <li class="nav-item"><a class="nav-link" href="{% url 'rentals:admin_user_list' %}">Admins</a></li>
+            {% endif %}
           </ul>
           <div class="d-flex align-items-center gap-2 flex-wrap ms-lg-auto">
             <button class="btn btn-sm theme-toggle" type="button" id="themeToggle" aria-label="Toggle theme">

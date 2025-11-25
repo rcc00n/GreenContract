@@ -16,7 +16,8 @@ except ImportError:  # pragma: no cover - optional dependency for .xlsx
     openpyxl = None
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import HttpResponse, JsonResponse
 from django.db import transaction
 from django.db.models import F, Q, Value
@@ -29,16 +30,18 @@ from django.utils.encoding import smart_str
 from django.views.generic import CreateView, ListView, UpdateView
 from django.views.decorators.http import require_POST
 
-from .forms import CarForm, ContractTemplateForm, CustomerForm, RentalForm
+from .forms import AdminUserCreationForm, CarForm, ContractTemplateForm, CustomerForm, RentalForm
 from .models import Car, ContractTemplate, Customer, CustomerTag, Rental
-from .services.contract_renderer import render_docx, render_html_template
-from .services.pricing import calculate_rental_pricing
+from .services.contract_renderer import placeholder_guide, render_docx, render_html_template, render_pdf
+from .services.pricing import calculate_rental_pricing, pricing_config
 from .services.stats import (
     car_utilization,
     monthly_rental_performance,
     rental_status_breakdown,
     rentals_summary,
 )
+
+User = get_user_model()
 
 PHONE_MAX_LEN = Customer._meta.get_field("phone").max_length
 LICENSE_MAX_LEN = Customer._meta.get_field("license_number").max_length
@@ -498,6 +501,24 @@ def _normalize_customer_row(row, row_index: int):
 
 
 @login_required
+@user_passes_test(lambda user: user.is_superuser, raise_exception=True)
+def admin_user_list(request):
+    admins = User.objects.filter(is_staff=True).order_by("username")
+    form = AdminUserCreationForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        new_admin = form.save()
+        messages.success(request, f"Администратор {new_admin.get_username()} создан.")
+        return redirect("rentals:admin_user_list")
+
+    context = {
+        "admins": admins,
+        "form": form,
+    }
+    return render(request, "rentals/admin_list.html", context)
+
+
+@login_required
 def dashboard(request):
     summary = rentals_summary()
     utilization = car_utilization()[:5]
@@ -809,6 +830,7 @@ class RentalCreateView(CreateView):
         context = super().get_context_data(**kwargs)
         context["car_pricing"] = [_serialize_car_pricing(car) for car in Car.objects.all()]
         context["customer_initial_label"] = getattr(context.get("form"), "initial_customer_label", "")
+        context["pricing_config"] = pricing_config()
         return context
 
 
@@ -823,6 +845,7 @@ class RentalUpdateView(UpdateView):
         context = super().get_context_data(**kwargs)
         context["car_pricing"] = [_serialize_car_pricing(car) for car in Car.objects.all()]
         context["customer_initial_label"] = getattr(context.get("form"), "initial_customer_label", "")
+        context["pricing_config"] = pricing_config()
         return context
 
 
@@ -839,6 +862,11 @@ class ContractTemplateCreateView(CreateView):
     template_name = "rentals/contract_template_form.html"
     success_url = reverse_lazy("rentals:contract_template_list")
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["placeholder_guide"] = placeholder_guide()
+        return context
+
 
 @method_decorator(login_required, name="dispatch")
 class ContractTemplateUpdateView(UpdateView):
@@ -846,6 +874,11 @@ class ContractTemplateUpdateView(UpdateView):
     form_class = ContractTemplateForm
     template_name = "rentals/contract_template_form.html"
     success_url = reverse_lazy("rentals:contract_template_list")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["placeholder_guide"] = placeholder_guide()
+        return context
 
 
 @login_required
@@ -1364,21 +1397,21 @@ def import_rentals_csv(request):
                     missing_relations += 1
                     continue
 
-                rental_days, computed_rate, computed_total = calculate_rental_pricing(car, start_date, end_date)
-                if rental_days <= 0:
+                breakdown = calculate_rental_pricing(car, start_date, end_date)
+                if breakdown.days <= 0:
                     skipped += 1
                     continue
 
                 daily_rate_raw = row.get("daily_rate")
                 daily_rate = (
-                    _parse_decimal(daily_rate_raw) if daily_rate_raw not in (None, "") else computed_rate
+                    _parse_decimal(daily_rate_raw) if daily_rate_raw not in (None, "") else breakdown.daily_rate
                 )
 
                 total_price_value = row.get("total_price")
                 total_price = (
                     _parse_decimal(total_price_value)
                     if total_price_value not in (None, "")
-                    else daily_rate * Decimal(rental_days)
+                    else daily_rate * Decimal(breakdown.days)
                 )
 
                 contract_number = (row.get("contract_number") or "").strip()
@@ -1442,17 +1475,36 @@ def generate_contract(request, rental_id, template_id):
     ct = get_object_or_404(ContractTemplate, pk=template_id)
 
     if ct.format == "html":
-        html = render_html_template(ct, rental)
+        try:
+            html = render_html_template(ct, rental)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.exception("Failed to render HTML contract", extra={"template_id": ct.id, "rental_id": rental.id})
+            return HttpResponse(f"Could not render HTML: {exc}", status=500)
         response = HttpResponse(html, content_type="text/html; charset=utf-8")
         return response
 
     elif ct.format == "docx":
-        file_io = render_docx(ct, rental)
+        try:
+            file_io = render_docx(ct, rental)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.exception("Failed to render DOCX contract", extra={"template_id": ct.id, "rental_id": rental.id})
+            return HttpResponse(f"Could not render DOCX: {exc}", status=500)
         response = HttpResponse(
             file_io.getvalue(),
             content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         )
         response["Content-Disposition"] = f'attachment; filename="contract_{rental.id}.docx"'
+        return response
+
+    elif ct.format == "pdf":
+        try:
+            file_io = render_pdf(ct, rental)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.exception("Failed to generate PDF contract", extra={"template_id": ct.id, "rental_id": rental.id})
+            return HttpResponse(f"Could not render PDF: {exc}", status=500)
+
+        response = HttpResponse(file_io.getvalue(), content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="contract_{rental.id}.pdf"'
         return response
 
     else:

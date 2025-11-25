@@ -1,8 +1,128 @@
-from datetime import date
-from decimal import Decimal
-from typing import Tuple
+from dataclasses import dataclass
+from datetime import date, datetime, time
+from decimal import Decimal, InvalidOperation
+from typing import Dict
 
 from ..models import Car
+
+AIRPORT_FEE_DEFAULT = Decimal("1100")
+AIRPORT_FEE_SLOTS = [
+    ("20:00", "20:59", Decimal("1000")),
+    ("21:00", "23:59", Decimal("1700")),
+    ("00:00", "05:59", Decimal("2200")),
+    ("06:00", "07:59", Decimal("1700")),
+    ("08:00", "08:59", Decimal("1000")),
+]
+
+# Таблица для ночного выхода — можно скорректировать при необходимости.
+NIGHT_EXIT_FEE_DEFAULT = Decimal("0")
+NIGHT_EXIT_FEE_SLOTS = AIRPORT_FEE_SLOTS
+
+DELIVERY_FEES: Dict[str, Decimal] = {
+    "Алупка": Decimal("4500"),
+    "Алушта": Decimal("2500"),
+    "за Алушту": Decimal("3000"),
+    "Змейка, Новотерский": Decimal("1300"),
+    "Армянск": Decimal("4500"),
+    "Ай-Даниль": Decimal("3500"),
+    "Балаклава": Decimal("3800"),
+    "Бахчисарай": Decimal("2500"),
+    "Береговое (Николаевка)": Decimal("2500"),
+    "Береговое Фео": Decimal("3500"),
+    "Витино": Decimal("3500"),
+    "Гаспра": Decimal("4000"),
+    "Гурзуф": Decimal("4000"),
+    "Джанкой": Decimal("3000"),
+    "Евпатория": Decimal("3000"),
+    "Заозерное": Decimal("3500"),
+    "Канака ( с Приветное)": Decimal("4500"),
+    "Кацивели": Decimal("4000"),
+    "Кача": Decimal("4000"),
+    "Керчь": Decimal("5500"),
+    "Краснодар": Decimal("7000"),
+    "Крымская роза": Decimal("2000"),
+    "Коктебель": Decimal("4200"),
+    "Кореиз": Decimal("4200"),
+    "Курпаты": Decimal("4200"),
+    "Курортное": Decimal("4000"),
+    "Ласпи": Decimal("4200"),
+    "Лучистое": Decimal("3900"),
+    "Малореченское": Decimal("3500"),
+    "Массандра": Decimal("3000"),
+    "Межводное": Decimal("4900"),
+    "Минеральные Воды": Decimal("10000"),
+    "Мирное": Decimal("3700"),
+    "Морское": Decimal("4000"),
+    "МРИЯ отель": Decimal("4200"),
+    "Николаевка": Decimal("2500"),
+    "Новофедоровка": Decimal("2800"),
+    "Новый Свет": Decimal("4200"),
+    "Оленевка": Decimal("4900"),
+    "Оползневое": Decimal("4200"),
+    "Орджоникидзе": Decimal("4200"),
+    "Орловка": Decimal("4000"),
+    "Отрадное": Decimal("2900"),
+    "Партенит": Decimal("3000"),
+    "Песчаное": Decimal("3000"),
+    "Поповка": Decimal("3800"),
+    "Приветное": Decimal("4000"),
+    "Приморский": Decimal("4200"),
+    "Саки": Decimal("2400"),
+    "Севастополь": Decimal("3500"),
+    "Семидворье": Decimal("3500"),
+    "Симеиз": Decimal("4200"),
+    "Симферополь": Decimal("1000"),
+    "Симферопольский р-ны Строгоновка, Денисовка, Мазанка": Decimal("1500"),
+    "Солнечногорское (Рыбачье)": Decimal("3500"),
+    "Сочи": Decimal("10000"),
+    "Судак": Decimal("3900"),
+    "Тарханкут (оленевка)": Decimal("4900"),
+    "Утес": Decimal("3300"),
+    "Уютное": Decimal("3000"),
+    "Угловое": Decimal("4000"),
+    "Феодосия": Decimal("3900"),
+    "фиолент": Decimal("3500"),
+    "Форос": Decimal("4200"),
+    "Фрунзе": Decimal("3000"),
+    "Черноморское": Decimal("4000"),
+    "Штормовое": Decimal("3800"),
+    "Щелкино": Decimal("5500"),
+    "Ялта": Decimal("3500"),
+    "за Ялту": Decimal("4000"),
+    "Кисловодск": Decimal("3500"),
+    "Ессентуки": Decimal("2500"),
+    "Пятигорск": Decimal("2500"),
+    "Железноводск": Decimal("2000"),
+}
+
+CHILD_SEAT_DAILY = Decimal("200")
+CHILD_SEAT_CAP = Decimal("2800")
+BOOSTER_DAILY = Decimal("100")
+BOOSTER_CAP = Decimal("1000")
+SKI_RACK_DAILY = Decimal("400")
+AUTOBOX_DAILY = Decimal("900")
+CROSSBARS_DAILY = Decimal("300")
+
+
+@dataclass
+class PricingBreakdown:
+    days: int
+    daily_rate: Decimal
+    base_total: Decimal
+    airport_total: Decimal
+    night_total: Decimal
+    delivery_total: Decimal
+    seats_total: Decimal
+    boosters_total: Decimal
+    gear_total: Decimal
+    equipment_manual_total: Decimal
+    extras_total: Decimal
+    discount_amount: Decimal
+    discount_percent_amount: Decimal
+    subtotal: Decimal
+    total_price: Decimal
+    prepayment: Decimal
+    balance_due: Decimal
 
 
 def rental_days(start_date: date | None, end_date: date | None) -> int:
@@ -12,17 +132,191 @@ def rental_days(start_date: date | None, end_date: date | None) -> int:
     return max((end_date - start_date).days, 0)
 
 
-def calculate_rental_pricing(car: Car | None, start_date: date | None, end_date: date | None) -> Tuple[int, Decimal, Decimal]:
-    """
-    Calculate rental days, per-day rate, and total price for the given car and dates.
+def _to_decimal(value, default="0.00") -> Decimal:
+    if value is None:
+        return Decimal(default)
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return Decimal(default)
 
-    Uses the car's tiered pricing, preferring high-season values (вс) and
-    falling back to low-season (нс) or the legacy daily_rate when empty.
+
+def _parse_time_string(value: str) -> time:
+    return datetime.strptime(value, "%H:%M").time()
+
+
+def _time_in_range(start: time, end: time, current: time) -> bool:
+    if start <= end:
+        return start <= current <= end
+    return current >= start or current <= end
+
+
+def _fee_for_time(value: time | None, slots: list[tuple[str, str, Decimal]], default: Decimal) -> Decimal:
+    if value is None:
+        return default
+    for start_raw, end_raw, amount in slots:
+        start_time = _parse_time_string(start_raw)
+        end_time = _parse_time_string(end_raw)
+        if _time_in_range(start_time, end_time, value):
+            return amount
+    return default
+
+
+def delivery_fee_for_city(city: str | None) -> Decimal:
+    if not city:
+        return Decimal("0.00")
+    return DELIVERY_FEES.get(city, Decimal("0.00"))
+
+
+def pricing_config() -> dict:
+    """Expose pricing constants for the UI."""
+
+    def _slot_list(slots):
+        return [{"start": start, "end": end, "amount": float(amount)} for start, end, amount in slots]
+
+    return {
+        "airport_default": float(AIRPORT_FEE_DEFAULT),
+        "airport_slots": _slot_list(AIRPORT_FEE_SLOTS),
+        "night_default": float(NIGHT_EXIT_FEE_DEFAULT),
+        "night_slots": _slot_list(NIGHT_EXIT_FEE_SLOTS),
+        "delivery_fees": {name: float(amount) for name, amount in DELIVERY_FEES.items()},
+        "child_seat_daily": float(CHILD_SEAT_DAILY),
+        "child_seat_cap": float(CHILD_SEAT_CAP),
+        "booster_daily": float(BOOSTER_DAILY),
+        "booster_cap": float(BOOSTER_CAP),
+        "ski_rack_daily": float(SKI_RACK_DAILY),
+        "autobox_daily": float(AUTOBOX_DAILY),
+        "crossbars_daily": float(CROSSBARS_DAILY),
+    }
+
+
+def calculate_rental_pricing(
+    car: Car | None,
+    start_date: date | None,
+    end_date: date | None,
+    *,
+    start_time: time | None = None,
+    end_time: time | None = None,
+    unique_daily_rate: Decimal | None = None,
+    airport_fee_start: Decimal | None = None,
+    airport_fee_end: Decimal | None = None,
+    night_fee_start: Decimal | None = None,
+    night_fee_end: Decimal | None = None,
+    delivery_issue_city: str = "",
+    delivery_return_city: str = "",
+    delivery_issue_fee: Decimal | None = None,
+    delivery_return_fee: Decimal | None = None,
+    child_seat_count: int = 0,
+    booster_count: int = 0,
+    ski_rack_count: int = 0,
+    roof_box_count: int = 0,
+    crossbars_count: int = 0,
+    child_seat_included: bool = False,
+    booster_included: bool = False,
+    ski_rack_included: bool = False,
+    roof_box_included: bool = False,
+    crossbars_included: bool = False,
+    equipment_manual_total: Decimal | None = None,
+    discount_amount: Decimal | None = None,
+    discount_percent: Decimal | None = None,
+    prepayment: Decimal | None = None,
+) -> PricingBreakdown:
+    """
+    Calculate full rental pricing with surcharges, extras, discounts and prepayment.
     """
     days = rental_days(start_date, end_date)
     if not car or days <= 0:
-        return days, Decimal("0.00"), Decimal("0.00")
+        zero = Decimal("0.00")
+        return PricingBreakdown(
+            days=days,
+            daily_rate=zero,
+            base_total=zero,
+            airport_total=zero,
+            night_total=zero,
+            delivery_total=zero,
+            seats_total=zero,
+            boosters_total=zero,
+            gear_total=zero,
+            equipment_manual_total=zero,
+            extras_total=zero,
+            discount_amount=zero,
+            discount_percent_amount=zero,
+            subtotal=zero,
+            total_price=zero,
+            prepayment=_to_decimal(prepayment),
+            balance_due=zero,
+        )
 
-    daily_rate = car.get_rate_for_days(days)
-    total_price = daily_rate * Decimal(days)
-    return days, daily_rate, total_price
+    base_daily_rate = _to_decimal(unique_daily_rate) if unique_daily_rate not in (None, "") else car.get_rate_for_days(days)
+    base_total = (base_daily_rate * Decimal(days)).quantize(Decimal("0.01"))
+
+    airport_start = _to_decimal(airport_fee_start) if airport_fee_start not in (None, "") else _fee_for_time(start_time, AIRPORT_FEE_SLOTS, AIRPORT_FEE_DEFAULT)
+    airport_end = _to_decimal(airport_fee_end) if airport_fee_end not in (None, "") else _fee_for_time(end_time, AIRPORT_FEE_SLOTS, AIRPORT_FEE_DEFAULT)
+    airport_total = (airport_start + airport_end).quantize(Decimal("0.01"))
+
+    night_start = _to_decimal(night_fee_start) if night_fee_start not in (None, "") else _fee_for_time(start_time, NIGHT_EXIT_FEE_SLOTS, NIGHT_EXIT_FEE_DEFAULT)
+    night_end = _to_decimal(night_fee_end) if night_fee_end not in (None, "") else _fee_for_time(end_time, NIGHT_EXIT_FEE_SLOTS, NIGHT_EXIT_FEE_DEFAULT)
+    night_total = (night_start + night_end).quantize(Decimal("0.01"))
+
+    issue_delivery_fee = _to_decimal(delivery_issue_fee) if delivery_issue_fee not in (None, "") else delivery_fee_for_city(delivery_issue_city)
+    return_delivery_fee = _to_decimal(delivery_return_fee) if delivery_return_fee not in (None, "") else delivery_fee_for_city(delivery_return_city)
+    delivery_total = (issue_delivery_fee + return_delivery_fee).quantize(Decimal("0.01"))
+
+    seat_units = max(int(child_seat_count or 0), 1 if child_seat_included else 0)
+    booster_units = max(int(booster_count or 0), 1 if booster_included else 0)
+    seats_total = (min(CHILD_SEAT_DAILY * days, CHILD_SEAT_CAP) * seat_units).quantize(Decimal("0.01"))
+    boosters_total = (min(BOOSTER_DAILY * days, BOOSTER_CAP) * booster_units).quantize(Decimal("0.01"))
+
+    ski_units = max(int(ski_rack_count or 0), 1 if ski_rack_included else 0)
+    box_units = max(int(roof_box_count or 0), 1 if roof_box_included else 0)
+    cross_units = max(int(crossbars_count or 0), 1 if crossbars_included else 0)
+    gear_total = (
+        SKI_RACK_DAILY * ski_units * days + AUTOBOX_DAILY * box_units * days + CROSSBARS_DAILY * cross_units * days
+    ).quantize(Decimal("0.01"))
+
+    equipment_override = _to_decimal(equipment_manual_total)
+    if equipment_override > 0:
+        equipment_manual = equipment_override.quantize(Decimal("0.01"))
+        seats_total = boosters_total = gear_total = Decimal("0.00")
+    else:
+        equipment_manual = Decimal("0.00")
+
+    extras_total = (airport_total + night_total + delivery_total + seats_total + boosters_total + gear_total + equipment_manual).quantize(Decimal("0.01"))
+    subtotal = (base_total + extras_total).quantize(Decimal("0.01"))
+
+    discount_value = _to_decimal(discount_amount)
+    discount_value = max(min(discount_value, subtotal), Decimal("0.00"))
+
+    percent_raw = _to_decimal(discount_percent)
+    if percent_raw < 0:
+        percent_raw = Decimal("0.00")
+    if percent_raw > 100:
+        percent_raw = Decimal("100.00")
+    percent_base = max(subtotal - discount_value, Decimal("0.00"))
+    discount_percent_amount = (percent_base * percent_raw / Decimal("100")).quantize(Decimal("0.01"))
+
+    total_price = (subtotal - discount_value - discount_percent_amount).quantize(Decimal("0.01"))
+    prepayment_value = _to_decimal(prepayment)
+    if prepayment_value < 0:
+        prepayment_value = Decimal("0.00")
+    balance_due = max(total_price - prepayment_value, Decimal("0.00")).quantize(Decimal("0.01"))
+
+    return PricingBreakdown(
+        days=days,
+        daily_rate=base_daily_rate.quantize(Decimal("0.01")),
+        base_total=base_total,
+        airport_total=airport_total,
+        night_total=night_total,
+        delivery_total=delivery_total,
+        seats_total=seats_total,
+        boosters_total=boosters_total,
+        gear_total=gear_total,
+        equipment_manual_total=equipment_manual,
+        extras_total=extras_total,
+        discount_amount=discount_value,
+        discount_percent_amount=discount_percent_amount,
+        subtotal=subtotal,
+        total_price=total_price,
+        prepayment=prepayment_value.quantize(Decimal("0.01")),
+        balance_due=balance_due,
+    )

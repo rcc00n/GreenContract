@@ -105,17 +105,29 @@
                 </div>
               </div>
 
-              <div class="col-md-6">
+              <div class="col-lg-3 col-md-6">
                 <label class="form-label" for="{{ form.start_date.id_for_label }}">Start date</label>
                 {{ form.start_date }}
                 <div class="form-text">Выберите дату начала аренды.</div>
                 {% for error in form.start_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
-              <div class="col-md-6">
+              <div class="col-lg-3 col-md-6">
+                <label class="form-label" for="{{ form.start_time.id_for_label }}">Start time</label>
+                {{ form.start_time }}
+                <div class="form-text">Нужен для расчёта аэропортового/ночного сбора.</div>
+                {% for error in form.start_time.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-lg-3 col-md-6">
                 <label class="form-label" for="{{ form.end_date.id_for_label }}">End date</label>
                 {{ form.end_date }}
                 <div class="form-text">Система подставит цену в зависимости от количества дней.</div>
                 {% for error in form.end_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-lg-3 col-md-6">
+                <label class="form-label" for="{{ form.end_time.id_for_label }}">End time</label>
+                {{ form.end_time }}
+                <div class="form-text">Для ночных/аэропортовых сборов при возврате.</div>
+                {% for error in form.end_time.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
 
               <div class="col-12">
@@ -128,23 +140,194 @@
                 </div>
               </div>
 
-              <div class="col-md-6">
+              <div class="col-lg-3 col-md-6">
+                <label class="form-label" for="{{ form.unique_daily_rate.id_for_label }}">Уникальный тариф</label>
+                {{ form.unique_daily_rate }}
+                <div class="form-text">Перебивает тариф машины на все дни.</div>
+                {% for error in form.unique_daily_rate.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-lg-3 col-md-6">
                 <label class="form-label" for="{{ form.daily_rate.id_for_label }}">Daily rate</label>
                 {{ form.daily_rate }}
                 <div class="form-text">Автозаполнение по тарифу автомобиля.</div>
                 {% for error in form.daily_rate.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
-              <div class="col-md-6">
+              <div class="col-lg-3 col-md-6">
                 <label class="form-label" for="{{ form.total_price.id_for_label }}">Total price</label>
                 {{ form.total_price }}
-                <div class="form-text">Считается автоматически по количеству дней.</div>
+                <div class="form-text">Сумма договора после доп. услуг и скидок.</div>
                 {% for error in form.total_price.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
+              <div class="col-lg-3 col-md-6">
+                <label class="form-label" for="{{ form.balance_due.id_for_label }}">К оплате после предоплаты</label>
+                {{ form.balance_due }}
+                <div class="form-text">Учитывает предоплату.</div>
+                {% for error in form.balance_due.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
 
-              <div class="col-md-6">
-                <label class="form-label" for="{{ form.status.id_for_label }}">Status</label>
-                {{ form.status }}
-                {% for error in form.status.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              <div class="col-12">
+                <div class="border rounded p-3 bg-light">
+                  <div class="fw-semibold mb-2">Аэропорт, ночной выход, доставка</div>
+                  <div class="row g-3">
+                    <div class="col-lg-6">
+                      <div class="border rounded p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                          <div class="fw-semibold small mb-0">Выдача</div>
+                          <button class="btn btn-sm btn-outline-secondary" type="button" data-time-fill="start">
+                            По времени выдачи
+                          </button>
+                        </div>
+                        <div class="row g-2">
+                          <div class="col-sm-6">
+                            <label class="form-label" for="{{ form.airport_fee_start.id_for_label }}">Аэропорт</label>
+                            {{ form.airport_fee_start }}
+                            <div class="form-text">Рассчитывается по времени, можно поправить.</div>
+                            {% for error in form.airport_fee_start.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                          </div>
+                          <div class="col-sm-6">
+                            <label class="form-label" for="{{ form.night_fee_start.id_for_label }}">Ночной выход</label>
+                            {{ form.night_fee_start }}
+                            <div class="form-text">По таблице ночных выходов.</div>
+                            {% for error in form.night_fee_start.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                          </div>
+                          <div class="col-sm-6">
+                            <label class="form-label" for="{{ form.delivery_issue_city.id_for_label }}">Город выдачи</label>
+                            {{ form.delivery_issue_city }}
+                            <div class="form-text">Стоимость возьмём из таблицы доставки.</div>
+                            {% for error in form.delivery_issue_city.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                          </div>
+                          <div class="col-sm-6">
+                            <label class="form-label" for="{{ form.delivery_issue_fee.id_for_label }}">Стоимость выдачи</label>
+                            {{ form.delivery_issue_fee }}
+                            <div class="form-text">Автозаполнение, можно изменить.</div>
+                            {% for error in form.delivery_issue_fee.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-lg-6">
+                      <div class="border rounded p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                          <div class="fw-semibold small mb-0">Возврат</div>
+                          <button class="btn btn-sm btn-outline-secondary" type="button" data-time-fill="end">
+                            По времени возврата
+                          </button>
+                        </div>
+                        <div class="row g-2">
+                          <div class="col-sm-6">
+                            <label class="form-label" for="{{ form.airport_fee_end.id_for_label }}">Аэропорт</label>
+                            {{ form.airport_fee_end }}
+                            <div class="form-text">По времени возврата.</div>
+                            {% for error in form.airport_fee_end.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                          </div>
+                          <div class="col-sm-6">
+                            <label class="form-label" for="{{ form.night_fee_end.id_for_label }}">Ночной выход</label>
+                            {{ form.night_fee_end }}
+                            <div class="form-text">Можно скорректировать вручную.</div>
+                            {% for error in form.night_fee_end.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                          </div>
+                          <div class="col-sm-6">
+                            <label class="form-label" for="{{ form.delivery_return_city.id_for_label }}">Город возврата</label>
+                            {{ form.delivery_return_city }}
+                            <div class="form-text">Считается отдельно от выдачи.</div>
+                            {% for error in form.delivery_return_city.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                          </div>
+                          <div class="col-sm-6">
+                            <label class="form-label" for="{{ form.delivery_return_fee.id_for_label }}">Стоимость возврата</label>
+                            {{ form.delivery_return_fee }}
+                            <div class="form-text">Авторасчёт по городу, редактируется.</div>
+                            {% for error in form.delivery_return_fee.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="border rounded p-3 bg-light">
+                  <div class="fw-semibold mb-2">Дополнительное оборудование</div>
+                  <div class="row g-3 align-items-center">
+                    <div class="col-md-4">
+                      <div class="form-check">
+                        {{ form.child_seat_included }}
+                        <label class="form-check-label" for="{{ form.child_seat_included.id_for_label }}">Детское кресло</label>
+                      </div>
+                      <div class="form-text">200 ₽/сут, максимум 2800 за кресло.</div>
+                      {% for error in form.child_seat_included.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                      <div class="form-check">
+                        {{ form.booster_included }}
+                        <label class="form-check-label" for="{{ form.booster_included.id_for_label }}">Бустер</label>
+                      </div>
+                      <div class="form-text">100 ₽/сут, максимум 1000 за бустер.</div>
+                      {% for error in form.booster_included.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                      <div class="form-check">
+                        {{ form.ski_rack_included }}
+                        <label class="form-check-label" for="{{ form.ski_rack_included.id_for_label }}">Крепления д/лыж</label>
+                      </div>
+                      <div class="form-text">400 ₽ в сутки.</div>
+                      {% for error in form.ski_rack_included.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                      <div class="form-check">
+                        {{ form.roof_box_included }}
+                        <label class="form-check-label" for="{{ form.roof_box_included.id_for_label }}">Автобокс</label>
+                      </div>
+                      <div class="form-text">900 ₽ в сутки.</div>
+                      {% for error in form.roof_box_included.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                      <div class="form-check">
+                        {{ form.crossbars_included }}
+                        <label class="form-check-label" for="{{ form.crossbars_included.id_for_label }}">Поперечины</label>
+                      </div>
+                      <div class="form-text">300 ₽ в сутки.</div>
+                      {% for error in form.crossbars_included.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label" for="{{ form.equipment_manual_total.id_for_label }}">Фикс. сумма оборудования</label>
+                      {{ form.equipment_manual_total }}
+                      <div class="form-text">Заполните, если не считать по суткам.</div>
+                      {% for error in form.equipment_manual_total.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="border rounded p-3 bg-light">
+                  <div class="fw-semibold mb-2">Скидки, предоплата и статус</div>
+                  <div class="row g-3">
+                    <div class="col-md-4">
+                      <label class="form-label" for="{{ form.discount_amount.id_for_label }}">Скидка суммой</label>
+                      {{ form.discount_amount }}
+                      <div class="form-text">Фиксированная скидка в рублях.</div>
+                      {% for error in form.discount_amount.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label" for="{{ form.discount_percent.id_for_label }}">Скидка %</label>
+                      {{ form.discount_percent }}
+                      <div class="form-text">Применяется после фиксированной скидки.</div>
+                      {% for error in form.discount_percent.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label" for="{{ form.prepayment.id_for_label }}">Предоплата</label>
+                      {{ form.prepayment }}
+                      <div class="form-text">Вычитается из суммы к оплате.</div>
+                      {% for error in form.prepayment.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label" for="{{ form.status.id_for_label }}">Status</label>
+                      {{ form.status }}
+                      {% for error in form.status.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -319,14 +502,21 @@
             {% if car_pricing %}
               {{ car_pricing|json_script:"car-pricing-data" }}
             {% endif %}
+            {% if pricing_config %}
+              {{ pricing_config|json_script:"pricing-config-data" }}
+            {% endif %}
 
             <script>
               (function() {
                 const carSelect = document.getElementById("id_car");
                 const startInput = document.getElementById("id_start_date");
                 const endInput = document.getElementById("id_end_date");
+                const startTimeInput = document.getElementById("id_start_time");
+                const endTimeInput = document.getElementById("id_end_time");
                 const dailyRateInput = document.getElementById("id_daily_rate");
+                const uniqueRateInput = document.getElementById("id_unique_daily_rate");
                 const totalInput = document.getElementById("id_total_price");
+                const balanceInput = document.getElementById("id_balance_due");
                 const summaryText = document.getElementById("price-summary-text");
                 const quickButtons = document.querySelectorAll("button[data-days]");
                 const contractInput = document.getElementById("id_contract_number");
@@ -335,11 +525,32 @@
                 const carDetailsEmpty = document.getElementById("car-details-empty");
                 const carEditLink = document.getElementById("car-edit-link");
                 const customerSearchInput = document.getElementById("customer-search");
-                let selectedCustomerName = (customerSearchInput?.value || "").trim();
-                let currentCar = null;
+                const airportStartInput = document.getElementById("id_airport_fee_start");
+                const airportEndInput = document.getElementById("id_airport_fee_end");
+                const nightStartInput = document.getElementById("id_night_fee_start");
+                const nightEndInput = document.getElementById("id_night_fee_end");
+                const deliveryIssueCity = document.getElementById("id_delivery_issue_city");
+                const deliveryReturnCity = document.getElementById("id_delivery_return_city");
+                const deliveryIssueFee = document.getElementById("id_delivery_issue_fee");
+                const deliveryReturnFee = document.getElementById("id_delivery_return_fee");
+                const childSeatToggle = document.getElementById("id_child_seat_included");
+                const boosterToggle = document.getElementById("id_booster_included");
+                const skiRackToggle = document.getElementById("id_ski_rack_included");
+                const roofBoxToggle = document.getElementById("id_roof_box_included");
+                const crossbarsToggle = document.getElementById("id_crossbars_included");
+                const equipmentManualInput = document.getElementById("id_equipment_manual_total");
+                const discountAmountInput = document.getElementById("id_discount_amount");
+                const discountPercentInput = document.getElementById("id_discount_percent");
+                const prepaymentInput = document.getElementById("id_prepayment");
+                const timeFillButtons = document.querySelectorAll("[data-time-fill]");
                 const carPricingData = window.JSON.parse(
                   (document.getElementById("car-pricing-data") || { textContent: "[]" }).textContent
                 );
+                const pricingConfig = window.JSON.parse(
+                  (document.getElementById("pricing-config-data") || { textContent: "{}" }).textContent
+                );
+                let selectedCustomerName = (customerSearchInput?.value || "").trim();
+                let currentCar = null;
 
                 const msPerDay = 24 * 60 * 60 * 1000;
 
@@ -358,6 +569,55 @@
                   return diff > 0 ? diff : 0;
                 }
 
+                function parseTimeMinutes(value) {
+                  if (!value) return null;
+                  const parts = value.split(":");
+                  if (parts.length !== 2) return null;
+                  const hours = parseInt(parts[0], 10);
+                  const minutes = parseInt(parts[1], 10);
+                  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+                  return hours * 60 + minutes;
+                }
+
+                function slotMinutes(text) {
+                  const parts = text.split(":");
+                  if (parts.length !== 2) return 0;
+                  return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+                }
+
+                function feeByTime(valueMinutes, slots, fallback) {
+                  if (valueMinutes === null || valueMinutes === undefined) return fallback;
+                  for (const slot of slots || []) {
+                    const start = slotMinutes(slot.start || "00:00");
+                    const end = slotMinutes(slot.end || "00:00");
+                    if (start <= end) {
+                      if (valueMinutes >= start && valueMinutes <= end) {
+                        return slot.amount ?? fallback;
+                      }
+                    } else if (valueMinutes >= start || valueMinutes <= end) {
+                      return slot.amount ?? fallback;
+                    }
+                  }
+                  return fallback;
+                }
+
+                function parseNumber(input) {
+                  if (!input) return 0;
+                  const raw = String(input.value || "").replace(",", ".").trim();
+                  const parsed = Number.parseFloat(raw);
+                  return Number.isFinite(parsed) ? parsed : 0;
+                }
+
+                function setNumber(input, value) {
+                  if (!input) return;
+                  const normalized = Number.isFinite(value) ? value : 0;
+                  input.value = normalized.toFixed(2);
+                }
+
+                function formatMoney(value) {
+                  return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB" }).format(value || 0);
+                }
+
                 function pickRate(car, days) {
                   if (!car) return 0;
                   const tiers = [
@@ -373,10 +633,6 @@
                     }
                   }
                   return car.daily_rate || 0;
-                }
-
-                function formatMoney(value) {
-                  return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB" }).format(value || 0);
                 }
 
                 function setCarDetail(field, value) {
@@ -435,53 +691,114 @@
                   dealPreview.textContent = `${contract}/${lastName}/${carPart}/${datePart}`;
                 }
 
-                const initialValues = {
-                  car: carSelect ? carSelect.value : "",
-                  start: startInput ? startInput.value : "",
-                  end: endInput ? endInput.value : "",
-                  daily: dailyRateInput ? dailyRateInput.value : "",
-                  total: totalInput ? totalInput.value : "",
-                };
+                function deliveryFeeFor(city) {
+                  if (!city) return 0;
+                  return pricingConfig.delivery_fees?.[city] || 0;
+                }
 
-                function updatePricing(forceWrite = false) {
+                function autoFillDelivery(selectEl, feeEl) {
+                  if (!selectEl || !feeEl) return;
+                  const fee = deliveryFeeFor(selectEl.value || "");
+                  setNumber(feeEl, fee);
+                }
+
+                function autoFillTimeFees(target) {
+                  const isStart = target === "start";
+                  const minutes = parseTimeMinutes(isStart ? startTimeInput?.value : endTimeInput?.value);
+                  const airportInput = isStart ? airportStartInput : airportEndInput;
+                  const nightInput = isStart ? nightStartInput : nightEndInput;
+                  const airportFee = feeByTime(minutes, pricingConfig.airport_slots || [], pricingConfig.airport_default || 0);
+                  const nightFee = feeByTime(minutes, pricingConfig.night_slots || [], pricingConfig.night_default || 0);
+                  setNumber(airportInput, airportFee);
+                  setNumber(nightInput, nightFee);
+                }
+
+                function calculatePricing(forceWrite = false) {
                   const carId = Number(carSelect?.value);
                   currentCar = carPricingData.find((item) => item.id === carId);
                   const startDate = parseDate(startInput?.value);
                   const endDate = parseDate(endInput?.value);
                   const days = diffDays(startDate, endDate);
-                  const hasExistingPrice = Boolean((dailyRateInput && dailyRateInput.value) || (totalInput && totalInput.value));
-                  const inputsChanged =
-                    initialValues.car !== (carSelect ? carSelect.value : "") ||
-                    initialValues.start !== (startInput ? startInput.value : "") ||
-                    initialValues.end !== (endInput ? endInput.value : "");
-                  const shouldWrite = forceWrite || !hasExistingPrice || inputsChanged;
 
                   updateCarDetails(currentCar);
                   updateDealPreview(currentCar);
 
                   if (!currentCar || !days) {
-                    if (shouldWrite && dailyRateInput) dailyRateInput.value = "";
-                    if (shouldWrite && totalInput) totalInput.value = "";
-                    if (hasExistingPrice && !shouldWrite) {
-                      summaryText.textContent = `Сохранённая сумма: ${formatMoney(Number(totalInput?.value || 0))}`;
-                    } else {
-                      summaryText.textContent = "Выберите авто и корректные даты аренды.";
+                    if (forceWrite) {
+                      setNumber(dailyRateInput, 0);
+                      setNumber(totalInput, 0);
+                      setNumber(balanceInput, 0);
                     }
+                    summaryText.textContent = "Выберите авто и корректные даты аренды.";
                     return;
                   }
 
-                  if (!shouldWrite && hasExistingPrice && days > 0) {
-                    summaryText.textContent = `${days} дн × ${formatMoney(Number(dailyRateInput?.value || 0))} = ${formatMoney(Number(totalInput?.value || 0))}`;
-                    return;
+                  const uniqueRate = parseNumber(uniqueRateInput);
+                  const baseRate = uniqueRate > 0 ? uniqueRate : pickRate(currentCar, days);
+                  const baseTotal = baseRate * days;
+
+                  if (airportStartInput && !airportStartInput.value) {
+                    setNumber(airportStartInput, pricingConfig.airport_default || 0);
+                  }
+                  if (airportEndInput && !airportEndInput.value) {
+                    setNumber(airportEndInput, pricingConfig.airport_default || 0);
+                  }
+                  if (nightStartInput && !nightStartInput.value) {
+                    setNumber(nightStartInput, pricingConfig.night_default || 0);
+                  }
+                  if (nightEndInput && !nightEndInput.value) {
+                    setNumber(nightEndInput, pricingConfig.night_default || 0);
                   }
 
-                  const rate = pickRate(currentCar, days);
-                  const total = rate * days;
+                  const airportTotal = parseNumber(airportStartInput) + parseNumber(airportEndInput);
+                  const nightTotal = parseNumber(nightStartInput) + parseNumber(nightEndInput);
+                  const deliveryTotal = parseNumber(deliveryIssueFee) + parseNumber(deliveryReturnFee);
 
-                  if (shouldWrite && dailyRateInput) dailyRateInput.value = rate ? rate.toFixed(2) : "";
-                  if (shouldWrite && totalInput) totalInput.value = total ? total.toFixed(2) : "";
+                  const seatsPerUnit = Math.min(
+                    days * (pricingConfig.child_seat_daily || 0),
+                    pricingConfig.child_seat_cap || 0
+                  );
+                  const boosterPerUnit = Math.min(
+                    days * (pricingConfig.booster_daily || 0),
+                    pricingConfig.booster_cap || 0
+                  );
+                  const seatsTotal = seatsPerUnit * (childSeatToggle?.checked ? 1 : 0);
+                  const boostersTotal = boosterPerUnit * (boosterToggle?.checked ? 1 : 0);
 
-                  summaryText.textContent = `${days} дн × ${formatMoney(rate)} = ${formatMoney(total)}`;
+                  const gearPerDay =
+                    (pricingConfig.ski_rack_daily || 0) * (skiRackToggle?.checked ? 1 : 0) +
+                    (pricingConfig.autobox_daily || 0) * (roofBoxToggle?.checked ? 1 : 0) +
+                    (pricingConfig.crossbars_daily || 0) * (crossbarsToggle?.checked ? 1 : 0);
+                  const gearTotal = gearPerDay * days;
+
+                  const manualEquipment = Math.max(parseNumber(equipmentManualInput), 0);
+                  const equipmentTotal = manualEquipment > 0 ? manualEquipment : seatsTotal + boostersTotal + gearTotal;
+
+                  const extras = airportTotal + nightTotal + deliveryTotal + equipmentTotal;
+                  const subtotal = baseTotal + extras;
+
+                  const discountAmount = Math.min(Math.max(parseNumber(discountAmountInput), 0), subtotal);
+                  const discountPercent = Math.min(Math.max(parseNumber(discountPercentInput), 0), 100);
+                  const percentBase = Math.max(subtotal - discountAmount, 0);
+                  const discountPercentAmount = percentBase * (discountPercent / 100);
+
+                  const contractTotal = subtotal - discountAmount - discountPercentAmount;
+                  const prepayment = Math.max(parseNumber(prepaymentInput), 0);
+                  const due = Math.max(contractTotal - prepayment, 0);
+
+                  setNumber(dailyRateInput, baseRate);
+                  setNumber(totalInput, contractTotal);
+                  setNumber(balanceInput, due);
+
+                  const discountsTotal = discountAmount + discountPercentAmount;
+                  const summaryParts = [
+                    `${days} дн × ${formatMoney(baseRate)} = ${formatMoney(baseTotal)}`,
+                    `доп. услуги ${formatMoney(extras)}`,
+                    `скидки ${formatMoney(discountsTotal)}`,
+                    `предоплата ${formatMoney(prepayment)}`,
+                    `к оплате ${formatMoney(due)}`,
+                  ];
+                  summaryText.textContent = summaryParts.join(" · ");
                 }
 
                 quickButtons.forEach((btn) => {
@@ -501,15 +818,53 @@
                     if (endInput) {
                       endInput.value = format(endDate);
                     }
-                    updatePricing(true);
+                    calculatePricing(true);
                   });
                 });
 
-                [carSelect, startInput, endInput].forEach((el) => {
+                [
+                  carSelect,
+                  startInput,
+                  endInput,
+                  startTimeInput,
+                  endTimeInput,
+                  uniqueRateInput,
+                  airportStartInput,
+                  airportEndInput,
+                  nightStartInput,
+                  nightEndInput,
+                  deliveryIssueFee,
+                  deliveryReturnFee,
+                  childSeatToggle,
+                  boosterToggle,
+                  skiRackToggle,
+                  roofBoxToggle,
+                  crossbarsToggle,
+                  equipmentManualInput,
+                  discountAmountInput,
+                  discountPercentInput,
+                  prepaymentInput,
+                ].forEach((el) => {
                   if (el) {
-                    el.addEventListener("change", () => updatePricing(true));
-                    el.addEventListener("input", () => updatePricing(true));
+                    el.addEventListener("change", () => calculatePricing(true));
+                    el.addEventListener("input", () => calculatePricing(true));
                   }
+                });
+
+                [deliveryIssueCity, deliveryReturnCity].forEach((el) => {
+                  if (!el) return;
+                  el.addEventListener("change", () => {
+                    autoFillDelivery(el, el === deliveryIssueCity ? deliveryIssueFee : deliveryReturnFee);
+                    calculatePricing(true);
+                  });
+                });
+
+                timeFillButtons.forEach((btn) => {
+                  btn.addEventListener("click", () => {
+                    const target = btn.getAttribute("data-time-fill");
+                    autoFillTimeFees(target);
+                    calculatePricing(true);
+                  });
                 });
 
                 customerSearchInput?.addEventListener("input", () => {
@@ -524,7 +879,7 @@
 
                 contractInput?.addEventListener("input", () => updateDealPreview(currentCar));
 
-                updatePricing(false);
+                calculatePricing(true);
               })();
             </script>
 

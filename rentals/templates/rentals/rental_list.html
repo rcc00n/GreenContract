@@ -115,6 +115,9 @@
               <td>
                 <div class="fw-semibold">₽{{ rental.total_price }}</div>
                 <div class="text-muted small">{{ rental.daily_rate }} в день</div>
+                <div class="text-muted small">
+                  Предоплата: ₽{{ rental.prepayment }} · К оплате: ₽{{ rental.balance_due }}
+                </div>
               </td>
               <td class="text-end">
                 <a href="{% url 'rentals:rental_update' rental.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>

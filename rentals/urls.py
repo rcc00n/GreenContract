@@ -6,6 +6,7 @@ app_name = "rentals"
 
 urlpatterns = [
     path("", views.dashboard, name="dashboard"),
+    path("admins/", views.admin_user_list, name="admin_user_list"),
     path("cars/", views.CarListView.as_view(), name="car_list"),
     path("cars/new/", views.CarCreateView.as_view(), name="car_create"),
     path("cars/<int:pk>/edit/", views.CarUpdateView.as_view(), name="car_update"),

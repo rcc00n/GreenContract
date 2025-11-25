@@ -2,6 +2,8 @@ Django>=5.0,<6.0
 gunicorn
 psycopg2-binary
 python-docx
+pypdf
+xhtml2pdf
 reportlab
 whitenoise
 xlrd<2

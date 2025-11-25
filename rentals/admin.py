@@ -26,7 +26,17 @@ class CustomerAdmin(admin.ModelAdmin):
 
 @admin.register(Rental)
 class RentalAdmin(admin.ModelAdmin):
-    list_display = ("contract_number", "car", "customer", "start_date", "end_date", "total_price", "status")
+    list_display = (
+        "contract_number",
+        "car",
+        "customer",
+        "start_date",
+        "end_date",
+        "total_price",
+        "prepayment",
+        "balance_due",
+        "status",
+    )
     list_filter = ("status", "start_date", "end_date")
     search_fields = ("contract_number", "car__plate_number", "car__make", "car__model", "customer__full_name")
 

@@ -2,9 +2,11 @@ import re
 from datetime import date, timedelta
 
 from django import forms
+from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import UserCreationForm
 
 from .models import Car, Customer, Rental, ContractTemplate, CustomerTag
-from .services.pricing import calculate_rental_pricing
+from .services.pricing import DELIVERY_FEES, calculate_rental_pricing
 
 
 class StyledModelForm(forms.ModelForm):
@@ -206,10 +208,68 @@ class RentalForm(StyledModelForm):
             widget.input_type = "date"
             widget.attrs.setdefault("placeholder", "YYYY-MM-DD")
 
-        for name in ("daily_rate", "total_price"):
-            self.fields[name].widget.attrs["readonly"] = True
-            self.fields[name].widget.attrs["tabindex"] = "-1"
-            self.fields[name].widget.attrs["aria-readonly"] = "true"
+        for name in ("start_time", "end_time"):
+            if name in self.fields:
+                widget = self.fields[name].widget
+                widget.input_type = "time"
+                widget.attrs.setdefault("placeholder", "HH:MM")
+
+        for name in (
+            "child_seat_included",
+            "booster_included",
+            "ski_rack_included",
+            "roof_box_included",
+            "crossbars_included",
+        ):
+            if name in self.fields:
+                self.fields[name].widget = forms.CheckboxInput(attrs={"class": "form-check-input"})
+
+        for name in ("daily_rate", "total_price", "balance_due"):
+            if name in self.fields:
+                self.fields[name].widget.attrs["readonly"] = True
+                self.fields[name].widget.attrs["tabindex"] = "-1"
+                self.fields[name].widget.attrs["aria-readonly"] = "true"
+
+        numeric_optional = (
+            "unique_daily_rate",
+            "airport_fee_start",
+            "airport_fee_end",
+            "night_fee_start",
+            "night_fee_end",
+            "delivery_issue_fee",
+            "delivery_return_fee",
+            "equipment_manual_total",
+            "discount_amount",
+            "discount_percent",
+            "prepayment",
+        )
+        integer_optional = (
+            "child_seat_count",
+            "booster_count",
+            "ski_rack_count",
+            "roof_box_count",
+            "crossbars_count",
+        )
+
+        for name in numeric_optional:
+            if name in self.fields:
+                self.fields[name].required = False
+                self.fields[name].widget.attrs.setdefault("min", "0")
+                self.fields[name].widget.attrs.setdefault("step", "0.01")
+
+        for name in integer_optional:
+            if name in self.fields:
+                self.fields[name].required = False
+                self.fields[name].widget.attrs.setdefault("min", "0")
+
+        if "discount_percent" in self.fields:
+            self.fields["discount_percent"].widget.attrs.setdefault("max", "100")
+
+        delivery_choices = [("", "Без доставки")] + [(city, city) for city in sorted(DELIVERY_FEES.keys())]
+        for name in ("delivery_issue_city", "delivery_return_city"):
+            if name in self.fields:
+                self.fields[name].required = False
+                self.fields[name].widget = forms.Select(choices=delivery_choices)
         self.initial_customer_label = getattr(self, "_customer_label", "")
 
     class Meta:
@@ -219,13 +279,65 @@ class RentalForm(StyledModelForm):
             "car",
             "customer",
             "start_date",
+            "start_time",
             "end_date",
+            "end_time",
+            "unique_daily_rate",
             "daily_rate",
+            "airport_fee_start",
+            "airport_fee_end",
+            "night_fee_start",
+            "night_fee_end",
+            "delivery_issue_city",
+            "delivery_issue_fee",
+            "delivery_return_city",
+            "delivery_return_fee",
+            "child_seat_included",
+            "child_seat_count",
+            "booster_included",
+            "booster_count",
+            "ski_rack_included",
+            "ski_rack_count",
+            "roof_box_included",
+            "roof_box_count",
+            "crossbars_included",
+            "crossbars_count",
+            "equipment_manual_total",
+            "discount_amount",
+            "discount_percent",
+            "prepayment",
             "total_price",
+            "balance_due",
             "status",
         ]
         labels = {
             "contract_number": "Contract number",
+            "start_time": "Время выдачи",
+            "end_time": "Время возврата",
+            "unique_daily_rate": "Уникальный тариф (за сутки)",
+            "airport_fee_start": "Аэропорт (выдача)",
+            "airport_fee_end": "Аэропорт (возврат)",
+            "night_fee_start": "Ночной выход (выдача)",
+            "night_fee_end": "Ночной выход (возврат)",
+            "delivery_issue_city": "Доставка: выдача в городе",
+            "delivery_issue_fee": "Стоимость выдачи",
+            "delivery_return_city": "Доставка: возврат в городе",
+            "delivery_return_fee": "Стоимость возврата",
+            "child_seat_included": "Детское кресло",
+            "child_seat_count": "Детское кресло, шт",
+            "booster_included": "Бустер",
+            "booster_count": "Бустер, шт",
+            "ski_rack_included": "Крепления д/лыж",
+            "ski_rack_count": "Крепления д/лыж",
+            "roof_box_included": "Автобокс",
+            "roof_box_count": "Автобокс",
+            "crossbars_included": "Поперечины",
+            "crossbars_count": "Поперечины",
+            "equipment_manual_total": "Фикс. сумма оборудования",
+            "discount_amount": "Скидка, ₽",
+            "discount_percent": "Скидка, %",
+            "prepayment": "Предоплата",
+            "balance_due": "К оплате после предоплаты",
         }
 
     def clean(self):
@@ -239,16 +351,53 @@ class RentalForm(StyledModelForm):
             self.add_error("end_date", "End date must be after start date.")
             return cleaned_data
 
-        recalc_needed = not self.instance.pk or any(
-            field in self.changed_data for field in ("car", "start_date", "end_date")
-        )
-        if recalc_needed:
-            _, daily_rate, total_price = calculate_rental_pricing(car, start_date, end_date)
-            cleaned_data["daily_rate"] = daily_rate
-            cleaned_data["total_price"] = total_price
-        else:
-            cleaned_data["daily_rate"] = self.instance.daily_rate
-            cleaned_data["total_price"] = self.instance.total_price
+        if start_date and end_date:
+            # Синхронизируем чекбоксы с количествами, чтобы в базе сохранялось 1/0.
+            for flag, count_field in (
+                ("child_seat_included", "child_seat_count"),
+                ("booster_included", "booster_count"),
+                ("ski_rack_included", "ski_rack_count"),
+                ("roof_box_included", "roof_box_count"),
+                ("crossbars_included", "crossbars_count"),
+            ):
+                if cleaned_data.get(flag) and not cleaned_data.get(count_field):
+                    cleaned_data[count_field] = 1
+                if not cleaned_data.get(flag):
+                    cleaned_data[count_field] = 0
+
+            pricing = calculate_rental_pricing(
+                car,
+                start_date,
+                end_date,
+                start_time=cleaned_data.get("start_time"),
+                end_time=cleaned_data.get("end_time"),
+                unique_daily_rate=cleaned_data.get("unique_daily_rate"),
+                airport_fee_start=cleaned_data.get("airport_fee_start"),
+                airport_fee_end=cleaned_data.get("airport_fee_end"),
+                night_fee_start=cleaned_data.get("night_fee_start"),
+                night_fee_end=cleaned_data.get("night_fee_end"),
+                delivery_issue_city=cleaned_data.get("delivery_issue_city") or "",
+                delivery_return_city=cleaned_data.get("delivery_return_city") or "",
+                delivery_issue_fee=cleaned_data.get("delivery_issue_fee"),
+                delivery_return_fee=cleaned_data.get("delivery_return_fee"),
+                child_seat_count=cleaned_data.get("child_seat_count") or 0,
+                booster_count=cleaned_data.get("booster_count") or 0,
+                ski_rack_count=cleaned_data.get("ski_rack_count") or 0,
+                roof_box_count=cleaned_data.get("roof_box_count") or 0,
+                crossbars_count=cleaned_data.get("crossbars_count") or 0,
+                child_seat_included=cleaned_data.get("child_seat_included") or False,
+                booster_included=cleaned_data.get("booster_included") or False,
+                ski_rack_included=cleaned_data.get("ski_rack_included") or False,
+                roof_box_included=cleaned_data.get("roof_box_included") or False,
+                crossbars_included=cleaned_data.get("crossbars_included") or False,
+                equipment_manual_total=cleaned_data.get("equipment_manual_total"),
+                discount_amount=cleaned_data.get("discount_amount"),
+                discount_percent=cleaned_data.get("discount_percent"),
+                prepayment=cleaned_data.get("prepayment"),
+            )
+            cleaned_data["daily_rate"] = pricing.daily_rate
+            cleaned_data["total_price"] = pricing.total_price
+            cleaned_data["balance_due"] = pricing.balance_due
         return cleaned_data
 
     def _limit_customer_queryset(self):
@@ -286,3 +435,76 @@ class ContractTemplateForm(StyledModelForm):
     class Meta:
         model = ContractTemplate
         fields = "__all__"
+
+    def clean(self):
+        cleaned = super().clean()
+        format_choice = cleaned.get("format")
+        uploaded_file = cleaned.get("file")
+        body_html = (cleaned.get("body_html") or "").strip()
+
+        def _add_error(field, message):
+            self.add_error(field, message)
+
+        if format_choice == "html":
+            if not body_html:
+                _add_error("body_html", "Добавьте HTML тело для шаблона.")
+
+        elif format_choice == "docx":
+            if not uploaded_file:
+                _add_error("file", "Загрузите DOCX-файл шаблона.")
+            elif not uploaded_file.name.lower().endswith(".docx"):
+                _add_error("file", "Для формата DOCX нужен файл с расширением .docx")
+
+        elif format_choice == "pdf":
+            if not uploaded_file and not body_html:
+                _add_error("file", "Загрузите PDF или заполните HTML для конвертации в PDF.")
+                _add_error("body_html", "Заполните HTML или приложите готовый PDF.")
+            if uploaded_file and not uploaded_file.name.lower().endswith(".pdf"):
+                _add_error("file", "Для формата PDF нужен файл с расширением .pdf")
+
+        return cleaned
+
+
+User = get_user_model()
+
+
+class AdminUserCreationForm(UserCreationForm):
+    make_superuser = forms.BooleanField(
+        required=False,
+        label="Сделать суперпользователем",
+        help_text="Даст полный доступ ко всем данным и настройкам.",
+    )
+
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = ("username", "email")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["username"].label = "Логин"
+        self.fields["username"].help_text = "Только латиница, цифры и @/./+/-/_."
+        if "email" in self.fields:
+            self.fields["email"].label = "Email"
+            self.fields["email"].required = False
+            self.fields["email"].help_text = "Необязательно, но пригодится для восстановления."
+        self.fields["password1"].label = "Пароль"
+        self.fields["password1"].help_text = "Минимум 8 символов, лучше длиннее."
+        self.fields["password2"].label = "Подтверждение пароля"
+        self.fields["password2"].help_text = "Повторите пароль для проверки."
+        self.order_fields(["username", "email", "password1", "password2", "make_superuser"])
+
+        for field in self.fields.values():
+            widget = field.widget
+            css = widget.attrs.get("class", "")
+            base_class = "form-control"
+            if isinstance(widget, forms.CheckboxInput):
+                base_class = "form-check-input"
+            widget.attrs["class"] = f"{base_class} {css}".strip()
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.is_staff = True
+        user.is_superuser = bool(self.cleaned_data.get("make_superuser"))
+        if commit:
+            user.save()
+        return user

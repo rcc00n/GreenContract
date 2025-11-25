@@ -147,8 +147,76 @@ class Rental(models.Model):
     )
     start_date = models.DateField()
     end_date = models.DateField()
+    start_time = models.TimeField(blank=True, null=True)
+    end_time = models.TimeField(blank=True, null=True)
+    unique_daily_rate = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Уникальный тариф по сделке. Перебивает цену авто.",
+    )
     daily_rate = models.DecimalField(max_digits=8, decimal_places=2)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
+    balance_due = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        blank=True,
+        help_text="Сумма к оплате после предоплаты.",
+    )
+    airport_fee_start = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        blank=True,
+        help_text="Сбор при выдаче в аэропорту.",
+    )
+    airport_fee_end = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        blank=True,
+        help_text="Сбор при возврате в аэропорту.",
+    )
+    night_fee_start = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        blank=True,
+        help_text="Ночной выход при выдаче.",
+    )
+    night_fee_end = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        blank=True,
+        help_text="Ночной выход при возврате.",
+    )
+    delivery_issue_city = models.CharField(max_length=120, blank=True, default="")
+    delivery_issue_fee = models.DecimalField(max_digits=9, decimal_places=2, default=Decimal("0.00"), blank=True)
+    delivery_return_city = models.CharField(max_length=120, blank=True, default="")
+    delivery_return_fee = models.DecimalField(max_digits=9, decimal_places=2, default=Decimal("0.00"), blank=True)
+    child_seat_included = models.BooleanField(default=False)
+    child_seat_count = models.PositiveIntegerField(default=0, blank=True)
+    booster_included = models.BooleanField(default=False)
+    booster_count = models.PositiveIntegerField(default=0, blank=True)
+    ski_rack_included = models.BooleanField(default=False)
+    ski_rack_count = models.PositiveIntegerField(default=0, blank=True)
+    roof_box_included = models.BooleanField(default=False)
+    roof_box_count = models.PositiveIntegerField(default=0, blank=True)
+    crossbars_included = models.BooleanField(default=False)
+    crossbars_count = models.PositiveIntegerField(default=0, blank=True)
+    equipment_manual_total = models.DecimalField(
+        max_digits=9,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        blank=True,
+        help_text="Фиксированная сумма за оборудование (если не по суткам).",
+    )
+    discount_amount = models.DecimalField(max_digits=9, decimal_places=2, default=Decimal("0.00"), blank=True)
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"), blank=True)
+    prepayment = models.DecimalField(max_digits=9, decimal_places=2, default=Decimal("0.00"), blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="draft")
     created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
 
@@ -216,6 +284,7 @@ class ContractTemplate(models.Model):
     FORMAT_CHOICES = [
         ("html", "HTML"),
         ("docx", "DOCX"),
+        ("pdf", "PDF"),
     ]
 
     name = models.CharField(max_length=100)

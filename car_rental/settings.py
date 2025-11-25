@@ -80,7 +80,7 @@ WHITENOISE_USE_FINDERS = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_REDIRECT_URL = "rentals:dashboard"
-LOGOUT_REDIRECT_URL = "rentals:dashboard"
+LOGOUT_REDIRECT_URL = "login"
 
 # Upload limits: allow larger CSV/XLS/XLSX imports by default.
 FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("FILE_UPLOAD_MAX_MEMORY_SIZE", 50 * 1024 * 1024))

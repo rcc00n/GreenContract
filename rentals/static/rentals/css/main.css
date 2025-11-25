@@ -366,3 +366,28 @@ body[data-theme="dark"] .theme-toggle .icon-sun {
 body[data-theme="dark"] .theme-toggle .icon-moon {
   display: inline;
 }
+
+.placeholder-card {
+  background: color-mix(in srgb, var(--surface-1) 90%, var(--surface-2));
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.placeholder-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-soft);
+}
+
+.placeholder-copy {
+  cursor: pointer;
+  border-style: dashed;
+}
+
+.placeholder-copy.copied {
+  background: color-mix(in srgb, var(--brand-contrast) 80%, transparent);
+  color: var(--brand-strong);
+  border-color: color-mix(in srgb, var(--brand) 60%, transparent);
+}
+
+#contractSnippet {
+  white-space: pre-wrap;
+}

@@ -6,7 +6,7 @@
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
           <h1 class="h4 mb-0">{% if object %}Edit contract template{% else %}New contract template{% endif %}</h1>
-          <p class="text-muted small mb-0">Upload a DOCX or author HTML with placeholders.</p>
+          <p class="text-muted small mb-0">Поддерживаются HTML → PDF, DOCX и заполнение готовых PDF с полями.</p>
         </div>
         <a href="{% url 'rentals:contract_template_list' %}" class="btn btn-outline-secondary">Back to list</a>
       </div>
@@ -18,19 +18,49 @@
             {% if form.non_field_errors %}
               <div class="alert alert-danger">{{ form.non_field_errors }}</div>
             {% endif %}
-            <div class="row g-3">
-              {% for field in form %}
-                <div class="{% if field.name in 'body_html description placeholder_help' %}col-12{% else %}col-md-6{% endif %}">
-                  <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                  {{ field }}
-                  {% if field.help_text %}
-                    <div class="form-text">{{ field.help_text }}</div>
-                  {% endif %}
-                  {% for error in field.errors %}
-                    <div class="invalid-feedback d-block">{{ error }}</div>
-                  {% endfor %}
+            <div class="row g-3 align-items-start">
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.name.id_for_label }}">Название</label>
+                {{ form.name }}
+                {% for error in form.name.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.format.id_for_label }}">Формат</label>
+                {{ form.format }}
+                <div class="form-text">HTML конвертируется в PDF, DOCX и PDF используют загруженный файл.</div>
+                {% for error in form.format.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+
+              <div class="col-md-6 format-file">
+                <label class="form-label" for="{{ form.file.id_for_label }}">Файл шаблона</label>
+                {{ form.file }}
+                <div class="form-text">
+                  DOCX: будут заменены плейсхолдеры. PDF: заполняются поля формы (AcroForm) с именами вроде <code>customer_full_name</code>.
                 </div>
-              {% endfor %}
+                {% for error in form.file.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+
+              <div class="col-12 format-html">
+                <div class="d-flex justify-content-between align-items-center">
+                  <label class="form-label mb-0" for="{{ form.body_html.id_for_label }}">HTML тело</label>
+                  <span class="badge text-bg-info">Опционально для PDF: будет сконвертировано</span>
+                </div>
+                {{ form.body_html }}
+                <div class="form-text">Используйте Django-подобные плейсхолдеры {% templatetag openvariable %} customer.full_name {% templatetag closevariable %} или {% templatetag openvariable %} rental.contract_number {% templatetag closevariable %}.</div>
+                {% for error in form.body_html.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+
+              <div class="col-12">
+                <label class="form-label" for="{{ form.description.id_for_label }}">Описание</label>
+                {{ form.description }}
+                {% for error in form.description.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+
+              <div class="col-12">
+                <label class="form-label" for="{{ form.placeholder_help.id_for_label }}">Подсказка внутри шаблона</label>
+                {{ form.placeholder_help }}
+                {% for error in form.placeholder_help.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
             </div>
             <div class="d-flex justify-content-end gap-2 pt-3">
               <a href="{% url 'rentals:contract_template_list' %}" class="btn btn-outline-secondary">Cancel</a>
@@ -39,6 +69,103 @@
           </form>
         </div>
       </div>
+
+      {% if placeholder_guide %}
+        <div class="card shadow-sm mt-3">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+              <div>
+                <div class="fw-semibold">Быстрая вставка плейсхолдеров</div>
+                <div class="text-muted small">Нажмите на бейдж, чтобы скопировать значение в буфер. Первый бейдж — для HTML/DOCX, второй — имя поля для PDF-форм.</div>
+              </div>
+              <div class="text-muted small" id="templateFormatHint">Формат: {{ form.format.value|default:"html" }}</div>
+            </div>
+            <div class="row g-3">
+              {% for group in placeholder_guide %}
+                <div class="col-md-4">
+                  <div class="placeholder-card h-100 p-3 border rounded">
+                    <div class="fw-semibold mb-2">{{ group.title }}</div>
+                    <div class="d-flex flex-column gap-2">
+                      {% for item in group.items %}
+                        <div class="placeholder-row">
+                          <div class="fw-semibold small text-truncate">{{ item.description }}</div>
+                          <div class="d-flex flex-wrap gap-2 mt-1">
+                            <span class="badge text-bg-primary placeholder-copy" data-copy-placeholder="{{ item.token }}" title="HTML/DOCX">{{ item.token }}</span>
+                            <span class="badge text-bg-secondary placeholder-copy" data-copy-placeholder="{{ item.alt }}" title="Поле формы PDF">{{ item.alt }}</span>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="card shadow-sm mt-3">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+              <div class="fw-semibold">Шаблон-рыба для быстрого старта</div>
+              <div class="text-muted small">Скопируйте и вставьте в HTML, DOCX или как подсказку к полям PDF.</div>
+            </div>
+            <button class="btn btn-sm btn-outline-primary" type="button" data-copy-template="#contractSnippet">Скопировать пример</button>
+          </div>
+          {% verbatim %}
+          <pre class="bg-body-tertiary rounded p-3 small" id="contractSnippet">Договор № {{ rental.contract_number }}
+г. {{ customer.address }}
+
+Арендодатель передает во временное пользование автомобиль {{ car.make }} {{ car.model }} ({{ car.plate_number }}) сроком с {{ rental.start_date }} по {{ rental.end_date }}.
+
+Арендатор: {{ customer.full_name }}, паспорт {{ customer.passport_series }} {{ customer.passport_number }}, выдан {{ customer.passport_issue_date }} {{ customer.passport_issued_by }}. Телефон: {{ customer.phone }}.
+
+Стоимость проката: {{ rental.total_price }}, предоплата: {{ rental.prepayment }}, к оплате при возврате: {{ rental.balance_due }}.</pre>
+          {% endverbatim %}
+        </div>
+      </div>
     </div>
   </div>
+
+  <script>
+    (() => {
+      const formatSelect = document.getElementById("id_format");
+      const formatHint = document.getElementById("templateFormatHint");
+      const toggleSections = () => {
+        const value = formatSelect?.value || "html";
+        document.querySelectorAll(".format-html").forEach((el) => el.classList.toggle("d-none", value === "docx"));
+        document.querySelectorAll(".format-file").forEach((el) => el.classList.toggle("d-none", value === "html"));
+        if (formatHint) formatHint.textContent = `Формат: ${value.toUpperCase()}`;
+      };
+      formatSelect?.addEventListener("change", toggleSections);
+      toggleSections();
+
+      const notifyCopy = (target) => {
+        target.classList.add("copied");
+        setTimeout(() => target.classList.remove("copied"), 1200);
+      };
+
+      document.querySelectorAll(".placeholder-copy").forEach((badge) => {
+        badge.addEventListener("click", () => {
+          const text = badge.dataset.copyPlaceholder;
+          if (!text) return;
+          navigator.clipboard?.writeText(text.trim());
+          notifyCopy(badge);
+        });
+      });
+
+      document.querySelectorAll("[data-copy-template]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const selector = button.getAttribute("data-copy-template");
+          const node = selector ? document.querySelector(selector) : null;
+          const text = node?.innerText;
+          if (text) {
+            navigator.clipboard?.writeText(text.trim());
+            notifyCopy(button);
+          }
+        });
+      });
+    })();
+  </script>
 {% endblock %}

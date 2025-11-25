@@ -202,8 +202,6 @@
       if (!chartDataEl) return;
 
       const chartData = JSON.parse(chartDataEl.textContent);
-      const neutralGrid = "#eef1f7";
-      const textColor = "#4a5568";
 
       const currency = new Intl.NumberFormat("en-US", {
         style: "currency",
@@ -211,159 +209,206 @@
         maximumFractionDigits: 0,
       });
 
-      const trendCtx = document.getElementById("trendChart");
-      if (trendCtx && chartData.trend) {
-        new Chart(trendCtx, {
-          type: "bar",
-          data: {
-            labels: chartData.trend.labels,
-            datasets: [
-              {
-                type: "line",
-                label: "Revenue",
-                data: chartData.trend.revenue,
-                borderColor: "#4c8bf5",
-                backgroundColor: "rgba(76, 139, 245, 0.12)",
-                tension: 0.35,
-                fill: true,
-                yAxisID: "y1",
-              },
-              {
-                label: "Bookings",
-                data: chartData.trend.counts,
-                backgroundColor: "#7bdcb5",
-                borderWidth: 0,
-                yAxisID: "y",
-                maxBarThickness: 36,
-              },
-            ],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              x: {
-                ticks: { color: textColor },
-                grid: { display: false },
-              },
-              y: {
-                beginAtZero: true,
-                ticks: { color: textColor },
-                grid: { color: neutralGrid },
-              },
-              y1: {
-                position: "right",
-                beginAtZero: true,
-                ticks: {
-                  color: textColor,
-                  callback: (value) => currency.format(value),
+      const hexToRgba = (hex, alpha, fallback) => {
+        if (typeof hex !== "string") return fallback;
+        const normalized = hex.replace("#", "").trim();
+        if (![3, 6].includes(normalized.length)) return fallback;
+        const expanded = normalized.length === 3 ? normalized.split("").map((c) => c + c).join("") : normalized;
+        const intVal = parseInt(expanded, 16);
+        if (Number.isNaN(intVal)) return fallback;
+        const r = (intVal >> 16) & 255;
+        const g = (intVal >> 8) & 255;
+        const b = intVal & 255;
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      };
+
+      const getPalette = () => {
+        const styles = getComputedStyle(document.body);
+        const read = (name, fallback) => (styles.getPropertyValue(name).trim() || fallback);
+        return {
+          primary: read("--chart-primary", "#25b36f"),
+          secondary: read("--chart-secondary", "#7ddca4"),
+          warning: read("--chart-warning", "#d6b35e"),
+          danger: read("--chart-danger", "#f38a82"),
+          grid: read("--chart-grid", "#eef1f7"),
+          text: read("--chart-text", "#4a5568"),
+          brand: read("--brand", "#25b36f"),
+          brandSoft: read("--brand-soft", "#7ddca4"),
+        };
+      };
+
+      let trendChart;
+      let statusChart;
+      let topCarsChart;
+
+      const renderCharts = () => {
+        const palette = getPalette();
+        const trendCtx = document.getElementById("trendChart");
+        const statusCtx = document.getElementById("statusChart");
+        const topCarsCtx = document.getElementById("topCarsChart");
+
+        const trendFill = hexToRgba(palette.primary, 0.16, "rgba(37, 179, 111, 0.16)");
+        const trendLine = palette.primary;
+        const bookingsFill = hexToRgba(palette.secondary, 0.78, "rgba(125, 220, 164, 0.78)");
+
+        if (trendChart) trendChart.destroy();
+        if (statusChart) statusChart.destroy();
+        if (topCarsChart) topCarsChart.destroy();
+
+        if (trendCtx && chartData.trend) {
+          trendChart = new Chart(trendCtx, {
+            type: "bar",
+            data: {
+              labels: chartData.trend.labels,
+              datasets: [
+                {
+                  type: "line",
+                  label: "Revenue",
+                  data: chartData.trend.revenue,
+                  borderColor: trendLine,
+                  backgroundColor: trendFill,
+                  tension: 0.35,
+                  fill: true,
+                  yAxisID: "y1",
                 },
-                grid: { drawOnChartArea: false },
-              },
+                {
+                  label: "Bookings",
+                  data: chartData.trend.counts,
+                  backgroundColor: bookingsFill,
+                  borderWidth: 0,
+                  yAxisID: "y",
+                  maxBarThickness: 36,
+                },
+              ],
             },
-            plugins: {
-              legend: {
-                labels: { color: textColor },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                x: {
+                  ticks: { color: palette.text },
+                  grid: { display: false },
+                },
+                y: {
+                  beginAtZero: true,
+                  ticks: { color: palette.text },
+                  grid: { color: palette.grid },
+                },
+                y1: {
+                  position: "right",
+                  beginAtZero: true,
+                  ticks: {
+                    color: palette.text,
+                    callback: (value) => currency.format(value),
+                  },
+                  grid: { drawOnChartArea: false },
+                },
               },
-              tooltip: {
-                callbacks: {
-                  label: (ctx) => {
-                    if (ctx.dataset.label === "Revenue") {
-                      return `${ctx.dataset.label}: ${currency.format(ctx.parsed.y)}`;
-                    }
-                    return `${ctx.dataset.label}: ${ctx.parsed.y}`;
+              plugins: {
+                legend: {
+                  labels: { color: palette.text },
+                },
+                tooltip: {
+                  callbacks: {
+                    label: (ctx) => {
+                      if (ctx.dataset.label === "Revenue") {
+                        return `${ctx.dataset.label}: ${currency.format(ctx.parsed.y)}`;
+                      }
+                      return `${ctx.dataset.label}: ${ctx.parsed.y}`;
+                    },
                   },
                 },
               },
             },
-          },
-        });
-      }
+          });
+        }
 
-      const statusCtx = document.getElementById("statusChart");
-      if (statusCtx && chartData.status) {
-        new Chart(statusCtx, {
-          type: "doughnut",
-          data: {
-            labels: chartData.status.labels,
-            datasets: [
-              {
-                data: chartData.status.counts,
-                backgroundColor: ["#4c8bf5", "#7bdcb5", "#f4b000", "#ef5350"],
-                borderWidth: 0,
-              },
-            ],
-          },
-          options: {
-            cutout: "60%",
-            plugins: {
-              legend: { position: "bottom", labels: { color: textColor } },
+        if (statusCtx && chartData.status) {
+          statusChart = new Chart(statusCtx, {
+            type: "doughnut",
+            data: {
+              labels: chartData.status.labels,
+              datasets: [
+                {
+                  data: chartData.status.counts,
+                  backgroundColor: [palette.primary, palette.secondary, palette.warning, palette.danger],
+                  borderWidth: 0,
+                },
+              ],
             },
-          },
-        });
-      }
-
-      const topCarsCtx = document.getElementById("topCarsChart");
-      if (topCarsCtx && chartData.topCars) {
-        new Chart(topCarsCtx, {
-          type: "bar",
-          data: {
-            labels: chartData.topCars.labels,
-            datasets: [
-              {
-                label: "Revenue",
-                data: chartData.topCars.revenue,
-                backgroundColor: "#4c8bf5",
-                xAxisID: "x",
-                maxBarThickness: 24,
-              },
-              {
-                label: "Completed",
-                data: chartData.topCars.counts,
-                backgroundColor: "#7bdcb5",
-                xAxisID: "x1",
-                maxBarThickness: 24,
-              },
-            ],
-          },
-          options: {
-            indexAxis: "y",
-            responsive: true,
-            scales: {
-              x: {
-                beginAtZero: true,
-                ticks: { color: textColor },
-                grid: { color: neutralGrid },
-                title: { display: true, text: "Revenue ($)", color: textColor },
-              },
-              x1: {
-                position: "top",
-                beginAtZero: true,
-                ticks: { color: textColor },
-                grid: { display: false },
-                title: { display: true, text: "Completed", color: textColor },
-              },
-              y: {
-                ticks: { color: textColor },
-                grid: { display: false },
+            options: {
+              cutout: "60%",
+              plugins: {
+                legend: { position: "bottom", labels: { color: palette.text } },
               },
             },
-            plugins: {
-              legend: { labels: { color: textColor } },
-              tooltip: {
-                callbacks: {
-                  label: (ctx) => {
-                    if (ctx.dataset.label === "Revenue") {
-                      return `${ctx.dataset.label}: ${currency.format(ctx.parsed.x)}`;
-                    }
-                    return `${ctx.dataset.label}: ${ctx.parsed.x}`;
+          });
+        }
+
+        if (topCarsCtx && chartData.topCars) {
+          topCarsChart = new Chart(topCarsCtx, {
+            type: "bar",
+            data: {
+              labels: chartData.topCars.labels,
+              datasets: [
+                {
+                  label: "Revenue",
+                  data: chartData.topCars.revenue,
+                  backgroundColor: palette.primary,
+                  xAxisID: "x",
+                  maxBarThickness: 24,
+                },
+                {
+                  label: "Completed",
+                  data: chartData.topCars.counts,
+                  backgroundColor: palette.secondary,
+                  xAxisID: "x1",
+                  maxBarThickness: 24,
+                },
+              ],
+            },
+            options: {
+              indexAxis: "y",
+              responsive: true,
+              scales: {
+                x: {
+                  beginAtZero: true,
+                  ticks: { color: palette.text },
+                  grid: { color: palette.grid },
+                  title: { display: true, text: "Revenue ($)", color: palette.text },
+                },
+                x1: {
+                  position: "top",
+                  beginAtZero: true,
+                  ticks: { color: palette.text },
+                  grid: { display: false },
+                  title: { display: true, text: "Completed", color: palette.text },
+                },
+                y: {
+                  ticks: { color: palette.text },
+                  grid: { display: false },
+                },
+              },
+              plugins: {
+                legend: { labels: { color: palette.text } },
+                tooltip: {
+                  callbacks: {
+                    label: (ctx) => {
+                      if (ctx.dataset.label === "Revenue") {
+                        return `${ctx.dataset.label}: ${currency.format(ctx.parsed.x)}`;
+                      }
+                      return `${ctx.dataset.label}: ${ctx.parsed.x}`;
+                    },
                   },
                 },
               },
             },
-          },
-        });
-      }
+          });
+        }
+      };
+
+      renderCharts();
+      document.addEventListener("theme:changed", renderCharts);
     })();
   </script>
 {% endblock %}

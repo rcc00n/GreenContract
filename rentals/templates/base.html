@@ -11,8 +11,8 @@
     {% load static %}
     <link rel="stylesheet" href="{% static 'rentals/css/main.css' %}">
   </head>
-  <body class="bg-light">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-3 shadow-sm">
+  <body data-theme="light" data-bs-theme="light">
+    <nav class="navbar navbar-expand-lg theme-navbar mb-3 shadow-sm px-2 px-lg-3">
       <div class="container-fluid">
         <a class="navbar-brand" href="{% url 'rentals:dashboard' %}">Car Rental</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
@@ -25,22 +25,34 @@
             <li class="nav-item"><a class="nav-link" href="{% url 'rentals:rental_list' %}">Rentals</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'rentals:contract_template_list' %}">Contract templates</a></li>
           </ul>
-          <ul class="navbar-nav">
-            {% if user.is_authenticated %}
-              <li class="nav-item">
-                <span class="navbar-text text-light small me-3">
-                  Hi, {{ user.get_short_name|default:user.username }}
-                </span>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link" href="{% url 'logout' %}">Logout</a>
-              </li>
-            {% else %}
-              <li class="nav-item">
-                <a class="nav-link" href="{% url 'login' %}">Login</a>
-              </li>
-            {% endif %}
-          </ul>
+          <div class="d-flex align-items-center gap-2 flex-wrap ms-lg-auto">
+            <button class="btn btn-sm theme-toggle" type="button" id="themeToggle" aria-label="Toggle theme">
+              <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 3v2m0 14v2m9-9h-2M5 12H3m15.5 6.5-1.5-1.5M7 7 5.5 5.5m12 0L16 7M7 17l-1.5 1.5" />
+              </svg>
+              <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8Z" />
+              </svg>
+              <span class="small fw-semibold" id="themeToggleLabel">Light</span>
+            </button>
+            <ul class="navbar-nav">
+              {% if user.is_authenticated %}
+                <li class="nav-item">
+                  <span class="navbar-text text-secondary small me-3">
+                    Hi, {{ user.get_short_name|default:user.username }}
+                  </span>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="{% url 'logout' %}">Logout</a>
+                </li>
+              {% else %}
+                <li class="nav-item">
+                  <a class="nav-link" href="{% url 'login' %}">Login</a>
+                </li>
+              {% endif %}
+            </ul>
+          </div>
         </div>
       </div>
     </nav>
@@ -58,5 +70,48 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      (() => {
+        const toggle = document.getElementById("themeToggle");
+        const label = document.getElementById("themeToggleLabel");
+        const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+        const storedTheme = localStorage.getItem("theme");
+        let userSelected = Boolean(storedTheme);
+
+        const applyTheme = (theme, persistChoice = false) => {
+          const nextTheme = theme === "dark" ? "dark" : "light";
+          document.body.dataset.theme = nextTheme;
+          document.body.setAttribute("data-bs-theme", nextTheme);
+          document.documentElement.style.colorScheme = nextTheme;
+          if (persistChoice) {
+            localStorage.setItem("theme", nextTheme);
+            userSelected = true;
+          }
+          if (label) {
+            label.textContent = nextTheme === "dark" ? "Dark" : "Light";
+          }
+          document.dispatchEvent(new CustomEvent("theme:changed", { detail: { theme: nextTheme } }));
+        };
+
+        applyTheme(storedTheme || (mediaQuery.matches ? "dark" : "light"), Boolean(storedTheme));
+
+        toggle?.addEventListener("click", () => {
+          const next = document.body.dataset.theme === "dark" ? "light" : "dark";
+          applyTheme(next, true);
+        });
+
+        const handleSchemeChange = (event) => {
+          if (!userSelected) {
+            applyTheme(event.matches ? "dark" : "light");
+          }
+        };
+
+        if (mediaQuery.addEventListener) {
+          mediaQuery.addEventListener("change", handleSchemeChange);
+        } else if (mediaQuery.addListener) {
+          mediaQuery.addListener(handleSchemeChange);
+        }
+      })();
+    </script>
   </body>
 </html>

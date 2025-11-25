@@ -1,0 +1,3 @@
+plate_number,make,model,year,daily_rate,is_active
+ABC123,Toyota,Corolla,2020,45.00,True
+XYZ789,Ford,Focus,2019,40.00,True

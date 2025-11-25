@@ -1,0 +1,14 @@
+<h1>Rental Agreement</h1>
+<p><strong>Customer:</strong> {{ customer.full_name }}</p>
+<p><strong>Car:</strong> {{ car.plate_number }} ({{ car.make }} {{ car.model }} {{ car.year }})</p>
+<p><strong>Rental dates:</strong> {{ rental.start_date }} to {{ rental.end_date }}</p>
+<p><strong>Total price:</strong> ${{ rental.total_price }}</p>
+
+<h2>Terms</h2>
+<ol>
+  <li>Vehicle must be returned with a full tank of fuel.</li>
+  <li>Late returns may incur additional charges.</li>
+  <li>All traffic violations during the rental period are the renter's responsibility.</li>
+</ol>
+
+<p>Signature: ________________________________</p>

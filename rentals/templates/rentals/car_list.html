@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-0">Cars</h1>
+      <p class="text-muted small mb-0">Vehicles available for rental.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{% url 'rentals:import_cars_csv' %}" class="btn btn-outline-secondary">Import CSV</a>
+      <a href="{% url 'rentals:export_cars_csv' %}" class="btn btn-outline-secondary">Export CSV</a>
+      <a href="{% url 'rentals:car_create' %}" class="btn btn-primary">Add car</a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Car</th>
+            <th>Prices (вс)</th>
+            <th>Prices (нс)</th>
+            <th>Status</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for car in object_list %}
+            <tr>
+              <td>
+                <div class="fw-semibold">{{ car.plate_number }}</div>
+                <div class="text-muted small">{{ car.make }} {{ car.model }} · {{ car.year }}</div>
+              </td>
+              <td class="small">
+                <div class="fw-semibold">1-4: {% if car.rate_1_4_high %}₽{{ car.rate_1_4_high }}{% else %}—{% endif %}</div>
+                <div>5-14: {% if car.rate_5_14_high %}₽{{ car.rate_5_14_high }}{% else %}—{% endif %}</div>
+                <div>15+: {% if car.rate_15_plus_high %}₽{{ car.rate_15_plus_high }}{% else %}—{% endif %}</div>
+              </td>
+              <td class="small text-muted">
+                <div class="fw-semibold text-secondary">1-4: {% if car.rate_1_4_low %}₽{{ car.rate_1_4_low }}{% else %}—{% endif %}</div>
+                <div>5-14: {% if car.rate_5_14_low %}₽{{ car.rate_5_14_low }}{% else %}—{% endif %}</div>
+                <div>15+: {% if car.rate_15_plus_low %}₽{{ car.rate_15_plus_low }}{% else %}—{% endif %}</div>
+              </td>
+              <td>
+                {% if car.is_active %}
+                  <span class="badge text-bg-success">Active</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">Inactive</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <a href="{% url 'rentals:car_update' car.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="7" class="text-center text-muted py-4">No cars yet. Add your first car to start renting.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

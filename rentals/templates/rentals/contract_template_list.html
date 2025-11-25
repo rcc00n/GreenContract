@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-0">Contract templates</h1>
+      <p class="text-muted small mb-0">Upload or compose reusable rental agreements.</p>
+    </div>
+    <a href="{% url 'rentals:contract_template_create' %}" class="btn btn-primary">New template</a>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Name</th>
+            <th>Format</th>
+            <th>File</th>
+            <th>Description</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for template in object_list %}
+            <tr>
+              <td>{{ template.name }}</td>
+              <td>{{ template.get_format_display }}</td>
+              <td>
+                {% if template.file %}
+                  <span class="badge text-bg-success">Uploaded</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">None</span>
+                {% endif %}
+              </td>
+              <td class="text-muted">{{ template.description|default:"-"|truncatechars:50 }}</td>
+              <td class="text-end">
+                <a href="{% url 'rentals:contract_template_update' template.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5" class="text-center text-muted py-4">No contract templates yet. Upload a DOCX or draft HTML.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

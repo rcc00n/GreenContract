@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="row">
+    <div class="col-lg-8 mx-auto">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h1 class="h4 mb-0">{% if object %}Edit rental{% else %}Create rental{% endif %}</h1>
+          <p class="text-muted small mb-0">Set rental dates, pricing, and status.</p>
+        </div>
+        <a href="{% url 'rentals:rental_list' %}" class="btn btn-outline-secondary">Back to list</a>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <form method="post" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.car.id_for_label }}">Car</label>
+                {{ form.car }}
+                <div class="form-text">Авто из списка автоматически подтягивает цену по длительности.</div>
+                {% for error in form.car.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.customer.id_for_label }}">Customer</label>
+                {{ form.customer }}
+                {% for error in form.customer.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.start_date.id_for_label }}">Start date</label>
+                {{ form.start_date }}
+                <div class="form-text">Выберите дату начала аренды.</div>
+                {% for error in form.start_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.end_date.id_for_label }}">End date</label>
+                {{ form.end_date }}
+                <div class="form-text">Система подставит цену в зависимости от количества дней.</div>
+                {% for error in form.end_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+
+              <div class="col-12">
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                  <span class="small text-muted">Быстрый выбор длительности:</span>
+                  <button class="btn btn-sm btn-outline-secondary" type="button" data-days="3">3 дня</button>
+                  <button class="btn btn-sm btn-outline-secondary" type="button" data-days="7">7 дней</button>
+                  <button class="btn btn-sm btn-outline-secondary" type="button" data-days="14">14 дней</button>
+                  <button class="btn btn-sm btn-outline-secondary" type="button" data-days="30">30 дней</button>
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.daily_rate.id_for_label }}">Daily rate</label>
+                {{ form.daily_rate }}
+                <div class="form-text">Автозаполнение по тарифу автомобиля.</div>
+                {% for error in form.daily_rate.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.total_price.id_for_label }}">Total price</label>
+                {{ form.total_price }}
+                <div class="form-text">Считается автоматически по количеству дней.</div>
+                {% for error in form.total_price.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.status.id_for_label }}">Status</label>
+                {{ form.status }}
+                {% for error in form.status.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+            </div>
+
+            <div class="alert alert-info d-flex align-items-center gap-2 mt-3" id="price-summary" role="alert">
+              <div class="spinner-border spinner-border-sm text-primary me-2 d-none" id="price-spinner" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <div>
+                <div class="fw-semibold mb-1">Итого будет рассчитано автоматически</div>
+                <div class="small text-muted" id="price-summary-text">Выберите авто и даты аренды.</div>
+              </div>
+            </div>
+
+            {% if car_pricing %}
+              {{ car_pricing|json_script:"car-pricing-data" }}
+            {% endif %}
+
+            <script>
+              (function() {
+                const carSelect = document.getElementById("id_car");
+                const startInput = document.getElementById("id_start_date");
+                const endInput = document.getElementById("id_end_date");
+                const dailyRateInput = document.getElementById("id_daily_rate");
+                const totalInput = document.getElementById("id_total_price");
+                const summaryText = document.getElementById("price-summary-text");
+                const quickButtons = document.querySelectorAll("button[data-days]");
+                const carPricingData = window.JSON.parse(
+                  (document.getElementById("car-pricing-data") || { textContent: "[]" }).textContent
+                );
+
+                const msPerDay = 24 * 60 * 60 * 1000;
+
+                function parseDate(value) {
+                  if (!value) return null;
+                  const parts = value.split("-");
+                  if (parts.length !== 3) return null;
+                  const [year, month, day] = parts.map((p) => parseInt(p, 10));
+                  if (!year || !month || !day) return null;
+                  return new Date(Date.UTC(year, month - 1, day));
+                }
+
+                function diffDays(start, end) {
+                  if (!start || !end) return 0;
+                  const diff = Math.round((end - start) / msPerDay);
+                  return diff > 0 ? diff : 0;
+                }
+
+                function pickRate(car, days) {
+                  if (!car) return 0;
+                  const tiers = [
+                    { threshold: 15, high: "rate_15_plus_high", low: "rate_15_plus_low" },
+                    { threshold: 5, high: "rate_5_14_high", low: "rate_5_14_low" },
+                    { threshold: 1, high: "rate_1_4_high", low: "rate_1_4_low" },
+                  ];
+
+                  for (const tier of tiers) {
+                    if (days >= tier.threshold) {
+                      if (car[tier.high]) return car[tier.high];
+                      if (car[tier.low]) return car[tier.low];
+                    }
+                  }
+                  return car.daily_rate || 0;
+                }
+
+                function formatMoney(value) {
+                  return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB" }).format(value || 0);
+                }
+
+                const initialValues = {
+                  car: carSelect ? carSelect.value : "",
+                  start: startInput ? startInput.value : "",
+                  end: endInput ? endInput.value : "",
+                  daily: dailyRateInput ? dailyRateInput.value : "",
+                  total: totalInput ? totalInput.value : "",
+                };
+
+                function updatePricing(forceWrite = false) {
+                  const carId = Number(carSelect?.value);
+                  const car = carPricingData.find((item) => item.id === carId);
+                  const startDate = parseDate(startInput?.value);
+                  const endDate = parseDate(endInput?.value);
+                  const days = diffDays(startDate, endDate);
+                  const hasExistingPrice = Boolean((dailyRateInput && dailyRateInput.value) || (totalInput && totalInput.value));
+                  const inputsChanged =
+                    initialValues.car !== (carSelect ? carSelect.value : "") ||
+                    initialValues.start !== (startInput ? startInput.value : "") ||
+                    initialValues.end !== (endInput ? endInput.value : "");
+                  const shouldWrite = forceWrite || !hasExistingPrice || inputsChanged;
+
+                  if (!car || !days) {
+                    if (shouldWrite && dailyRateInput) dailyRateInput.value = "";
+                    if (shouldWrite && totalInput) totalInput.value = "";
+                    if (hasExistingPrice && !shouldWrite) {
+                      summaryText.textContent = `Сохранённая сумма: ${formatMoney(Number(totalInput?.value || 0))}`;
+                    } else {
+                      summaryText.textContent = "Выберите авто и корректные даты аренды.";
+                    }
+                    return;
+                  }
+
+                  if (!shouldWrite && hasExistingPrice && days > 0) {
+                    summaryText.textContent = `${days} дн × ${formatMoney(Number(dailyRateInput?.value || 0))} = ${formatMoney(Number(totalInput?.value || 0))}`;
+                    return;
+                  }
+
+                  const rate = pickRate(car, days);
+                  const total = rate * days;
+
+                  if (shouldWrite && dailyRateInput) dailyRateInput.value = rate ? rate.toFixed(2) : "";
+                  if (shouldWrite && totalInput) totalInput.value = total ? total.toFixed(2) : "";
+
+                  summaryText.textContent = `${days} дн × ${formatMoney(rate)} = ${formatMoney(total)}`;
+                }
+
+                quickButtons.forEach((btn) => {
+                  btn.addEventListener("click", () => {
+                    const days = Number(btn.getAttribute("data-days") || "0");
+                    const startDate = parseDate(startInput?.value) || new Date();
+                    const endDate = new Date(startDate.getTime() + days * msPerDay);
+                    const format = (date) => {
+                      const y = date.getUTCFullYear();
+                      const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+                      const d = String(date.getUTCDate()).padStart(2, "0");
+                      return `${y}-${m}-${d}`;
+                    };
+                    if (startInput && !startInput.value) {
+                      startInput.value = format(startDate);
+                    }
+                    if (endInput) {
+                      endInput.value = format(endDate);
+                    }
+                    updatePricing(true);
+                  });
+                });
+
+                [carSelect, startInput, endInput].forEach((el) => {
+                  if (el) {
+                    el.addEventListener("change", () => updatePricing(true));
+                    el.addEventListener("input", () => updatePricing(true));
+                  }
+                });
+
+                updatePricing(false);
+              })();
+            </script>
+
+            <div class="d-flex justify-content-end gap-2 pt-3">
+              <a href="{% url 'rentals:rental_list' %}" class="btn btn-outline-secondary">Cancel</a>
+              <button class="btn btn-primary" type="submit">Save rental</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

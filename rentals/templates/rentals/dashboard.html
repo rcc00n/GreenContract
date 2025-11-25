@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-0">Dashboard</h1>
+      <p class="text-muted small mb-0">Snapshot of fleet health and current bookings.</p>
+    </div>
+    <a href="{% url 'rentals:export_rentals_csv' %}" class="btn btn-outline-secondary">Export rentals CSV</a>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <p class="text-uppercase text-muted fw-semibold small mb-1">Total rentals</p>
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="display-6 fw-bold">{{ total_rentals }}</div>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'rentals:rental_list' %}">View</a>
+          </div>
+          <p class="text-muted small mb-0">All bookings in the system.</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <p class="text-uppercase text-muted fw-semibold small mb-1">Active</p>
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="display-6 fw-bold">{{ active_rentals }}</div>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'rentals:rental_list' %}">View</a>
+          </div>
+          <p class="text-muted small mb-0">Currently running bookings.</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <p class="text-uppercase text-muted fw-semibold small mb-1">Completed</p>
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="display-6 fw-bold">{{ completed_rentals }}</div>
+            <span class="badge text-bg-light text-muted">All time</span>
+          </div>
+          <p class="text-muted small mb-0">Closed rentals that generated revenue.</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <p class="text-uppercase text-muted fw-semibold small mb-1">Revenue</p>
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="display-6 fw-bold">${{ total_revenue|floatformat:2 }}</div>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'rentals:rental_list' %}">Rentals</a>
+          </div>
+          <p class="text-muted small mb-0">Sum of completed rental totals.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h2 class="h5 mb-0">Top cars by completed rentals</h2>
+              <p class="text-muted small mb-0">Last 5 by count of completed rentals.</p>
+            </div>
+            <a href="{% url 'rentals:car_list' %}" class="btn btn-outline-secondary btn-sm">View cars</a>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Plate</th>
+                  <th>Car</th>
+                  <th class="text-center">Completed</th>
+                  <th class="text-end">Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for car in top_cars %}
+                  <tr>
+                    <td class="fw-semibold">{{ car.car__plate_number }}</td>
+                    <td class="text-muted">{{ car.car__make }} {{ car.car__model }}</td>
+                    <td class="text-center">{{ car.num_rentals }}</td>
+                    <td class="text-end">${{ car.revenue|default:0|floatformat:2 }}</td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="4" class="text-center text-muted py-4">No completed rentals yet.</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-body d-flex flex-column gap-3">
+          <div>
+            <h2 class="h5 mb-1">Inventory snapshot</h2>
+            <p class="text-muted small mb-0">Quick view of active records.</p>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+              <span class="text-muted">Cars</span>
+              <span class="fw-semibold">{{ cars_count }}</span>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+              <span class="text-muted">Customers</span>
+              <span class="fw-semibold">{{ customers_count }}</span>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+              <span class="text-muted">Active rentals</span>
+              <span class="fw-semibold">{{ active_rentals }}</span>
+            </li>
+          </ul>
+          <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'rentals:car_create' %}" class="btn btn-primary btn-sm">Add car</a>
+            <a href="{% url 'rentals:customer_create' %}" class="btn btn-outline-primary btn-sm">Add customer</a>
+            <a href="{% url 'rentals:rental_create' %}" class="btn btn-outline-secondary btn-sm">Create rental</a>
+            <a href="{% url 'rentals:contract_template_create' %}" class="btn btn-outline-secondary btn-sm">New template</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

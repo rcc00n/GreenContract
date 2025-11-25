@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="row">
+    <div class="col-lg-9 mx-auto">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h1 class="h4 mb-0">{% if object %}Edit contract template{% else %}New contract template{% endif %}</h1>
+          <p class="text-muted small mb-0">Upload a DOCX or author HTML with placeholders.</p>
+        </div>
+        <a href="{% url 'rentals:contract_template_list' %}" class="btn btn-outline-secondary">Back to list</a>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <form method="post" enctype="multipart/form-data" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+            <div class="row g-3">
+              {% for field in form %}
+                <div class="{% if field.name in 'body_html description placeholder_help' %}col-12{% else %}col-md-6{% endif %}">
+                  <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                  {{ field }}
+                  {% if field.help_text %}
+                    <div class="form-text">{{ field.help_text }}</div>
+                  {% endif %}
+                  {% for error in field.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                  {% endfor %}
+                </div>
+              {% endfor %}
+            </div>
+            <div class="d-flex justify-content-end gap-2 pt-3">
+              <a href="{% url 'rentals:contract_template_list' %}" class="btn btn-outline-secondary">Cancel</a>
+              <button class="btn btn-primary" type="submit">Save template</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

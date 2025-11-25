@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-0">{{ title|default:"Import data" }}</h1>
+      {% if help_text %}
+        <p class="text-muted small mb-0">{{ help_text }}</p>
+      {% endif %}
+    </div>
+    <a href="{{ back_url }}" class="btn btn-outline-secondary">Back to list</a>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data" class="d-flex flex-column gap-3">
+        {% csrf_token %}
+        <div>
+          <label class="form-label">CSV file</label>
+          <input type="file" name="file" accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel" class="form-control" required>
+          <div class="form-text">
+            Upload a UTF-8 CSV or Excel .xls file. Each row will create or update a record using the unique field described below.
+          </div>
+        </div>
+
+        {% if expected_headers %}
+          <div class="bg-light border rounded p-3">
+            <div class="text-muted small mb-2">Expected headers</div>
+            <div class="d-flex flex-wrap gap-2">
+              {% for header in expected_headers %}
+                <span class="badge text-bg-light border text-secondary">{{ header }}</span>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+
+        {% if xls_headers %}
+          <div class="bg-light border rounded p-3">
+            <div class="text-muted small mb-2">XLS columns supported</div>
+            <div class="d-flex flex-wrap gap-2">
+              {% for header in xls_headers %}
+                <span class="badge text-bg-light border text-secondary">{{ header }}</span>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-primary w-auto">Upload file</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}

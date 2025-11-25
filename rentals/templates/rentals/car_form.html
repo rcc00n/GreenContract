@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="row">
+    <div class="col-lg-8 mx-auto">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h1 class="h4 mb-0">{% if object %}Edit car{% else %}Add car{% endif %}</h1>
+          <p class="text-muted small mb-0">Keep license plate, make, model, year, and tiered rates up to date.</p>
+        </div>
+        <a href="{% url 'rentals:car_list' %}" class="btn btn-outline-secondary">Back to list</a>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <form method="post" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label" for="{{ form.plate_number.id_for_label }}">{{ form.plate_number.label }}</label>
+                {{ form.plate_number }}
+                {% if form.plate_number.help_text %}<div class="form-text">{{ form.plate_number.help_text }}</div>{% endif %}
+                {% for error in form.plate_number.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="{{ form.make.id_for_label }}">{{ form.make.label }}</label>
+                {{ form.make }}
+                {% if form.make.help_text %}<div class="form-text">{{ form.make.help_text }}</div>{% endif %}
+                {% for error in form.make.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="{{ form.model.id_for_label }}">{{ form.model.label }}</label>
+                {{ form.model }}
+                {% if form.model.help_text %}<div class="form-text">{{ form.model.help_text }}</div>{% endif %}
+                {% for error in form.model.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="{{ form.year.id_for_label }}">{{ form.year.label }}</label>
+                {{ form.year }}
+                {% if form.year.help_text %}<div class="form-text">{{ form.year.help_text }}</div>{% endif %}
+                {% for error in form.year.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="{{ form.daily_rate.id_for_label }}">{{ form.daily_rate.label }}</label>
+                {{ form.daily_rate }}
+                {% if form.daily_rate.help_text %}<div class="form-text">{{ form.daily_rate.help_text }}</div>{% endif %}
+                {% for error in form.daily_rate.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-3 d-flex align-items-center">
+                <div class="form-check mt-3">
+                  {{ form.is_active }}
+                  <label class="form-check-label" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
+                </div>
+                {% for error in form.is_active.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+            </div>
+
+            <hr class="my-4">
+            <div class="mb-2">
+              <div class="small fw-semibold text-muted">Высокий сезон (вс)</div>
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label" for="{{ form.rate_1_4_high.id_for_label }}">{{ form.rate_1_4_high.label }}</label>
+                  {{ form.rate_1_4_high }}
+                  {% if form.rate_1_4_high.help_text %}<div class="form-text">{{ form.rate_1_4_high.help_text }}</div>{% endif %}
+                  {% for error in form.rate_1_4_high.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="{{ form.rate_5_14_high.id_for_label }}">{{ form.rate_5_14_high.label }}</label>
+                  {{ form.rate_5_14_high }}
+                  {% if form.rate_5_14_high.help_text %}<div class="form-text">{{ form.rate_5_14_high.help_text }}</div>{% endif %}
+                  {% for error in form.rate_5_14_high.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="{{ form.rate_15_plus_high.id_for_label }}">{{ form.rate_15_plus_high.label }}</label>
+                  {{ form.rate_15_plus_high }}
+                  {% if form.rate_15_plus_high.help_text %}<div class="form-text">{{ form.rate_15_plus_high.help_text }}</div>{% endif %}
+                  {% for error in form.rate_15_plus_high.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-2 mt-4">
+              <div class="small fw-semibold text-muted">Низкий сезон (нс)</div>
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label" for="{{ form.rate_1_4_low.id_for_label }}">{{ form.rate_1_4_low.label }}</label>
+                  {{ form.rate_1_4_low }}
+                  {% if form.rate_1_4_low.help_text %}<div class="form-text">{{ form.rate_1_4_low.help_text }}</div>{% endif %}
+                  {% for error in form.rate_1_4_low.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="{{ form.rate_5_14_low.id_for_label }}">{{ form.rate_5_14_low.label }}</label>
+                  {{ form.rate_5_14_low }}
+                  {% if form.rate_5_14_low.help_text %}<div class="form-text">{{ form.rate_5_14_low.help_text }}</div>{% endif %}
+                  {% for error in form.rate_5_14_low.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="{{ form.rate_15_plus_low.id_for_label }}">{{ form.rate_15_plus_low.label }}</label>
+                  {{ form.rate_15_plus_low }}
+                  {% if form.rate_15_plus_low.help_text %}<div class="form-text">{{ form.rate_15_plus_low.help_text }}</div>{% endif %}
+                  {% for error in form.rate_15_plus_low.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 pt-3">
+              <a href="{% url 'rentals:car_list' %}" class="btn btn-outline-secondary">Cancel</a>
+              <button class="btn btn-primary" type="submit">Save car</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

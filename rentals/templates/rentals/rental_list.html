@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-0">Rentals</h1>
+      <p class="text-muted small mb-0">Upcoming and in-progress reservations.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{% url 'rentals:import_rentals_csv' %}" class="btn btn-outline-secondary">Import CSV</a>
+      <a href="{% url 'rentals:export_rentals_csv' %}" class="btn btn-outline-secondary">Export CSV</a>
+      <a href="{% url 'rentals:rental_create' %}" class="btn btn-primary">Create rental</a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Car</th>
+            <th>Customer</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Status</th>
+            <th>Total</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rental in object_list %}
+            <tr>
+              <td>{{ rental.car }}</td>
+              <td>{{ rental.customer }}</td>
+              <td>{{ rental.start_date|date:"Y-m-d" }}</td>
+              <td>{{ rental.end_date|date:"Y-m-d" }}</td>
+              <td>
+                {% if rental.status == "active" %}
+                  <span class="badge text-bg-success">{{ rental.get_status_display }}</span>
+                {% elif rental.status == "completed" %}
+                  <span class="badge text-bg-primary">{{ rental.get_status_display }}</span>
+                {% elif rental.status == "cancelled" %}
+                  <span class="badge text-bg-danger">{{ rental.get_status_display }}</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">{{ rental.get_status_display }}</span>
+                {% endif %}
+              </td>
+              <td>${{ rental.total_price }}</td>
+              <td class="text-end">
+                <a href="{% url 'rentals:rental_update' rental.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                {% if contract_templates %}
+                  <div class="btn-group ms-2">
+                    <button type="button" class="btn btn-sm btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+                      Contract
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      {% for ct in contract_templates %}
+                        <li>
+                          <a class="dropdown-item" href="{% url 'rentals:generate_contract' rental.pk ct.pk %}">
+                            {{ ct.name }}
+                          </a>
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="7" class="text-center text-muted py-4">No rentals yet. Create your first booking.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

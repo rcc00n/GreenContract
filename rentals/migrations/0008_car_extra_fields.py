@@ -9,119 +9,119 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="color",
             field=models.CharField(blank=True, max_length=50, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="fuel_tank_cost_rub",
             field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="fuel_tank_volume_liters",
             field=models.PositiveIntegerField(blank=True, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="loss_alloy_wheel_fee",
             field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="loss_car_keys_fee",
             field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="loss_child_seat_fee",
             field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="loss_external_antenna_fee",
             field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="loss_fire_extinguisher_fee",
             field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="loss_first_aid_kit_fee",
             field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="loss_gps_fee",
             field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="loss_hubcaps_fee",
             field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="loss_jack_fee",
             field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="loss_license_plate_fee",
             field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="loss_radio_panel_fee",
             field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="loss_reflective_vest_fee",
             field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="loss_registration_certificate_fee",
             field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="loss_ski_mount_fee",
             field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="loss_steel_wheel_fee",
             field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="loss_tire_fee",
             field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="loss_warning_triangle_fee",
             field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="photo_url",
             field=models.URLField(blank=True, max_length=500, null=True),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="region_code",
             field=models.CharField(
                 blank=True, help_text="Регион номера (например, 26 или 82).", max_length=10, null=True
             ),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="registration_certificate_info",
             field=models.CharField(
@@ -131,7 +131,7 @@ class Migration(migrations.Migration):
                 null=True,
             ),
         ),
-        migrations.add_field(
+        migrations.AddField(
             model_name="car",
             name="security_deposit",
             field=models.DecimalField(

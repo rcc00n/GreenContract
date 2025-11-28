@@ -696,7 +696,8 @@ class CarCreateView(CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["loss_fee_fields"] = CAR_LOSS_FEE_FIELDS
+        form = context.get("form")
+        context["loss_fee_fields"] = [form[name] for name, _ in CAR_LOSS_FEE_FIELDS] if form else []
         return context
 
 
@@ -709,7 +710,8 @@ class CarUpdateView(UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["loss_fee_fields"] = CAR_LOSS_FEE_FIELDS
+        form = context.get("form")
+        context["loss_fee_fields"] = [form[name] for name, _ in CAR_LOSS_FEE_FIELDS] if form else []
         return context
 
 

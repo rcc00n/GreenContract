@@ -178,15 +178,13 @@
               <div class="small fw-semibold text-muted">Стоимость деталей и документов при утере</div>
               <p class="text-muted small mb-2">Заполните сумму в рублях, оставьте пустым если не применимо.</p>
               <div class="row g-3">
-                {% for field_name, _ in loss_fee_fields %}
-                  {% with field=form[field_name] %}
-                    <div class="col-md-4">
-                      <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                      {{ field }}
-                      {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                      {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-                    </div>
-                  {% endwith %}
+                {% for field in loss_fee_fields %}
+                  <div class="col-md-4">
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                    {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                  </div>
                 {% endfor %}
               </div>
             </div>

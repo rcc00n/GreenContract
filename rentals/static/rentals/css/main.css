@@ -396,6 +396,51 @@ body[data-theme="dark"] .theme-toggle .icon-moon {
   border-color: color-mix(in srgb, var(--brand) 60%, transparent);
 }
 
+.tag-filter {
+  position: relative;
+  --tag-collapse-height: 132px;
+}
+
+.tag-filter-list {
+  transition: max-height 0.2s ease;
+}
+
+.tag-filter.tag-filter-overflow .tag-filter-list {
+  max-height: var(--tag-collapse-height);
+  overflow: hidden;
+}
+
+.tag-filter .tag-filter-fade {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 72px;
+  pointer-events: none;
+  background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--surface-1) 0%, transparent) 0%,
+      color-mix(in srgb, var(--surface-1) 55%, transparent) 45%,
+      color-mix(in srgb, var(--surface-1) 90%, var(--surface-0)) 100%
+    );
+  backdrop-filter: blur(6px);
+  opacity: 1;
+  transition: opacity 0.2s ease;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.tag-filter.is-expanded .tag-filter-list {
+  max-height: none;
+  overflow: visible;
+}
+
+.tag-filter.is-expanded .tag-filter-fade {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.tag-filter:not(.tag-filter-overflow) .tag-filter-fade {
+  display: none;
+}
+
 #contractSnippet {
   white-space: pre-wrap;
 }

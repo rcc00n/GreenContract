@@ -5,10 +5,10 @@
     <div class="col-lg-8 mx-auto">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-          <h1 class="h4 mb-0">{% if object %}Edit customer{% else %}Add customer{% endif %}</h1>
-          <p class="text-muted small mb-0">Store customer contact info and license number.</p>
+          <h1 class="h4 mb-0">{% if object %}Редактирование клиента{% else %}Новый клиент{% endif %}</h1>
+          <p class="text-muted small mb-0">Контакты, документы, стаж и скидка.</p>
         </div>
-        <a href="{% url 'rentals:customer_list' %}" class="btn btn-outline-secondary">Back to list</a>
+        <a href="{% url 'rentals:customer_list' %}" class="btn btn-outline-secondary">Назад к списку</a>
       </div>
 
       <div class="card shadow-sm">
@@ -20,7 +20,7 @@
             {% endif %}
             <div class="row g-3">
               {% for field in form %}
-                <div class="{% if field.name == 'address' or field.name == 'registration_address' or field.name == 'residence_address' or field.name == 'notes' or field.name == 'tags_text' %}col-12{% else %}col-md-6{% endif %}">
+                <div class="{% if field.name == 'registration_address' or field.name == 'tags_text' %}col-12{% else %}col-md-6{% endif %}">
                   <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                   {{ field }}
                   {% if field.help_text %}
@@ -33,8 +33,8 @@
               {% endfor %}
             </div>
             <div class="d-flex justify-content-end gap-2 pt-3">
-              <a href="{% url 'rentals:customer_list' %}" class="btn btn-outline-secondary">Cancel</a>
-              <button class="btn btn-primary" type="submit">Save customer</button>
+              <a href="{% url 'rentals:customer_list' %}" class="btn btn-outline-secondary">Отмена</a>
+              <button class="btn btn-primary" type="submit">Сохранить</button>
             </div>
           </form>
         </div>

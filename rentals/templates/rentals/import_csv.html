@@ -3,12 +3,12 @@
 {% block content %}
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-      <h1 class="h4 mb-0">{{ title|default:"Import data" }}</h1>
+      <h1 class="h4 mb-0">{{ title|default:"Импорт данных" }}</h1>
       {% if help_text %}
         <p class="text-muted small mb-0">{{ help_text }}</p>
       {% endif %}
     </div>
-    <a href="{{ back_url }}" class="btn btn-outline-secondary">Back to list</a>
+    <a href="{{ back_url }}" class="btn btn-outline-secondary">Вернуться</a>
   </div>
 
   <div class="card shadow-sm">
@@ -16,16 +16,16 @@
       <form method="post" enctype="multipart/form-data" class="d-flex flex-column gap-3">
         {% csrf_token %}
         <div>
-          <label class="form-label">CSV or Excel file</label>
+          <label class="form-label">Файл CSV или Excel</label>
           <input type="file" name="file" accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel" class="form-control" required>
           <div class="form-text">
-            Upload a UTF-8 CSV or Excel file (.xls, .xlsx). Each row will create or update a record using the unique field described below.
+            Загрузите файл в кодировке UTF-8/CP1251 (.csv, .xls, .xlsx). Каждая строка создаёт или обновляет запись по уникальным полям.
           </div>
         </div>
 
         {% if expected_headers %}
           <div class="bg-light border rounded p-3">
-            <div class="text-muted small mb-2">Expected headers</div>
+            <div class="text-muted small mb-2">Ожидаемые заголовки</div>
             <div class="d-flex flex-wrap gap-2">
               {% for header in expected_headers %}
                 <span class="badge text-bg-light border text-secondary">{{ header }}</span>
@@ -36,7 +36,7 @@
 
         {% if xls_headers %}
           <div class="bg-light border rounded p-3">
-            <div class="text-muted small mb-2">XLS columns supported</div>
+            <div class="text-muted small mb-2">Колонки XLS, которые поддерживаются</div>
             <div class="d-flex flex-wrap gap-2">
               {% for header in xls_headers %}
                 <span class="badge text-bg-light border text-secondary">{{ header }}</span>
@@ -45,7 +45,7 @@
           </div>
         {% endif %}
 
-        <button type="submit" class="btn btn-primary w-auto">Upload file</button>
+        <button type="submit" class="btn btn-primary w-auto">Загрузить файл</button>
       </form>
     </div>
   </div>

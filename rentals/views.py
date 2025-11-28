@@ -31,6 +31,7 @@ from django.core.exceptions import PermissionDenied
 from django.views.generic import CreateView, ListView, UpdateView
 from django.views.decorators.http import require_POST
 
+from .car_constants import CAR_LOSS_FEE_FIELDS
 from .forms import AdminUserCreationForm, CarForm, ContractTemplateForm, CustomerForm, RentalForm
 from .models import Car, ContractTemplate, Customer, CustomerTag, Rental
 from .services.contract_renderer import placeholder_guide, render_docx, render_html_template, render_pdf
@@ -63,6 +64,14 @@ def _parse_decimal(value):
         return Decimal(text)
     except (InvalidOperation, AttributeError, TypeError):
         return Decimal("0")
+
+
+def _parse_int(value):
+    try:
+        text = str(value).strip().replace(",", ".")
+        return int(float(text))
+    except (ValueError, TypeError, AttributeError):
+        return None
 
 
 def _parse_date(value):
@@ -216,8 +225,21 @@ def _serialize_car_pricing(car: Car):
 
 
 def _read_csv_rows(upload):
-    decoded = upload.read().decode("utf-8-sig").splitlines()
-    return list(csv.DictReader(decoded))
+    raw = upload.read()
+    decoded_text = None
+    last_error = None
+    for encoding in ("utf-8-sig", "cp1251"):
+        try:
+            decoded_text = raw.decode(encoding)
+            break
+        except UnicodeDecodeError as exc:
+            last_error = exc
+            continue
+
+    if decoded_text is None:
+        raise UnicodeDecodeError("utf-8", raw, 0, 0, f"Failed to decode CSV: {last_error}")
+
+    return list(csv.DictReader(decoded_text.splitlines()))
 
 
 def _read_excel_rows(upload):
@@ -322,6 +344,9 @@ def _normalize_car_row(row):
         year = None
 
     vin = _pick_value(row, ["vin", "VIN", "vin_code", "Vin", "ВИН", "Вин"])
+    color = _pick_value(row, ["color", "Color", "Цвет", "цвет"])
+    region_code = _pick_value(row, ["region_code", "Регион", "регион", "Регион (26 или 82)"])
+    photo_url = _pick_value(row, ["photo_url", "Фото", "Фото (ссылка)", "Фото ссылка"])
     sts_number = _pick_value(
         row,
         [
@@ -334,6 +359,25 @@ def _normalize_car_row(row):
     )
     sts_issue_date_raw = _pick_value(row, ["sts_issue_date", "дата выдачи стс", "СТС выдано"])
     sts_issued_by = _pick_value(row, ["sts_issued_by", "кем выдано стс", "кем выдано"])
+    registration_certificate_info = _pick_value(
+        row,
+        ["registration_certificate_info", "Свидетельство о регистрации", "свидетельство о регистрации"],
+    )
+    fuel_tank_volume_raw = _pick_value(
+        row,
+        ["fuel_tank_volume_liters", "Объем бака", "Объём бака", "объем бака", "объём бака"],
+    )
+    fuel_tank_cost_raw = _pick_value(
+        row,
+        [
+            "fuel_tank_cost_rub",
+            "Объем бака(руб.)",
+            "Объём бака(руб.)",
+            "Объем бака (руб)",
+            "Объём бака (руб)",
+        ],
+    )
+    security_deposit_raw = _pick_value(row, ["security_deposit", "Залог", "залог"])
 
     rate_1_4_high = _pick_value(row, ["rate_1_4_high", "1-4 дней(вс)", "1-4 дней (вс)"])
     rate_5_14_high = _pick_value(row, ["rate_5_14_high", "5-14 дней(вс)", "5-14 дней (вс)"])
@@ -359,6 +403,19 @@ def _normalize_car_row(row):
     rate_5_14_low = _parse_decimal(rate_5_14_low) if rate_5_14_low not in (None, "") else None
     rate_15_low = _parse_decimal(rate_15_low) if rate_15_low not in (None, "") else None
 
+    def _header_candidates(field_name: str, label: str) -> list[str]:
+        candidates = [field_name, label]
+        if isinstance(label, str):
+            normalized = label.replace("ё", "е").replace("Ё", "Е")
+            if normalized not in candidates:
+                candidates.append(normalized)
+        return candidates
+
+    loss_fee_values = {}
+    for field, label in CAR_LOSS_FEE_FIELDS:
+        loss_raw = _pick_value(row, _header_candidates(field, label))
+        loss_fee_values[field] = _parse_decimal(loss_raw) if loss_raw not in (None, "") else None
+
     def _first_rate(*values):
         for value in values:
             if value not in (None, Decimal("0")):
@@ -375,15 +432,34 @@ def _normalize_car_row(row):
         rate_15_low,
     )
 
+    vin_clean = _clean_text_value(vin).upper()
+    if vin_clean:
+        vin_clean = vin_clean.replace(" ", "")
+
+    sts_number_clean = _clean_text_value(sts_number)
+
+    fuel_tank_volume = _parse_int(fuel_tank_volume_raw) if fuel_tank_volume_raw not in (None, "") else None
+    fuel_tank_cost = _parse_decimal(fuel_tank_cost_raw) if fuel_tank_cost_raw not in (None, "") else None
+    security_deposit = (
+        _parse_decimal(security_deposit_raw) if security_deposit_raw not in (None, "") else None
+    )
+
     return {
         "plate_number": plate or "",
         "make": str(make).strip() if make else "",
         "model": str(model).strip() if model else "",
         "year": year,
-        "vin": _clean_text_value(vin),
-        "sts_number": _clean_text_value(sts_number),
+        "vin": vin_clean,
+        "color": _clean_text_value(color),
+        "region_code": _clean_text_value(region_code),
+        "photo_url": _clean_text_value(photo_url),
+        "sts_number": sts_number_clean,
         "sts_issue_date": _parse_date(sts_issue_date_raw),
         "sts_issued_by": _clean_text_value(sts_issued_by),
+        "registration_certificate_info": _clean_text_value(registration_certificate_info),
+        "fuel_tank_volume_liters": fuel_tank_volume,
+        "fuel_tank_cost_rub": fuel_tank_cost,
+        "security_deposit": security_deposit,
         "daily_rate": base_rate,
         "rate_1_4_high": rate_1_4_high,
         "rate_5_14_high": rate_5_14_high,
@@ -392,11 +468,21 @@ def _normalize_car_row(row):
         "rate_5_14_low": rate_5_14_low,
         "rate_15_low": rate_15_low,
         "is_active": is_active,
+        **loss_fee_values,
     }
 
 
 def _normalize_customer_row(row, row_index: int):
     """Normalize AmoCRM CSV/XLSX export rows into Customer fields."""
+
+    def _parse_discount(raw_value):
+        cleaned = _clean_text_value(raw_value).replace("%", "")
+        if not cleaned:
+            return None
+        try:
+            return Decimal(cleaned.replace(",", "."))
+        except (InvalidOperation, ValueError):
+            return None
 
     def pick(keys):
         for key in keys:
@@ -456,18 +542,13 @@ def _normalize_customer_row(row, row_index: int):
     email = _limit_length(
         pick(["email", "Email", "Рабочий email", "Личный email", "Другой email"]), EMAIL_MAX_LEN
     )
-    address = pick(["Адрес (контакт)", "Адрес (компания)", "address", "Address"])
-    passport_series = pick(["passport_series", "Паспорт серия", "Серия паспорта", "серия паспорта"])
-    passport_number = pick(["passport_number", "Паспорт номер", "Номер паспорта", "номер паспорта"])
-    passport_issued_by = pick(
-        ["passport_issued_by", "Кем выдан паспорт", "кем выдан паспорт", "Паспорт кем выдан"]
-    )
-    passport_issue_date_raw = pick(
-        ["passport_issue_date", "Дата выдачи паспорта", "дата выдачи паспорта", "Паспорт выдан"]
-    )
+    birth_date_raw = pick(["birth_date", "Birth date", "Дата рождения"])
+    license_issued_by = pick(["license_issued_by", "В.у. выдано", "ВУ выдано", "В/У выдано"])
+    driving_since_raw = pick(["driving_since", "Стаж с", "стаж с"])
     registration_address = pick(
         ["registration_address", "Адрес прописки", "адрес прописки", "Прописка", "прописка"]
     )
+    address_fallback = pick(["Адрес (контакт)", "Адрес (компания)", "address", "Address"])
     residence_address = pick(
         [
             "residence_address",
@@ -477,26 +558,37 @@ def _normalize_customer_row(row, row_index: int):
             "фактический адрес",
         ]
     )
-    notes = pick(["notes", "Notes", "заметки", "Заметки"])
+    primary_address = registration_address or residence_address or address_fallback
+    passport_series = pick(["passport_series", "Паспорт серия", "Серия паспорта", "серия паспорта"])
+    passport_number = pick(["passport_number", "Паспорт номер", "Номер паспорта", "номер паспорта"])
+    passport_issued_by = pick(
+        ["passport_issued_by", "Кем выдан паспорт", "кем выдан паспорт", "Паспорт кем выдан"]
+    )
+    passport_issue_date_raw = pick(
+        ["passport_issue_date", "Дата выдачи паспорта", "дата выдачи паспорта", "Паспорт выдан"]
+    )
+    discount_raw = pick(["discount_percent", "discount", "Скидка", "скидка", "скидка %", "Скидка %"])
     tags_raw = pick(["tags", "Tags", "теги", "Теги"])
     tags = _split_tags(tags_raw) if tags_raw else None
     passport_series = _limit_length(passport_series, 10) or None
     passport_number = _limit_length(passport_number, 20) or None
     passport_issued_by = _limit_length(passport_issued_by, 255) or None
+    license_issued_by = _limit_length(license_issued_by, 255) or None
 
     return {
         "full_name": full_name,
+        "birth_date": _parse_date(birth_date_raw),
         "email": email or None,
         "phone": phone,
         "license_number": license_number,
-        "address": address or None,
-        "registration_address": registration_address or None,
-        "residence_address": residence_address or None,
+        "license_issued_by": license_issued_by,
+        "driving_since": _parse_date(driving_since_raw),
+        "registration_address": primary_address or None,
         "passport_series": passport_series,
         "passport_number": passport_number,
         "passport_issued_by": passport_issued_by,
         "passport_issue_date": _parse_date(passport_issue_date_raw),
-        "notes": notes or None,
+        "discount_percent": _parse_discount(discount_raw),
         "tags": tags,
     }
 
@@ -602,6 +694,11 @@ class CarCreateView(CreateView):
     template_name = "rentals/car_form.html"
     success_url = reverse_lazy("rentals:car_list")
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["loss_fee_fields"] = CAR_LOSS_FEE_FIELDS
+        return context
+
 
 @method_decorator(login_required, name="dispatch")
 class CarUpdateView(UpdateView):
@@ -609,6 +706,11 @@ class CarUpdateView(UpdateView):
     form_class = CarForm
     template_name = "rentals/car_form.html"
     success_url = reverse_lazy("rentals:car_list")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["loss_fee_fields"] = CAR_LOSS_FEE_FIELDS
+        return context
 
 
 @login_required
@@ -709,20 +811,30 @@ class CustomerListView(ListView):
         if self.search_query:
             terms = [term for term in re.split(r"\s+", self.search_query) if term]
             for term in terms:
-                queryset = queryset.filter(
+                date_value = _parse_date(term)
+                discount_value = None
+                try:
+                    cleaned_term = str(term).replace("%", "").replace(",", ".")
+                    discount_value = Decimal(cleaned_term)
+                except (InvalidOperation, ValueError):
+                    discount_value = None
+                condition = (
                     Q(full_name__icontains=term)
                     | Q(phone__icontains=term)
                     | Q(email__icontains=term)
                     | Q(license_number__icontains=term)
-                    | Q(address__icontains=term)
+                    | Q(license_issued_by__icontains=term)
                     | Q(registration_address__icontains=term)
-                    | Q(residence_address__icontains=term)
                     | Q(passport_series__icontains=term)
                     | Q(passport_number__icontains=term)
                     | Q(passport_issued_by__icontains=term)
-                    | Q(notes__icontains=term)
                     | Q(tags__name__icontains=term)
                 )
+                if date_value:
+                    condition |= Q(passport_issue_date=date_value) | Q(birth_date=date_value) | Q(driving_since=date_value)
+                if discount_value is not None:
+                    condition |= Q(discount_percent=discount_value)
+                queryset = queryset.filter(condition)
 
         if self.active_tags:
             queryset = queryset.filter(tags__id__in=self.active_tags)
@@ -901,23 +1013,22 @@ def customer_search(request):
     if not term:
         return JsonResponse({"results": []})
 
-    matches = (
-        Customer.objects.filter(
-            Q(full_name__icontains=term)
-            | Q(phone__icontains=term)
-            | Q(email__icontains=term)
-            | Q(license_number__icontains=term)
-            | Q(passport_number__icontains=term)
-            | Q(passport_series__icontains=term)
-            | Q(tags__name__icontains=term)
-            | Q(address__icontains=term)
-            | Q(registration_address__icontains=term)
-            | Q(residence_address__icontains=term)
-        )
-        .order_by("full_name")
-        .distinct()
-        [:limit]
+    date_value = _parse_date(term)
+    condition = (
+        Q(full_name__icontains=term)
+        | Q(phone__icontains=term)
+        | Q(email__icontains=term)
+        | Q(license_number__icontains=term)
+        | Q(license_issued_by__icontains=term)
+        | Q(registration_address__icontains=term)
+        | Q(passport_number__icontains=term)
+        | Q(passport_series__icontains=term)
+        | Q(tags__name__icontains=term)
     )
+    if date_value:
+        condition |= Q(birth_date=date_value) | Q(driving_since=date_value) | Q(passport_issue_date=date_value)
+
+    matches = Customer.objects.filter(condition).order_by("full_name").distinct()[:limit]
 
     results = []
     for customer in matches:
@@ -949,9 +1060,16 @@ def export_cars_csv(request):
             "model",
             "year",
             "vin",
+            "color",
+            "region_code",
+            "photo_url",
             "sts_number",
             "sts_issue_date",
             "sts_issued_by",
+            "registration_certificate_info",
+            "fuel_tank_volume_liters",
+            "fuel_tank_cost_rub",
+            "security_deposit",
             "daily_rate",
             "rate_1_4_high",
             "rate_5_14_high",
@@ -960,6 +1078,7 @@ def export_cars_csv(request):
             "rate_5_14_low",
             "rate_15_plus_low",
             "is_active",
+            *[field for field, _ in CAR_LOSS_FEE_FIELDS],
         ]
     )
 
@@ -971,9 +1090,16 @@ def export_cars_csv(request):
                 smart_str(car.model),
                 car.year,
                 smart_str(car.vin),
+                smart_str(car.color),
+                smart_str(car.region_code),
+                smart_str(car.photo_url),
                 smart_str(car.sts_number),
                 car.sts_issue_date.isoformat() if car.sts_issue_date else "",
                 smart_str(car.sts_issued_by),
+                smart_str(car.registration_certificate_info),
+                car.fuel_tank_volume_liters if car.fuel_tank_volume_liters is not None else "",
+                car.fuel_tank_cost_rub if car.fuel_tank_cost_rub is not None else "",
+                car.security_deposit if car.security_deposit is not None else "",
                 car.daily_rate,
                 car.rate_1_4_high,
                 car.rate_5_14_high,
@@ -982,6 +1108,10 @@ def export_cars_csv(request):
                 car.rate_5_14_low,
                 car.rate_15_plus_low,
                 car.is_active,
+                *[
+                    getattr(car, field) if getattr(car, field) is not None else ""
+                    for field, _ in CAR_LOSS_FEE_FIELDS
+                ],
             ]
         )
 
@@ -997,17 +1127,18 @@ def export_customers_csv(request):
     writer.writerow(
         [
             "full_name",
+            "birth_date",
             "email",
             "phone",
             "license_number",
+            "license_issued_by",
+            "driving_since",
             "passport_series",
             "passport_number",
             "passport_issue_date",
             "passport_issued_by",
-            "address",
             "registration_address",
-            "residence_address",
-            "notes",
+            "discount_percent",
             "tags",
         ]
     )
@@ -1017,17 +1148,18 @@ def export_customers_csv(request):
         writer.writerow(
             [
                 smart_str(customer.full_name),
-                smart_str(customer.email),
-                smart_str(customer.phone),
+                customer.birth_date.isoformat() if customer.birth_date else "",
+                smart_str(customer.email or ""),
+                smart_str(customer.phone or ""),
                 smart_str(customer.license_number),
-                smart_str(customer.passport_series),
-                smart_str(customer.passport_number),
+                smart_str(customer.license_issued_by or ""),
+                customer.driving_since.isoformat() if customer.driving_since else "",
+                smart_str(customer.passport_series or ""),
+                smart_str(customer.passport_number or ""),
                 customer.passport_issue_date.isoformat() if customer.passport_issue_date else "",
-                smart_str(customer.passport_issued_by),
-                smart_str(customer.address),
-                smart_str(customer.registration_address),
-                smart_str(customer.residence_address),
-                smart_str(customer.notes),
+                smart_str(customer.passport_issued_by or ""),
+                smart_str(customer.registration_address or ""),
+                smart_str(customer.discount_percent if customer.discount_percent is not None else ""),
                 smart_str(tags),
             ]
         )
@@ -1100,9 +1232,16 @@ def import_cars_csv(request):
                 model = normalized["model"]
                 year = normalized["year"]
                 vin = normalized["vin"]
+                color = normalized.get("color")
+                region_code = normalized.get("region_code")
+                photo_url = normalized.get("photo_url")
                 sts_number = normalized["sts_number"]
                 sts_issue_date = normalized["sts_issue_date"]
                 sts_issued_by = normalized["sts_issued_by"]
+                registration_certificate_info = normalized.get("registration_certificate_info")
+                fuel_tank_volume_liters = normalized.get("fuel_tank_volume_liters")
+                fuel_tank_cost_rub = normalized.get("fuel_tank_cost_rub")
+                security_deposit = normalized.get("security_deposit")
                 daily_rate = normalized["daily_rate"]
                 rate_1_4_high = normalized["rate_1_4_high"]
                 rate_5_14_high = normalized["rate_5_14_high"]
@@ -1110,6 +1249,7 @@ def import_cars_csv(request):
                 rate_1_4_low = normalized["rate_1_4_low"]
                 rate_5_14_low = normalized["rate_5_14_low"]
                 rate_15_low = normalized["rate_15_low"]
+                loss_fee_values = {field: normalized.get(field) for field, _ in CAR_LOSS_FEE_FIELDS}
 
                 has_rate = any(
                     rate not in (None, Decimal("0"))
@@ -1130,26 +1270,78 @@ def import_cars_csv(request):
 
                 base_daily_rate = daily_rate or rate_1_4_high or rate_1_4_low or Decimal("0")
 
-                Car.objects.update_or_create(
-                    plate_number=plate,
-                    defaults={
-                        "make": make,
-                        "model": model,
-                        "year": year,
-                        "vin": vin or None,
-                        "sts_number": sts_number or None,
-                        "sts_issue_date": sts_issue_date,
-                        "sts_issued_by": sts_issued_by or None,
-                        "daily_rate": base_daily_rate,
-                        "rate_1_4_high": rate_1_4_high or Decimal("0"),
-                        "rate_5_14_high": rate_5_14_high or Decimal("0"),
-                        "rate_15_plus_high": rate_15_high or Decimal("0"),
-                        "rate_1_4_low": rate_1_4_low or Decimal("0"),
-                        "rate_5_14_low": rate_5_14_low or Decimal("0"),
-                        "rate_15_plus_low": rate_15_low or Decimal("0"),
-                        "is_active": normalized["is_active"],
-                    },
-                )
+                defaults = {
+                    "make": make,
+                    "model": model,
+                    "year": year,
+                    "vin": vin or None,
+                    "color": color or None,
+                    "region_code": region_code or None,
+                    "photo_url": photo_url or None,
+                    "sts_number": sts_number or None,
+                    "sts_issue_date": sts_issue_date,
+                    "sts_issued_by": sts_issued_by or None,
+                    "registration_certificate_info": registration_certificate_info or None,
+                    "fuel_tank_volume_liters": fuel_tank_volume_liters,
+                    "fuel_tank_cost_rub": fuel_tank_cost_rub,
+                    "security_deposit": security_deposit,
+                    "daily_rate": base_daily_rate,
+                    "rate_1_4_high": rate_1_4_high or Decimal("0"),
+                    "rate_5_14_high": rate_5_14_high or Decimal("0"),
+                    "rate_15_plus_high": rate_15_high or Decimal("0"),
+                    "rate_1_4_low": rate_1_4_low or Decimal("0"),
+                    "rate_5_14_low": rate_5_14_low or Decimal("0"),
+                    "rate_15_plus_low": rate_15_low or Decimal("0"),
+                    "is_active": normalized["is_active"],
+                    **loss_fee_values,
+                }
+
+                car, created = Car.objects.get_or_create(plate_number=plate, defaults=defaults)
+                if not created:
+                    car.make = make or car.make
+                    car.model = model or car.model
+                    car.year = year or car.year
+                    if vin:
+                        car.vin = vin
+                    if color:
+                        car.color = color
+                    if region_code:
+                        car.region_code = region_code
+                    if photo_url:
+                        car.photo_url = photo_url
+                    if sts_number:
+                        car.sts_number = sts_number
+                    if sts_issue_date:
+                        car.sts_issue_date = sts_issue_date
+                    if sts_issued_by:
+                        car.sts_issued_by = sts_issued_by
+                    if registration_certificate_info:
+                        car.registration_certificate_info = registration_certificate_info
+                    if fuel_tank_volume_liters is not None:
+                        car.fuel_tank_volume_liters = fuel_tank_volume_liters
+                    if fuel_tank_cost_rub is not None:
+                        car.fuel_tank_cost_rub = fuel_tank_cost_rub
+                    if security_deposit is not None:
+                        car.security_deposit = security_deposit
+                    if base_daily_rate is not None:
+                        car.daily_rate = base_daily_rate
+                    if rate_1_4_high is not None:
+                        car.rate_1_4_high = rate_1_4_high
+                    if rate_5_14_high is not None:
+                        car.rate_5_14_high = rate_5_14_high
+                    if rate_15_high is not None:
+                        car.rate_15_plus_high = rate_15_high
+                    if rate_1_4_low is not None:
+                        car.rate_1_4_low = rate_1_4_low
+                    if rate_5_14_low is not None:
+                        car.rate_5_14_low = rate_5_14_low
+                    if rate_15_low is not None:
+                        car.rate_15_plus_low = rate_15_low
+                    for field, value in loss_fee_values.items():
+                        if value is not None:
+                            setattr(car, field, value)
+                    car.is_active = normalized["is_active"]
+                    car.save()
                 imported += 1
 
             if imported:
@@ -1167,12 +1359,19 @@ def import_cars_csv(request):
             "expected_headers": [
                 "plate_number",
                 "vin",
+                "color",
+                "region_code",
+                "photo_url",
                 "make",
                 "model",
                 "year",
                 "sts_number",
                 "sts_issue_date (YYYY-MM-DD)",
                 "sts_issued_by",
+                "registration_certificate_info",
+                "fuel_tank_volume_liters",
+                "fuel_tank_cost_rub",
+                "security_deposit",
                 "daily_rate",
                 "rate_1_4_high",
                 "rate_5_14_high",
@@ -1181,21 +1380,30 @@ def import_cars_csv(request):
                 "rate_5_14_low",
                 "rate_15_plus_low",
                 "is_active",
+                *[field for field, _ in CAR_LOSS_FEE_FIELDS],
             ],
             "xls_headers": [
                 "Регистрационный знак",
                 "VIN / ВИН",
+                "Цвет",
+                "Регион",
+                "Фото (ссылка)",
                 "Марка",
                 "Год выпуска",
                 "СТС",
+                "Свидетельство о регистрации",
+                "Объем бака",
+                "Объем бака(руб.)",
+                "Залог",
                 "1-4 дней(вс)",
                 "5-14 дней(вс)",
                 "15 дней и более(вс)",
                 "1-4 дней(нс)",
                 "5-14 дней(нс)",
                 "15 дней и более(нс)",
+                *[label for _, label in CAR_LOSS_FEE_FIELDS],
             ],
-            "help_text": "Upload CSV or Excel (.xls). The Russian XLS template is supported, and tiered prices for высокий/низкий сезон will be imported. Existing plate numbers will be updated. Optional VIN/СТС columns will also be stored.",
+            "help_text": "Upload CSV or Excel (.xls). The Russian XLS template is supported, and tiered prices для высокий/низкий сезон будут импортированы. Дополнительно поддерживаются цвет, регион, ссылка на фото, параметры бака, залог и цены при утере комплектующих. Existing plate numbers will be updated without clearing missing fields.",
             "back_url": reverse("rentals:car_list"),
         },
     )
@@ -1206,17 +1414,17 @@ def import_customers_csv(request):
     if request.method == "POST":
         upload = request.FILES.get("file")
         if not upload:
-            messages.error(request, "Please choose a CSV or Excel file to upload.")
+            messages.error(request, "Пожалуйста, выберите CSV или Excel файл.")
         else:
             try:
                 rows = _load_rows(upload)
             except Exception as exc:  # noqa: BLE001 - show error to user
                 logger.exception("Customer import: failed to read file %s", upload.name)
-                messages.error(request, f"Could not read file: {exc}")
+                messages.error(request, f"Не удалось прочитать файл: {exc}")
                 return redirect("rentals:import_customers_csv")
 
             if not rows:
-                messages.warning(request, "File is empty or missing rows.")
+                messages.warning(request, "Файл пустой или не содержит строк.")
                 return redirect("rentals:import_customers_csv")
 
             created_count, updated_count, skipped_empty = 0, 0, 0
@@ -1230,7 +1438,7 @@ def import_customers_csv(request):
                 normalized_rows.append(normalized)
 
             if not normalized_rows:
-                messages.warning(request, "No valid rows found in file.")
+                messages.warning(request, "Не найдено корректных строк для импорта.")
                 return redirect("rentals:import_customers_csv")
 
             # Deduplicate by license number inside the upload.
@@ -1255,16 +1463,17 @@ def import_customers_csv(request):
             to_update = []
             update_fields = (
                 "full_name",
+                "birth_date",
                 "email",
                 "phone",
-                "address",
+                "license_issued_by",
+                "driving_since",
                 "registration_address",
-                "residence_address",
                 "passport_series",
                 "passport_number",
                 "passport_issued_by",
                 "passport_issue_date",
-                "notes",
+                "discount_percent",
             )
             for license_number, data in by_license.items():
                 if license_number in existing:
@@ -1307,18 +1516,18 @@ def import_customers_csv(request):
             if imported:
                 messages.success(
                     request,
-                    f"Imported {imported} customers "
-                    f"({created_count} created, {updated_count} updated). Missing fields were auto-filled.",
+                    f"Импортировано {imported} клиент(ов) "
+                    f"(создано {created_count}, обновлено {updated_count}). Пустые поля заполнены автоматически.",
                 )
             if skipped_empty:
                 messages.info(
                     request,
-                    f"Skipped {skipped_empty} completely empty rows.",
+                    f"Пропущено {skipped_empty} полностью пустых строк.",
                 )
             if duplicate_rows:
                 messages.info(
                     request,
-                    f"Deduplicated {duplicate_rows} rows with the same license number inside the file.",
+                    f"Объединены {duplicate_rows} строк(и) с одинаковым номером ВУ в файле.",
                 )
 
             logger.info(
@@ -1339,26 +1548,27 @@ def import_customers_csv(request):
         request,
         "rentals/import_csv.html",
         {
-            "title": "Import customers",
+            "title": "Импорт клиентов",
             "expected_headers": [
                 "full_name / Наименование",
                 "Имя",
                 "Фамилия",
                 "phone / Телефон (контакт) / Мобильный телефон / Рабочий телефон",
                 "license_number / Водит. удостоверение. (контакт)",
+                "license_issued_by / В.у. выдано",
+                "driving_since / Стаж с",
+                "birth_date / Дата рождения",
+                "discount_percent / Скидка %",
                 "email (рабочий/личный/другой)",
-                "Адрес (контакт) / Адрес (компания)",
                 "registration_address / Адрес прописки",
-                "residence_address / Адрес проживания",
                 "passport_series / Серия паспорта",
                 "passport_number / Номер паспорта",
                 "passport_issued_by / Кем выдан паспорт",
                 "passport_issue_date (YYYY-MM-DD / ДД.ММ.ГГГГ)",
-                "notes / Заметки",
                 "tags / теги через запятую",
                 "ID (используется как резервный идентификатор)",
             ],
-            "help_text": "Upload CSV or Excel (.xls, .xlsx). Rows will be matched by license number, otherwise AmoCRM ID/phone. Missing fields are filled automatically instead of skipping rows. Паспортные данные, адреса и теги подхватываются при наличии колонок.",
+            "help_text": "Загрузите CSV или Excel (.xls, .xlsx). Строки сопоставляются по номеру ВУ, затем по ID/телефону из AmoCRM. Пустые значения заполняются автоматически. Адрес (контакт/фактический) при импорте кладётся в адрес прописки.",
             "back_url": reverse("rentals:customer_list"),
         },
     )

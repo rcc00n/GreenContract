@@ -20,8 +20,8 @@ class CarAdmin(admin.ModelAdmin):
 
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
-    list_display = ("full_name", "email", "phone", "license_number")
-    search_fields = ("full_name", "email", "phone", "license_number")
+    list_display = ("full_name", "birth_date", "phone", "email", "license_number", "discount_percent")
+    search_fields = ("full_name", "email", "phone", "license_number", "registration_address", "license_issued_by")
 
 
 @admin.register(Rental)

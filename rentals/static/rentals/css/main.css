@@ -200,6 +200,14 @@ main.container {
   border-top: 1px solid color-mix(in srgb, var(--border-subtle) 80%, transparent);
 }
 
+.pagination-bar {
+  position: sticky;
+  bottom: 0;
+  background: var(--surface-1);
+  z-index: 5;
+  box-shadow: 0 -12px 40px color-mix(in srgb, var(--border-subtle) 65%, transparent);
+}
+
 .table-light {
   --bs-table-bg: color-mix(in srgb, var(--surface-2) 75%, transparent);
   --bs-table-color: var(--text-primary);
@@ -390,4 +398,15 @@ body[data-theme="dark"] .theme-toggle .icon-moon {
 
 #contractSnippet {
   white-space: pre-wrap;
+}
+
+.sticky-summary {
+  position: sticky;
+  top: 88px;
+}
+
+@media (max-width: 991.98px) {
+  .sticky-summary {
+    position: static;
+  }
 }

@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <div class="row">
-    <div class="col-lg-8 mx-auto">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <h1 class="h4 mb-0">{% if object %}Edit rental{% else %}Create rental{% endif %}</h1>
-          <p class="text-muted small mb-0">Set rental dates, pricing, and status.</p>
-        </div>
-        <a href="{% url 'rentals:rental_list' %}" class="btn btn-outline-secondary">Back to list</a>
-      </div>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-0">{% if object %}Edit rental{% else %}Create rental{% endif %}</h1>
+      <p class="text-muted small mb-0">Set rental dates, pricing, and status.</p>
+    </div>
+    <a href="{% url 'rentals:rental_list' %}" class="btn btn-outline-secondary">Back to list</a>
+  </div>
 
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <form method="post" novalidate>
-            {% csrf_token %}
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="row g-4 align-items-start">
+      <div class="col-lg-9">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
             {% if form.non_field_errors %}
               <div class="alert alert-danger">{{ form.non_field_errors }}</div>
             {% endif %}
@@ -22,22 +22,7 @@
               <div class="col-md-4 col-lg-3">
                 <label class="form-label" for="{{ form.contract_number.id_for_label }}">Contract number</label>
                 {{ form.contract_number }}
-                <div class="form-text">
-                  5-значный номер генерируется автоматически и попадёт в название сделки.
-                </div>
-                <div class="small text-muted" id="deal-name-preview">
-                  Пример: 12345/Фамилия/A123BC Toyota/2025-01-01
-                </div>
                 {% for error in form.contract_number.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-              </div>
-              <div class="col-md-8 col-lg-9">
-                <div class="alert alert-light border small mb-0">
-                  <div class="fw-semibold">Формат названия сделки</div>
-                  <div class="text-muted">
-                    {номер договора}/{Фамилия}/{Номер машины + марка}/{Дата начала аренды}.<br>
-                    Фамилия берётся из клиента, авто — из гос. номера и марки, дата — из начала аренды.
-                  </div>
-                </div>
               </div>
 
               <div class="col-md-6">
@@ -331,565 +316,704 @@
               </div>
             </div>
 
-            <div class="alert alert-info d-flex align-items-center gap-2 mt-3" id="price-summary" role="alert">
-              <div class="spinner-border spinner-border-sm text-primary me-2 d-none" id="price-spinner" role="status">
-                <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-3">
+        <div class="sticky-summary">
+          <div class="card shadow-sm" id="price-summary" role="alert">
+            <div class="card-body">
+              <div class="d-flex align-items-center gap-2 mb-3">
+                <div class="spinner-border spinner-border-sm text-primary d-none" id="price-spinner" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                <div>
+                  <div class="fw-semibold text-uppercase small text-muted mb-1">Текущий расчёт</div>
+                  <div class="small text-muted" id="price-summary-text">Выберите авто и даты аренды.</div>
+                </div>
               </div>
-              <div>
-                <div class="fw-semibold mb-1">Итого будет рассчитано автоматически</div>
-                <div class="small text-muted" id="price-summary-text">Выберите авто и даты аренды.</div>
+              <div class="bg-light rounded p-3 mb-3">
+                <div class="text-muted small">К оплате</div>
+                <div class="h4 mb-0" id="price-summary-due">—</div>
+              </div>
+              <div class="small" id="price-summary-breakdown">
+                <div class="d-flex justify-content-between">
+                  <span>Дней</span>
+                  <span id="price-summary-days">—</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                  <span>Тариф</span>
+                  <span id="price-summary-rate">—</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                  <span>Базово</span>
+                  <span id="price-summary-base">—</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                  <span>Доп. услуги</span>
+                  <span id="price-summary-extras">—</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                  <span>Скидки</span>
+                  <span id="price-summary-discounts">—</span>
+                </div>
+                <div class="d-flex justify-content-between fw-semibold">
+                  <span>Итого</span>
+                  <span id="price-summary-total">—</span>
+                </div>
               </div>
             </div>
-
-            <script>
-              (function() {
-                const searchInput = document.getElementById("customer-search");
-                const resultsMenu = document.getElementById("customer-search-results");
-                const hiddenField = document.getElementById("id_customer");
-                const summary = document.getElementById("customer-selected-summary");
-                const searchUrl = searchInput?.dataset.searchUrl;
-                const initialLabel = searchInput?.dataset.initialLabel;
-                let debounceTimer = null;
-                let activeRequest = null;
-                let lastSelectedLabel = initialLabel && hiddenField?.value ? initialLabel : "";
-
-                if (!searchInput || !resultsMenu || !hiddenField || !searchUrl) {
-                  return;
-                }
-
-                function setSummary(text, highlight = false) {
-                  if (!summary) return;
-                  summary.textContent = text;
-                  summary.classList.toggle("text-danger", highlight);
-                }
-
-                function clearResults() {
-                  resultsMenu.innerHTML = "";
-                  resultsMenu.classList.remove("show");
-                }
-
-                function selectCustomer(item) {
-                  if (!item) return;
-                  hiddenField.value = item.id;
-                  const parts = [item.name, item.phone].filter(Boolean);
-                  const label = parts.join(" · ") || item.name;
-                  searchInput.value = item.name;
-                  lastSelectedLabel = label;
-                  setSummary(label);
-                  document.dispatchEvent(
-                    new CustomEvent("rental:customer-change", { detail: { name: item.name } })
-                  );
-                  clearResults();
-                }
-
-                function renderResults(items) {
-                  clearResults();
-                  if (!items.length) {
-                    const empty = document.createElement("div");
-                    empty.className = "dropdown-item text-muted small";
-                    empty.textContent = "Ничего не найдено";
-                    resultsMenu.appendChild(empty);
-                    resultsMenu.classList.add("show");
-                    return;
-                  }
-
-                  items.forEach((item) => {
-                    const btn = document.createElement("button");
-                    btn.type = "button";
-                    btn.className = "dropdown-item text-wrap";
-                    btn.dataset.id = item.id;
-
-                    btn.addEventListener("click", () => selectCustomer(item));
-
-                    const title = document.createElement("div");
-                    title.className = "fw-semibold";
-                    title.textContent = item.name;
-
-                    const meta = document.createElement("div");
-                    meta.className = "small text-muted";
-                    const metaParts = [item.phone, item.email, item.license_number].filter(Boolean);
-                    meta.textContent = metaParts.join(" • ");
-
-                    btn.appendChild(title);
-                    btn.appendChild(meta);
-                    resultsMenu.appendChild(btn);
-                  });
-
-                  resultsMenu.classList.add("show");
-                }
-
-                function fetchResults(term) {
-                  if (!term) return;
-
-                  if (activeRequest) {
-                    activeRequest.abort();
-                  }
-
-                  const controller = new AbortController();
-                  activeRequest = controller;
-
-                  resultsMenu.innerHTML = '<span class="dropdown-item text-muted small">Ищем...</span>';
-                  resultsMenu.classList.add("show");
-
-                  fetch(`${searchUrl}?q=${encodeURIComponent(term)}`, { signal: controller.signal })
-                    .then((response) => (response.ok ? response.json() : Promise.reject()))
-                    .then((data) => {
-                      if (controller.signal.aborted) return;
-                      renderResults((data && data.results) || []);
-                    })
-                    .catch(() => {
-                      if (controller.signal.aborted) return;
-                      clearResults();
-                      setSummary("Не удалось загрузить клиентов. Попробуйте ещё раз.", true);
-                    })
-                    .finally(() => {
-                      if (activeRequest === controller) {
-                        activeRequest = null;
-                      }
-                    });
-                }
-
-                function handleInput() {
-                  const term = searchInput.value.trim();
-                  if (term !== lastSelectedLabel && hiddenField.value) {
-                    hiddenField.value = "";
-                  }
-
-                  if (term.length < 2) {
-                    clearResults();
-                    if (!hiddenField.value) {
-                      setSummary("Введите минимум 2 символа для поиска.", true);
-                    }
-                    return;
-                  }
-
-                  setSummary("Выберите клиента из результатов поиска.");
-
-                  if (debounceTimer) {
-                    window.clearTimeout(debounceTimer);
-                  }
-                  debounceTimer = window.setTimeout(() => fetchResults(term), 180);
-                }
-
-                searchInput.addEventListener("input", handleInput);
-                searchInput.addEventListener("focus", () => {
-                  if (resultsMenu.innerHTML.trim()) {
-                    resultsMenu.classList.add("show");
-                  }
-                });
-
-                document.addEventListener("click", (event) => {
-                  if (event.target === searchInput || resultsMenu.contains(event.target)) {
-                    return;
-                  }
-                  clearResults();
-                });
-
-                if (initialLabel && hiddenField.value) {
-                  searchInput.value = initialLabel;
-                  setSummary(initialLabel);
-                  document.dispatchEvent(
-                    new CustomEvent("rental:customer-change", { detail: { name: searchInput.value || initialLabel } })
-                  );
-                } else if (hiddenField.value) {
-                  setSummary("Клиент выбран");
-                } else {
-                  setSummary("Введите минимум 2 символа для поиска.", true);
-                }
-              })();
-            </script>
-
-            {% if car_pricing %}
-              {{ car_pricing|json_script:"car-pricing-data" }}
-            {% endif %}
-            {% if pricing_config %}
-              {{ pricing_config|json_script:"pricing-config-data" }}
-            {% endif %}
-
-            <script>
-              (function() {
-                const carSelect = document.getElementById("id_car");
-                const startInput = document.getElementById("id_start_date");
-                const endInput = document.getElementById("id_end_date");
-                const startTimeInput = document.getElementById("id_start_time");
-                const endTimeInput = document.getElementById("id_end_time");
-                const dailyRateInput = document.getElementById("id_daily_rate");
-                const uniqueRateInput = document.getElementById("id_unique_daily_rate");
-                const totalInput = document.getElementById("id_total_price");
-                const balanceInput = document.getElementById("id_balance_due");
-                const summaryText = document.getElementById("price-summary-text");
-                const quickButtons = document.querySelectorAll("button[data-days]");
-                const contractInput = document.getElementById("id_contract_number");
-                const dealPreview = document.getElementById("deal-name-preview");
-                const carDetails = document.getElementById("car-details");
-                const carDetailsEmpty = document.getElementById("car-details-empty");
-                const carEditLink = document.getElementById("car-edit-link");
-                const customerSearchInput = document.getElementById("customer-search");
-                const airportStartInput = document.getElementById("id_airport_fee_start");
-                const airportEndInput = document.getElementById("id_airport_fee_end");
-                const nightStartInput = document.getElementById("id_night_fee_start");
-                const nightEndInput = document.getElementById("id_night_fee_end");
-                const deliveryIssueCity = document.getElementById("id_delivery_issue_city");
-                const deliveryReturnCity = document.getElementById("id_delivery_return_city");
-                const deliveryIssueFee = document.getElementById("id_delivery_issue_fee");
-                const deliveryReturnFee = document.getElementById("id_delivery_return_fee");
-                const childSeatToggle = document.getElementById("id_child_seat_included");
-                const boosterToggle = document.getElementById("id_booster_included");
-                const skiRackToggle = document.getElementById("id_ski_rack_included");
-                const roofBoxToggle = document.getElementById("id_roof_box_included");
-                const crossbarsToggle = document.getElementById("id_crossbars_included");
-                const equipmentManualInput = document.getElementById("id_equipment_manual_total");
-                const discountAmountInput = document.getElementById("id_discount_amount");
-                const discountPercentInput = document.getElementById("id_discount_percent");
-                const prepaymentInput = document.getElementById("id_prepayment");
-                const timeFillButtons = document.querySelectorAll("[data-time-fill]");
-                const carPricingData = window.JSON.parse(
-                  (document.getElementById("car-pricing-data") || { textContent: "[]" }).textContent
-                );
-                const pricingConfig = window.JSON.parse(
-                  (document.getElementById("pricing-config-data") || { textContent: "{}" }).textContent
-                );
-                let selectedCustomerName = (customerSearchInput?.value || "").trim();
-                let currentCar = null;
-
-                const msPerDay = 24 * 60 * 60 * 1000;
-
-                function parseDate(value) {
-                  if (!value) return null;
-                  const parts = value.split("-");
-                  if (parts.length !== 3) return null;
-                  const [year, month, day] = parts.map((p) => parseInt(p, 10));
-                  if (!year || !month || !day) return null;
-                  return new Date(Date.UTC(year, month - 1, day));
-                }
-
-                function diffDays(start, end) {
-                  if (!start || !end) return 0;
-                  const diff = Math.round((end - start) / msPerDay);
-                  return diff > 0 ? diff : 0;
-                }
-
-                function parseTimeMinutes(value) {
-                  if (!value) return null;
-                  const parts = value.split(":");
-                  if (parts.length !== 2) return null;
-                  const hours = parseInt(parts[0], 10);
-                  const minutes = parseInt(parts[1], 10);
-                  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
-                  return hours * 60 + minutes;
-                }
-
-                function slotMinutes(text) {
-                  const parts = text.split(":");
-                  if (parts.length !== 2) return 0;
-                  return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
-                }
-
-                function feeByTime(valueMinutes, slots, fallback) {
-                  if (valueMinutes === null || valueMinutes === undefined) return fallback;
-                  for (const slot of slots || []) {
-                    const start = slotMinutes(slot.start || "00:00");
-                    const end = slotMinutes(slot.end || "00:00");
-                    if (start <= end) {
-                      if (valueMinutes >= start && valueMinutes <= end) {
-                        return slot.amount ?? fallback;
-                      }
-                    } else if (valueMinutes >= start || valueMinutes <= end) {
-                      return slot.amount ?? fallback;
-                    }
-                  }
-                  return fallback;
-                }
-
-                function parseNumber(input) {
-                  if (!input) return 0;
-                  const raw = String(input.value || "").replace(",", ".").trim();
-                  const parsed = Number.parseFloat(raw);
-                  return Number.isFinite(parsed) ? parsed : 0;
-                }
-
-                function setNumber(input, value) {
-                  if (!input) return;
-                  const normalized = Number.isFinite(value) ? value : 0;
-                  input.value = normalized.toFixed(2);
-                }
-
-                function formatMoney(value) {
-                  return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB" }).format(value || 0);
-                }
-
-                function pickRate(car, days) {
-                  if (!car) return 0;
-                  const tiers = [
-                    { threshold: 15, high: "rate_15_plus_high", low: "rate_15_plus_low" },
-                    { threshold: 5, high: "rate_5_14_high", low: "rate_5_14_low" },
-                    { threshold: 1, high: "rate_1_4_high", low: "rate_1_4_low" },
-                  ];
-
-                  for (const tier of tiers) {
-                    if (days >= tier.threshold) {
-                      if (car[tier.high]) return car[tier.high];
-                      if (car[tier.low]) return car[tier.low];
-                    }
-                  }
-                  return car.daily_rate || 0;
-                }
-
-                function setCarDetail(field, value) {
-                  const el = carDetails?.querySelector(`[data-field="${field}"]`);
-                  if (el) {
-                    el.textContent = value || "—";
-                  }
-                }
-
-                function updateCarDetails(car) {
-                  if (!carDetails || !carDetailsEmpty) return;
-                  if (!car) {
-                    setCarDetail("plate", "—");
-                    setCarDetail("makeModel", "—");
-                    setCarDetail("year", "—");
-                    setCarDetail("vin", "—");
-                    setCarDetail("sts_number", "—");
-                    setCarDetail("sts_issue_date", "—");
-                    setCarDetail("sts_issued_by", "—");
-                    carDetailsEmpty.classList.remove("d-none");
-                    carDetails.classList.add("opacity-50");
-                    carEditLink?.classList.add("d-none");
-                    return;
-                  }
-
-                  setCarDetail("plate", car.plate_number || "—");
-                  setCarDetail("makeModel", [car.make, car.model].filter(Boolean).join(" ").trim() || "—");
-                  setCarDetail("year", car.year || "—");
-                  setCarDetail("vin", car.vin || "—");
-                  setCarDetail("sts_number", car.sts_number || "—");
-                  setCarDetail("sts_issue_date", car.sts_issue_date || "—");
-                  setCarDetail("sts_issued_by", car.sts_issued_by || "—");
-                  carDetailsEmpty.classList.add("d-none");
-                  carDetails.classList.remove("opacity-50");
-                  if (carEditLink) {
-                    if (car.edit_url) {
-                      carEditLink.href = car.edit_url;
-                      carEditLink.classList.remove("d-none");
-                    } else {
-                      carEditLink.classList.add("d-none");
-                    }
-                  }
-                }
-
-                function extractLastName(name) {
-                  const parts = (name || "").trim().split(/\s+/);
-                  return parts.length ? parts[0] : "";
-                }
-
-                function updateDealPreview(car) {
-                  if (!dealPreview) return;
-                  const contract = (contractInput?.value || "").trim() || "#####";
-                  const lastName = extractLastName(selectedCustomerName) || "Фамилия";
-                  const carPart = car ? `${car.plate_number} ${car.make}`.trim() : "Авто";
-                  const datePart = startInput?.value || "дата";
-                  dealPreview.textContent = `${contract}/${lastName}/${carPart}/${datePart}`;
-                }
-
-                function deliveryFeeFor(city) {
-                  if (!city) return 0;
-                  return pricingConfig.delivery_fees?.[city] || 0;
-                }
-
-                function autoFillDelivery(selectEl, feeEl) {
-                  if (!selectEl || !feeEl) return;
-                  const fee = deliveryFeeFor(selectEl.value || "");
-                  setNumber(feeEl, fee);
-                }
-
-                function autoFillTimeFees(target) {
-                  const isStart = target === "start";
-                  const minutes = parseTimeMinutes(isStart ? startTimeInput?.value : endTimeInput?.value);
-                  const airportInput = isStart ? airportStartInput : airportEndInput;
-                  const nightInput = isStart ? nightStartInput : nightEndInput;
-                  const airportFee = feeByTime(minutes, pricingConfig.airport_slots || [], pricingConfig.airport_default || 0);
-                  const nightFee = feeByTime(minutes, pricingConfig.night_slots || [], pricingConfig.night_default || 0);
-                  setNumber(airportInput, airportFee);
-                  setNumber(nightInput, nightFee);
-                }
-
-                function calculatePricing(forceWrite = false) {
-                  const carId = Number(carSelect?.value);
-                  currentCar = carPricingData.find((item) => item.id === carId);
-                  const startDate = parseDate(startInput?.value);
-                  const endDate = parseDate(endInput?.value);
-                  const days = diffDays(startDate, endDate);
-
-                  updateCarDetails(currentCar);
-                  updateDealPreview(currentCar);
-
-                  if (!currentCar || !days) {
-                    if (forceWrite) {
-                      setNumber(dailyRateInput, 0);
-                      setNumber(totalInput, 0);
-                      setNumber(balanceInput, 0);
-                    }
-                    summaryText.textContent = "Выберите авто и корректные даты аренды.";
-                    return;
-                  }
-
-                  const uniqueRate = parseNumber(uniqueRateInput);
-                  const baseRate = uniqueRate > 0 ? uniqueRate : pickRate(currentCar, days);
-                  const baseTotal = baseRate * days;
-
-                  if (airportStartInput && !airportStartInput.value) {
-                    setNumber(airportStartInput, pricingConfig.airport_default || 0);
-                  }
-                  if (airportEndInput && !airportEndInput.value) {
-                    setNumber(airportEndInput, pricingConfig.airport_default || 0);
-                  }
-                  if (nightStartInput && !nightStartInput.value) {
-                    setNumber(nightStartInput, pricingConfig.night_default || 0);
-                  }
-                  if (nightEndInput && !nightEndInput.value) {
-                    setNumber(nightEndInput, pricingConfig.night_default || 0);
-                  }
-
-                  const airportTotal = parseNumber(airportStartInput) + parseNumber(airportEndInput);
-                  const nightTotal = parseNumber(nightStartInput) + parseNumber(nightEndInput);
-                  const deliveryTotal = parseNumber(deliveryIssueFee) + parseNumber(deliveryReturnFee);
-
-                  const seatsPerUnit = Math.min(
-                    days * (pricingConfig.child_seat_daily || 0),
-                    pricingConfig.child_seat_cap || 0
-                  );
-                  const boosterPerUnit = Math.min(
-                    days * (pricingConfig.booster_daily || 0),
-                    pricingConfig.booster_cap || 0
-                  );
-                  const seatsTotal = seatsPerUnit * (childSeatToggle?.checked ? 1 : 0);
-                  const boostersTotal = boosterPerUnit * (boosterToggle?.checked ? 1 : 0);
-
-                  const gearPerDay =
-                    (pricingConfig.ski_rack_daily || 0) * (skiRackToggle?.checked ? 1 : 0) +
-                    (pricingConfig.autobox_daily || 0) * (roofBoxToggle?.checked ? 1 : 0) +
-                    (pricingConfig.crossbars_daily || 0) * (crossbarsToggle?.checked ? 1 : 0);
-                  const gearTotal = gearPerDay * days;
-
-                  const manualEquipment = Math.max(parseNumber(equipmentManualInput), 0);
-                  const equipmentTotal = manualEquipment > 0 ? manualEquipment : seatsTotal + boostersTotal + gearTotal;
-
-                  const extras = airportTotal + nightTotal + deliveryTotal + equipmentTotal;
-                  const subtotal = baseTotal + extras;
-
-                  const discountAmount = Math.min(Math.max(parseNumber(discountAmountInput), 0), subtotal);
-                  const discountPercent = Math.min(Math.max(parseNumber(discountPercentInput), 0), 100);
-                  const percentBase = Math.max(subtotal - discountAmount, 0);
-                  const discountPercentAmount = percentBase * (discountPercent / 100);
-
-                  const contractTotal = subtotal - discountAmount - discountPercentAmount;
-                  const prepayment = Math.max(parseNumber(prepaymentInput), 0);
-                  const due = Math.max(contractTotal - prepayment, 0);
-
-                  setNumber(dailyRateInput, baseRate);
-                  setNumber(totalInput, contractTotal);
-                  setNumber(balanceInput, due);
-
-                  const discountsTotal = discountAmount + discountPercentAmount;
-                  const summaryParts = [
-                    `${days} дн × ${formatMoney(baseRate)} = ${formatMoney(baseTotal)}`,
-                    `доп. услуги ${formatMoney(extras)}`,
-                    `скидки ${formatMoney(discountsTotal)}`,
-                    `предоплата ${formatMoney(prepayment)}`,
-                    `к оплате ${formatMoney(due)}`,
-                  ];
-                  summaryText.textContent = summaryParts.join(" · ");
-                }
-
-                quickButtons.forEach((btn) => {
-                  btn.addEventListener("click", () => {
-                    const days = Number(btn.getAttribute("data-days") || "0");
-                    const startDate = parseDate(startInput?.value) || new Date();
-                    const endDate = new Date(startDate.getTime() + days * msPerDay);
-                    const format = (date) => {
-                      const y = date.getUTCFullYear();
-                      const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-                      const d = String(date.getUTCDate()).padStart(2, "0");
-                      return `${y}-${m}-${d}`;
-                    };
-                    if (startInput && !startInput.value) {
-                      startInput.value = format(startDate);
-                    }
-                    if (endInput) {
-                      endInput.value = format(endDate);
-                    }
-                    calculatePricing(true);
-                  });
-                });
-
-                [
-                  carSelect,
-                  startInput,
-                  endInput,
-                  startTimeInput,
-                  endTimeInput,
-                  uniqueRateInput,
-                  airportStartInput,
-                  airportEndInput,
-                  nightStartInput,
-                  nightEndInput,
-                  deliveryIssueFee,
-                  deliveryReturnFee,
-                  childSeatToggle,
-                  boosterToggle,
-                  skiRackToggle,
-                  roofBoxToggle,
-                  crossbarsToggle,
-                  equipmentManualInput,
-                  discountAmountInput,
-                  discountPercentInput,
-                  prepaymentInput,
-                ].forEach((el) => {
-                  if (el) {
-                    el.addEventListener("change", () => calculatePricing(true));
-                    el.addEventListener("input", () => calculatePricing(true));
-                  }
-                });
-
-                [deliveryIssueCity, deliveryReturnCity].forEach((el) => {
-                  if (!el) return;
-                  el.addEventListener("change", () => {
-                    autoFillDelivery(el, el === deliveryIssueCity ? deliveryIssueFee : deliveryReturnFee);
-                    calculatePricing(true);
-                  });
-                });
-
-                timeFillButtons.forEach((btn) => {
-                  btn.addEventListener("click", () => {
-                    const target = btn.getAttribute("data-time-fill");
-                    autoFillTimeFees(target);
-                    calculatePricing(true);
-                  });
-                });
-
-                customerSearchInput?.addEventListener("input", () => {
-                  selectedCustomerName = customerSearchInput.value.trim();
-                  updateDealPreview(currentCar);
-                });
-
-                document.addEventListener("rental:customer-change", (event) => {
-                  selectedCustomerName = (event.detail?.name || "").trim();
-                  updateDealPreview(currentCar);
-                });
-
-                contractInput?.addEventListener("input", () => updateDealPreview(currentCar));
-
-                calculatePricing(true);
-              })();
-            </script>
-
-            <div class="d-flex justify-content-end gap-2 pt-3">
-              <a href="{% url 'rentals:rental_list' %}" class="btn btn-outline-secondary">Cancel</a>
-              <button class="btn btn-primary" type="submit">Save rental</button>
-            </div>
-          </form>
+          </div>
         </div>
       </div>
     </div>
-  </div>
+
+    {% if car_pricing %}
+      {{ car_pricing|json_script:"car-pricing-data" }}
+    {% endif %}
+    {% if pricing_config %}
+      {{ pricing_config|json_script:"pricing-config-data" }}
+    {% endif %}
+
+    <script>
+      (function() {
+        const searchInput = document.getElementById("customer-search");
+        const resultsMenu = document.getElementById("customer-search-results");
+        const hiddenField = document.getElementById("id_customer");
+        const summary = document.getElementById("customer-selected-summary");
+        const searchUrl = searchInput?.dataset.searchUrl;
+        const initialLabel = searchInput?.dataset.initialLabel;
+        let debounceTimer = null;
+        let activeRequest = null;
+        let lastSelectedLabel = initialLabel && hiddenField?.value ? initialLabel : "";
+
+        if (!searchInput || !resultsMenu || !hiddenField || !searchUrl) {
+          return;
+        }
+
+        function setSummary(text, highlight = false) {
+          if (!summary) return;
+          summary.textContent = text;
+          summary.classList.toggle("text-danger", highlight);
+        }
+
+        function clearResults() {
+          resultsMenu.innerHTML = "";
+          resultsMenu.classList.remove("show");
+        }
+
+        function selectCustomer(item) {
+          if (!item) return;
+          hiddenField.value = item.id;
+          const parts = [item.name, item.phone].filter(Boolean);
+          const label = parts.join(" · ") || item.name;
+          searchInput.value = item.name;
+          lastSelectedLabel = label;
+          setSummary(label);
+          document.dispatchEvent(new CustomEvent("rental:customer-change", { detail: { name: item.name } }));
+          clearResults();
+        }
+
+        function renderResults(items) {
+          clearResults();
+          if (!items.length) {
+            const empty = document.createElement("div");
+            empty.className = "dropdown-item text-muted small";
+            empty.textContent = "Ничего не найдено";
+            resultsMenu.appendChild(empty);
+            resultsMenu.classList.add("show");
+            return;
+          }
+
+          items.forEach((item) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "dropdown-item text-wrap";
+            btn.dataset.id = item.id;
+
+            btn.addEventListener("click", () => selectCustomer(item));
+
+            const title = document.createElement("div");
+            title.className = "fw-semibold";
+            title.textContent = item.name;
+
+            const meta = document.createElement("div");
+            meta.className = "small text-muted";
+            const metaParts = [item.phone, item.email, item.license_number].filter(Boolean);
+            meta.textContent = metaParts.join(" • ");
+
+            btn.appendChild(title);
+            btn.appendChild(meta);
+            resultsMenu.appendChild(btn);
+          });
+
+          resultsMenu.classList.add("show");
+        }
+
+        function fetchResults(term) {
+          if (!term) return;
+
+          if (activeRequest) {
+            activeRequest.abort();
+          }
+
+          const controller = new AbortController();
+          activeRequest = controller;
+
+          resultsMenu.innerHTML = '<span class="dropdown-item text-muted small">Ищем...</span>';
+          resultsMenu.classList.add("show");
+
+          fetch(`${searchUrl}?q=${encodeURIComponent(term)}`, { signal: controller.signal })
+            .then((response) => (response.ok ? response.json() : Promise.reject()))
+            .then((data) => {
+              if (controller.signal.aborted) return;
+              renderResults((data && data.results) || []);
+            })
+            .catch(() => {
+              if (controller.signal.aborted) return;
+              clearResults();
+              setSummary("Не удалось загрузить клиентов. Попробуйте ещё раз.", true);
+            })
+            .finally(() => {
+              if (activeRequest === controller) {
+                activeRequest = null;
+              }
+            });
+        }
+
+        function handleInput() {
+          const term = searchInput.value.trim();
+          if (term !== lastSelectedLabel && hiddenField.value) {
+            hiddenField.value = "";
+          }
+
+          if (term.length < 2) {
+            clearResults();
+            if (!hiddenField.value) {
+              setSummary("Введите минимум 2 символа для поиска.", true);
+            }
+            return;
+          }
+
+          setSummary("Выберите клиента из результатов поиска.");
+
+          if (debounceTimer) {
+            window.clearTimeout(debounceTimer);
+          }
+          debounceTimer = window.setTimeout(() => fetchResults(term), 180);
+        }
+
+        searchInput.addEventListener("input", handleInput);
+        searchInput.addEventListener("focus", () => {
+          if (resultsMenu.innerHTML.trim()) {
+            resultsMenu.classList.add("show");
+          }
+        });
+
+        document.addEventListener("click", (event) => {
+          if (event.target === searchInput || resultsMenu.contains(event.target)) {
+            return;
+          }
+          clearResults();
+        });
+
+        if (initialLabel && hiddenField.value) {
+          searchInput.value = initialLabel;
+          setSummary(initialLabel);
+          document.dispatchEvent(
+            new CustomEvent("rental:customer-change", { detail: { name: searchInput.value || initialLabel } })
+          );
+        } else if (hiddenField.value) {
+          setSummary("Клиент выбран");
+        } else {
+          setSummary("Введите минимум 2 символа для поиска.", true);
+        }
+      })();
+    </script>
+
+    <script>
+      (function() {
+        const carSelect = document.getElementById("id_car");
+        const startInput = document.getElementById("id_start_date");
+        const endInput = document.getElementById("id_end_date");
+        const startTimeInput = document.getElementById("id_start_time");
+        const endTimeInput = document.getElementById("id_end_time");
+        const dailyRateInput = document.getElementById("id_daily_rate");
+        const uniqueRateInput = document.getElementById("id_unique_daily_rate");
+        const totalInput = document.getElementById("id_total_price");
+        const balanceInput = document.getElementById("id_balance_due");
+        const summaryText = document.getElementById("price-summary-text");
+        const summaryDays = document.getElementById("price-summary-days");
+        const summaryRate = document.getElementById("price-summary-rate");
+        const summaryBase = document.getElementById("price-summary-base");
+        const summaryExtras = document.getElementById("price-summary-extras");
+        const summaryDiscounts = document.getElementById("price-summary-discounts");
+        const summaryTotal = document.getElementById("price-summary-total");
+        const summaryDue = document.getElementById("price-summary-due");
+        const quickButtons = document.querySelectorAll("button[data-days]");
+        const contractInput = document.getElementById("id_contract_number");
+        const dealPreview = document.getElementById("deal-name-preview");
+        const carDetails = document.getElementById("car-details");
+        const carDetailsEmpty = document.getElementById("car-details-empty");
+        const carEditLink = document.getElementById("car-edit-link");
+        const customerSearchInput = document.getElementById("customer-search");
+        const airportStartInput = document.getElementById("id_airport_fee_start");
+        const airportEndInput = document.getElementById("id_airport_fee_end");
+        const nightStartInput = document.getElementById("id_night_fee_start");
+        const nightEndInput = document.getElementById("id_night_fee_end");
+        const deliveryIssueCity = document.getElementById("id_delivery_issue_city");
+        const deliveryReturnCity = document.getElementById("id_delivery_return_city");
+        const deliveryIssueFee = document.getElementById("id_delivery_issue_fee");
+        const deliveryReturnFee = document.getElementById("id_delivery_return_fee");
+        const childSeatToggle = document.getElementById("id_child_seat_included");
+        const boosterToggle = document.getElementById("id_booster_included");
+        const skiRackToggle = document.getElementById("id_ski_rack_included");
+        const roofBoxToggle = document.getElementById("id_roof_box_included");
+        const crossbarsToggle = document.getElementById("id_crossbars_included");
+        const equipmentManualInput = document.getElementById("id_equipment_manual_total");
+        const discountAmountInput = document.getElementById("id_discount_amount");
+        const discountPercentInput = document.getElementById("id_discount_percent");
+        const prepaymentInput = document.getElementById("id_prepayment");
+        const timeFillButtons = document.querySelectorAll("[data-time-fill]");
+        const carPricingData = window.JSON.parse((document.getElementById("car-pricing-data") || { textContent: "[]" }).textContent);
+        const pricingConfig = window.JSON.parse((document.getElementById("pricing-config-data") || { textContent: "{}" }).textContent);
+        let selectedCustomerName = (customerSearchInput?.value || "").trim();
+        let currentCar = null;
+
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const manualTimeFlags = {
+          airportStart: false,
+          airportEnd: false,
+          nightStart: false,
+          nightEnd: false,
+        };
+
+        function roundMoney(value) {
+          const numeric = Number(value);
+          if (!Number.isFinite(numeric)) return 0;
+          return Math.round(numeric);
+        }
+
+        function parseDate(value) {
+          if (!value) return null;
+          const parts = value.split("-");
+          if (parts.length !== 3) return null;
+          const [year, month, day] = parts.map((p) => parseInt(p, 10));
+          if (!year || !month || !day) return null;
+          return new Date(Date.UTC(year, month - 1, day));
+        }
+
+        function diffDays(start, end) {
+          if (!start || !end) return 0;
+          const diff = Math.round((end - start) / msPerDay);
+          return diff > 0 ? diff : 0;
+        }
+
+        function parseTimeMinutes(value) {
+          if (!value) return null;
+          const parts = value.split(":");
+          if (parts.length !== 2) return null;
+          const hours = parseInt(parts[0], 10);
+          const minutes = parseInt(parts[1], 10);
+          if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+          return hours * 60 + minutes;
+        }
+
+        function slotMinutes(text) {
+          const parts = text.split(":");
+          if (parts.length !== 2) return 0;
+          return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        }
+
+        function feeByTime(valueMinutes, slots, fallback) {
+          if (valueMinutes === null || valueMinutes === undefined) return fallback;
+          for (const slot of slots || []) {
+            const start = slotMinutes(slot.start || "00:00");
+            const end = slotMinutes(slot.end || "00:00");
+            if (start <= end) {
+              if (valueMinutes >= start && valueMinutes <= end) {
+                return slot.amount ?? fallback;
+              }
+            } else if (valueMinutes >= start || valueMinutes <= end) {
+              return slot.amount ?? fallback;
+            }
+          }
+          return fallback;
+        }
+
+        function parseNumber(input) {
+          if (!input) return 0;
+          const raw = String(input.value || "").replace(",", ".").trim();
+          const parsed = Number.parseFloat(raw);
+          return Number.isFinite(parsed) ? roundMoney(parsed) : 0;
+        }
+
+        function setNumber(input, value) {
+          if (!input) return;
+          input.value = String(roundMoney(value));
+        }
+
+        function formatMoney(value) {
+          return new Intl.NumberFormat("ru-RU", {
+            style: "currency",
+            currency: "RUB",
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+          }).format(roundMoney(value));
+        }
+
+        function pickRate(car, days) {
+          if (!car) return 0;
+          const tiers = [
+            { threshold: 15, high: "rate_15_plus_high", low: "rate_15_plus_low" },
+            { threshold: 5, high: "rate_5_14_high", low: "rate_5_14_low" },
+            { threshold: 1, high: "rate_1_4_high", low: "rate_1_4_low" },
+          ];
+
+          for (const tier of tiers) {
+            if (days >= tier.threshold) {
+              if (car[tier.high]) return car[tier.high];
+              if (car[tier.low]) return car[tier.low];
+            }
+          }
+          return car.daily_rate || 0;
+        }
+
+        function setCarDetail(field, value) {
+          const el = carDetails?.querySelector(`[data-field="${field}"]`);
+          if (el) {
+            el.textContent = value || "—";
+          }
+        }
+
+        function updateCarDetails(car) {
+          if (!carDetails || !carDetailsEmpty) return;
+          if (!car) {
+            setCarDetail("plate", "—");
+            setCarDetail("makeModel", "—");
+            setCarDetail("year", "—");
+            setCarDetail("vin", "—");
+            setCarDetail("sts_number", "—");
+            setCarDetail("sts_issue_date", "—");
+            setCarDetail("sts_issued_by", "—");
+            carDetailsEmpty.classList.remove("d-none");
+            carDetails.classList.add("opacity-50");
+            carEditLink?.classList.add("d-none");
+            return;
+          }
+
+          setCarDetail("plate", car.plate_number || "—");
+          setCarDetail("makeModel", [car.make, car.model].filter(Boolean).join(" ").trim() || "—");
+          setCarDetail("year", car.year || "—");
+          setCarDetail("vin", car.vin || "—");
+          setCarDetail("sts_number", car.sts_number || "—");
+          setCarDetail("sts_issue_date", car.sts_issue_date || "—");
+          setCarDetail("sts_issued_by", car.sts_issued_by || "—");
+          carDetailsEmpty.classList.add("d-none");
+          carDetails.classList.remove("opacity-50");
+          if (carEditLink) {
+            if (car.edit_url) {
+              carEditLink.href = car.edit_url;
+              carEditLink.classList.remove("d-none");
+            } else {
+              carEditLink.classList.add("d-none");
+            }
+          }
+        }
+
+        function extractLastName(name) {
+          const parts = (name || "").trim().split(/\s+/);
+          return parts.length ? parts[0] : "";
+        }
+
+        function updateDealPreview(car) {
+          if (!dealPreview) return;
+          const contract = (contractInput?.value || "").trim() || "#####";
+          const lastName = extractLastName(selectedCustomerName) || "Фамилия";
+          const carPart = car ? `${car.plate_number} ${car.make}`.trim() : "Авто";
+          const datePart = startInput?.value || "дата";
+          dealPreview.textContent = `${contract}/${lastName}/${carPart}/${datePart}`;
+        }
+
+        function deliveryFeeFor(city) {
+          if (!city) return 0;
+          return pricingConfig.delivery_fees?.[city] || 0;
+        }
+
+        function autoFillDelivery(selectEl, feeEl) {
+          if (!selectEl || !feeEl) return;
+          const fee = deliveryFeeFor(selectEl.value || "");
+          setNumber(feeEl, fee);
+        }
+
+        function autoFillTimeFees(target, { force = false } = {}) {
+          const isStart = target === "start";
+          const minutes = parseTimeMinutes(isStart ? startTimeInput?.value : endTimeInput?.value);
+          const airportInput = isStart ? airportStartInput : airportEndInput;
+          const nightInput = isStart ? nightStartInput : nightEndInput;
+          const airportKey = isStart ? "airportStart" : "airportEnd";
+          const nightKey = isStart ? "nightStart" : "nightEnd";
+          const airportFee = feeByTime(minutes, pricingConfig.airport_slots || [], pricingConfig.airport_default || 0);
+          const nightFee = feeByTime(minutes, pricingConfig.night_slots || [], pricingConfig.night_default || 0);
+
+          if (airportInput && (!manualTimeFlags[airportKey] || force || !airportInput.value)) {
+            setNumber(airportInput, airportFee);
+          }
+          if (nightInput && (!manualTimeFlags[nightKey] || force || !nightInput.value)) {
+            setNumber(nightInput, nightFee);
+          }
+        }
+
+        function clearSummary() {
+          if (summaryDays) summaryDays.textContent = "—";
+          if (summaryRate) summaryRate.textContent = "—";
+          if (summaryBase) summaryBase.textContent = "—";
+          if (summaryExtras) summaryExtras.textContent = "—";
+          if (summaryDiscounts) summaryDiscounts.textContent = "—";
+          if (summaryTotal) summaryTotal.textContent = "—";
+          if (summaryDue) summaryDue.textContent = "—";
+        }
+
+        function calculatePricing(forceWrite = false) {
+          const carId = Number(carSelect?.value);
+          currentCar = carPricingData.find((item) => item.id === carId);
+          const startDate = parseDate(startInput?.value);
+          const endDate = parseDate(endInput?.value);
+          const days = diffDays(startDate, endDate);
+
+          updateCarDetails(currentCar);
+          updateDealPreview(currentCar);
+
+          if (!currentCar || !days) {
+            if (forceWrite) {
+              setNumber(dailyRateInput, 0);
+              setNumber(totalInput, 0);
+              setNumber(balanceInput, 0);
+            }
+            clearSummary();
+            if (summaryText) {
+              summaryText.textContent = "Выберите авто и корректные даты аренды.";
+            }
+            return;
+          }
+
+          const uniqueRate = parseNumber(uniqueRateInput);
+          const baseRate = roundMoney(uniqueRate > 0 ? uniqueRate : pickRate(currentCar, days));
+          const baseTotal = roundMoney(baseRate * days);
+
+          if (airportStartInput && !airportStartInput.value && !manualTimeFlags.airportStart) {
+            setNumber(airportStartInput, pricingConfig.airport_default || 0);
+          }
+          if (airportEndInput && !airportEndInput.value && !manualTimeFlags.airportEnd) {
+            setNumber(airportEndInput, pricingConfig.airport_default || 0);
+          }
+          if (nightStartInput && !nightStartInput.value && !manualTimeFlags.nightStart) {
+            setNumber(nightStartInput, pricingConfig.night_default || 0);
+          }
+          if (nightEndInput && !nightEndInput.value && !manualTimeFlags.nightEnd) {
+            setNumber(nightEndInput, pricingConfig.night_default || 0);
+          }
+
+          const airportTotal = roundMoney(parseNumber(airportStartInput) + parseNumber(airportEndInput));
+          const nightTotal = roundMoney(parseNumber(nightStartInput) + parseNumber(nightEndInput));
+          const deliveryTotal = roundMoney(parseNumber(deliveryIssueFee) + parseNumber(deliveryReturnFee));
+
+          const seatsPerUnit = Math.min(
+            days * (pricingConfig.child_seat_daily || 0),
+            pricingConfig.child_seat_cap || 0
+          );
+          const boosterPerUnit = Math.min(
+            days * (pricingConfig.booster_daily || 0),
+            pricingConfig.booster_cap || 0
+          );
+          const seatsTotal = roundMoney(seatsPerUnit * (childSeatToggle?.checked ? 1 : 0));
+          const boostersTotal = roundMoney(boosterPerUnit * (boosterToggle?.checked ? 1 : 0));
+
+          const gearPerDay =
+            (pricingConfig.ski_rack_daily || 0) * (skiRackToggle?.checked ? 1 : 0) +
+            (pricingConfig.autobox_daily || 0) * (roofBoxToggle?.checked ? 1 : 0) +
+            (pricingConfig.crossbars_daily || 0) * (crossbarsToggle?.checked ? 1 : 0);
+          const gearTotal = roundMoney(gearPerDay * days);
+
+          const manualEquipment = Math.max(parseNumber(equipmentManualInput), 0);
+          const equipmentTotal = manualEquipment > 0 ? roundMoney(manualEquipment) : roundMoney(seatsTotal + boostersTotal + gearTotal);
+
+          const extras = roundMoney(airportTotal + nightTotal + deliveryTotal + equipmentTotal);
+          const subtotal = roundMoney(baseTotal + extras);
+
+          const discountAmount = Math.min(Math.max(parseNumber(discountAmountInput), 0), subtotal);
+          const discountPercent = Math.min(Math.max(parseNumber(discountPercentInput), 0), 100);
+          const percentBase = Math.max(subtotal - discountAmount, 0);
+          const discountPercentAmount = roundMoney(percentBase * (discountPercent / 100));
+
+          const contractTotal = roundMoney(subtotal - discountAmount - discountPercentAmount);
+          const prepayment = Math.max(parseNumber(prepaymentInput), 0);
+          const due = roundMoney(Math.max(contractTotal - prepayment, 0));
+
+          setNumber(dailyRateInput, baseRate);
+          setNumber(totalInput, contractTotal);
+          setNumber(balanceInput, due);
+
+          const discountsTotal = roundMoney(discountAmount + discountPercentAmount);
+          if (summaryText) {
+            summaryText.textContent = [
+              `${days} дн × ${formatMoney(baseRate)} = ${formatMoney(baseTotal)}`,
+              `доп. услуги ${formatMoney(extras)}`,
+              `скидки ${formatMoney(discountsTotal)}`,
+              `предоплата ${formatMoney(prepayment)}`,
+            ].join(" · ");
+          }
+
+          if (summaryDays) summaryDays.textContent = `${days}`;
+          if (summaryRate) summaryRate.textContent = formatMoney(baseRate);
+          if (summaryBase) summaryBase.textContent = formatMoney(baseTotal);
+          if (summaryExtras) summaryExtras.textContent = formatMoney(extras);
+          if (summaryDiscounts) summaryDiscounts.textContent = `-${formatMoney(discountsTotal)}`;
+          if (summaryTotal) summaryTotal.textContent = formatMoney(contractTotal);
+          if (summaryDue) summaryDue.textContent = formatMoney(due);
+        }
+
+        quickButtons.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const days = Number(btn.getAttribute("data-days") || "0");
+            const startDate = parseDate(startInput?.value) || new Date();
+            const endDate = new Date(startDate.getTime() + days * msPerDay);
+            const format = (date) => {
+              const y = date.getUTCFullYear();
+              const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+              const d = String(date.getUTCDate()).padStart(2, "0");
+              return `${y}-${m}-${d}`;
+            };
+            if (startInput && !startInput.value) {
+              startInput.value = format(startDate);
+            }
+            if (endInput) {
+              endInput.value = format(endDate);
+            }
+            autoFillTimeFees("start");
+            autoFillTimeFees("end");
+            calculatePricing(true);
+          });
+        });
+
+        [
+          carSelect,
+          startInput,
+          endInput,
+          uniqueRateInput,
+          airportStartInput,
+          airportEndInput,
+          nightStartInput,
+          nightEndInput,
+          deliveryIssueFee,
+          deliveryReturnFee,
+          childSeatToggle,
+          boosterToggle,
+          skiRackToggle,
+          roofBoxToggle,
+          crossbarsToggle,
+          equipmentManualInput,
+          discountAmountInput,
+          discountPercentInput,
+          prepaymentInput,
+        ].forEach((el) => {
+          if (el) {
+            el.addEventListener("change", () => calculatePricing(true));
+            el.addEventListener("input", () => calculatePricing(true));
+          }
+        });
+
+        [startTimeInput, endTimeInput].forEach((el) => {
+          if (!el) return;
+          el.addEventListener("change", () => {
+            autoFillTimeFees(el === startTimeInput ? "start" : "end");
+            calculatePricing(true);
+          });
+          el.addEventListener("input", () => {
+            autoFillTimeFees(el === startTimeInput ? "start" : "end");
+            calculatePricing(true);
+          });
+        });
+
+        [
+          [airportStartInput, "airportStart"],
+          [airportEndInput, "airportEnd"],
+          [nightStartInput, "nightStart"],
+          [nightEndInput, "nightEnd"],
+        ].forEach(([input, key]) => {
+          if (!input) return;
+          input.addEventListener("input", () => {
+            manualTimeFlags[key] = Boolean((input.value || "").trim());
+            calculatePricing(true);
+          });
+        });
+
+        [deliveryIssueCity, deliveryReturnCity].forEach((el) => {
+          if (!el) return;
+          el.addEventListener("change", () => {
+            autoFillDelivery(el, el === deliveryIssueCity ? deliveryIssueFee : deliveryReturnFee);
+            calculatePricing(true);
+          });
+        });
+
+        timeFillButtons.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const target = btn.getAttribute("data-time-fill");
+            if (target === "start") {
+              manualTimeFlags.airportStart = false;
+              manualTimeFlags.nightStart = false;
+            } else if (target === "end") {
+              manualTimeFlags.airportEnd = false;
+              manualTimeFlags.nightEnd = false;
+            }
+            autoFillTimeFees(target, { force: true });
+            calculatePricing(true);
+          });
+        });
+
+        customerSearchInput?.addEventListener("input", () => {
+          selectedCustomerName = customerSearchInput.value.trim();
+          updateDealPreview(currentCar);
+        });
+
+        document.addEventListener("rental:customer-change", (event) => {
+          selectedCustomerName = (event.detail?.name || "").trim();
+          updateDealPreview(currentCar);
+        });
+
+        contractInput?.addEventListener("input", () => updateDealPreview(currentCar));
+
+        [
+          uniqueRateInput,
+          airportStartInput,
+          airportEndInput,
+          nightStartInput,
+          nightEndInput,
+          deliveryIssueFee,
+          deliveryReturnFee,
+          equipmentManualInput,
+          discountAmountInput,
+          prepaymentInput,
+        ].forEach((el) => {
+          if (el && (el.value || "").trim()) {
+            setNumber(el, parseNumber(el));
+          }
+        });
+
+        if (!((airportStartInput?.value || "").trim() || (nightStartInput?.value || "").trim())) {
+          autoFillTimeFees("start");
+        }
+        if (!((airportEndInput?.value || "").trim() || (nightEndInput?.value || "").trim())) {
+          autoFillTimeFees("end");
+        }
+        calculatePricing(true);
+      })();
+    </script>
+
+    <div class="d-flex justify-content-end gap-2 pt-3">
+      <a href="{% url 'rentals:rental_list' %}" class="btn btn-outline-secondary">Cancel</a>
+      <button class="btn btn-primary" type="submit">Save rental</button>
+    </div>
+  </form>
 {% endblock %}

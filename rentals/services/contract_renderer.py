@@ -21,16 +21,18 @@ PLACEHOLDER_GUIDE = [
         "Клиент",
         {
             "customer.full_name": "ФИО клиента",
+            "customer.birth_date": "Дата рождения",
             "customer.phone": "Телефон",
             "customer.email": "Email",
             "customer.license_number": "Водительское удостоверение",
+            "customer.license_issued_by": "В.у. выдано",
+            "customer.driving_since": "Стаж с",
+            "customer.discount_percent": "Скидка, %",
             "customer.passport_series": "Серия паспорта",
             "customer.passport_number": "Номер паспорта",
             "customer.passport_issue_date": "Дата выдачи паспорта",
             "customer.passport_issued_by": "Кем выдан паспорт",
-            "customer.address": "Адрес клиента",
             "customer.registration_address": "Адрес регистрации",
-            "customer.residence_address": "Адрес проживания",
         },
     ),
     (
@@ -179,20 +181,25 @@ def build_placeholder_values(rental: Rental) -> dict[str, str]:
     date_range = ""
     if start_date or end_date:
         date_range = " — ".join(filter(None, (_fmt_date(start_date), _fmt_date(end_date))))
+    address_primary = customer.registration_address or customer.address or customer.residence_address
 
     values = {
         # Client
         "customer.full_name": customer.full_name,
+        "customer.birth_date": _fmt_date(customer.birth_date),
         "customer.phone": customer.phone,
         "customer.email": customer.email,
         "customer.license_number": customer.license_number,
+        "customer.license_issued_by": customer.license_issued_by,
+        "customer.driving_since": _fmt_date(customer.driving_since),
+        "customer.discount_percent": _fmt_decimal(customer.discount_percent),
         "customer.passport_series": customer.passport_series,
         "customer.passport_number": customer.passport_number,
         "customer.passport_issue_date": _fmt_date(customer.passport_issue_date),
         "customer.passport_issued_by": customer.passport_issued_by,
-        "customer.address": customer.address,
-        "customer.registration_address": customer.registration_address,
-        "customer.residence_address": customer.residence_address,
+        "customer.address": address_primary,
+        "customer.registration_address": address_primary,
+        "customer.residence_address": address_primary,
         # Car
         "car.plate_number": car.plate_number,
         "car.make": car.make,

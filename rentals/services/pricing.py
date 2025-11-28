@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import date, datetime, time
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Dict
 
 from ..models import Car
@@ -102,6 +102,7 @@ BOOSTER_CAP = Decimal("1000")
 SKI_RACK_DAILY = Decimal("400")
 AUTOBOX_DAILY = Decimal("900")
 CROSSBARS_DAILY = Decimal("300")
+MONEY_QUANT = Decimal("1")
 
 
 @dataclass
@@ -139,6 +140,13 @@ def _to_decimal(value, default="0.00") -> Decimal:
         return Decimal(str(value))
     except (InvalidOperation, TypeError, ValueError):
         return Decimal(default)
+
+
+def _round_money(value) -> Decimal:
+    try:
+        return _to_decimal(value).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+    except InvalidOperation:
+        return Decimal("0")
 
 
 def _parse_time_string(value: str) -> time:
@@ -226,7 +234,7 @@ def calculate_rental_pricing(
     """
     days = rental_days(start_date, end_date)
     if not car or days <= 0:
-        zero = Decimal("0.00")
+        zero = Decimal("0")
         return PricingBreakdown(
             days=days,
             daily_rate=zero,
@@ -243,67 +251,93 @@ def calculate_rental_pricing(
             discount_percent_amount=zero,
             subtotal=zero,
             total_price=zero,
-            prepayment=_to_decimal(prepayment),
+            prepayment=_round_money(prepayment),
             balance_due=zero,
         )
 
-    base_daily_rate = _to_decimal(unique_daily_rate) if unique_daily_rate not in (None, "") else car.get_rate_for_days(days)
-    base_total = (base_daily_rate * Decimal(days)).quantize(Decimal("0.01"))
+    base_daily_rate = (
+        _round_money(unique_daily_rate) if unique_daily_rate not in (None, "") else _round_money(car.get_rate_for_days(days))
+    )
+    base_total = _round_money(base_daily_rate * Decimal(days))
 
-    airport_start = _to_decimal(airport_fee_start) if airport_fee_start not in (None, "") else _fee_for_time(start_time, AIRPORT_FEE_SLOTS, AIRPORT_FEE_DEFAULT)
-    airport_end = _to_decimal(airport_fee_end) if airport_fee_end not in (None, "") else _fee_for_time(end_time, AIRPORT_FEE_SLOTS, AIRPORT_FEE_DEFAULT)
-    airport_total = (airport_start + airport_end).quantize(Decimal("0.01"))
+    airport_start = (
+        _round_money(airport_fee_start)
+        if airport_fee_start not in (None, "")
+        else _round_money(_fee_for_time(start_time, AIRPORT_FEE_SLOTS, AIRPORT_FEE_DEFAULT))
+    )
+    airport_end = (
+        _round_money(airport_fee_end)
+        if airport_fee_end not in (None, "")
+        else _round_money(_fee_for_time(end_time, AIRPORT_FEE_SLOTS, AIRPORT_FEE_DEFAULT))
+    )
+    airport_total = _round_money(airport_start + airport_end)
 
-    night_start = _to_decimal(night_fee_start) if night_fee_start not in (None, "") else _fee_for_time(start_time, NIGHT_EXIT_FEE_SLOTS, NIGHT_EXIT_FEE_DEFAULT)
-    night_end = _to_decimal(night_fee_end) if night_fee_end not in (None, "") else _fee_for_time(end_time, NIGHT_EXIT_FEE_SLOTS, NIGHT_EXIT_FEE_DEFAULT)
-    night_total = (night_start + night_end).quantize(Decimal("0.01"))
+    night_start = (
+        _round_money(night_fee_start)
+        if night_fee_start not in (None, "")
+        else _round_money(_fee_for_time(start_time, NIGHT_EXIT_FEE_SLOTS, NIGHT_EXIT_FEE_DEFAULT))
+    )
+    night_end = (
+        _round_money(night_fee_end)
+        if night_fee_end not in (None, "")
+        else _round_money(_fee_for_time(end_time, NIGHT_EXIT_FEE_SLOTS, NIGHT_EXIT_FEE_DEFAULT))
+    )
+    night_total = _round_money(night_start + night_end)
 
-    issue_delivery_fee = _to_decimal(delivery_issue_fee) if delivery_issue_fee not in (None, "") else delivery_fee_for_city(delivery_issue_city)
-    return_delivery_fee = _to_decimal(delivery_return_fee) if delivery_return_fee not in (None, "") else delivery_fee_for_city(delivery_return_city)
-    delivery_total = (issue_delivery_fee + return_delivery_fee).quantize(Decimal("0.01"))
+    issue_delivery_fee = (
+        _round_money(delivery_issue_fee)
+        if delivery_issue_fee not in (None, "")
+        else _round_money(delivery_fee_for_city(delivery_issue_city))
+    )
+    return_delivery_fee = (
+        _round_money(delivery_return_fee)
+        if delivery_return_fee not in (None, "")
+        else _round_money(delivery_fee_for_city(delivery_return_city))
+    )
+    delivery_total = _round_money(issue_delivery_fee + return_delivery_fee)
 
     seat_units = max(int(child_seat_count or 0), 1 if child_seat_included else 0)
     booster_units = max(int(booster_count or 0), 1 if booster_included else 0)
-    seats_total = (min(CHILD_SEAT_DAILY * days, CHILD_SEAT_CAP) * seat_units).quantize(Decimal("0.01"))
-    boosters_total = (min(BOOSTER_DAILY * days, BOOSTER_CAP) * booster_units).quantize(Decimal("0.01"))
+    seats_total = _round_money(min(CHILD_SEAT_DAILY * days, CHILD_SEAT_CAP) * seat_units)
+    boosters_total = _round_money(min(BOOSTER_DAILY * days, BOOSTER_CAP) * booster_units)
 
     ski_units = max(int(ski_rack_count or 0), 1 if ski_rack_included else 0)
     box_units = max(int(roof_box_count or 0), 1 if roof_box_included else 0)
     cross_units = max(int(crossbars_count or 0), 1 if crossbars_included else 0)
-    gear_total = (
+    gear_total = _round_money(
         SKI_RACK_DAILY * ski_units * days + AUTOBOX_DAILY * box_units * days + CROSSBARS_DAILY * cross_units * days
-    ).quantize(Decimal("0.01"))
+    )
 
-    equipment_override = _to_decimal(equipment_manual_total)
+    equipment_override = _round_money(equipment_manual_total)
     if equipment_override > 0:
-        equipment_manual = equipment_override.quantize(Decimal("0.01"))
-        seats_total = boosters_total = gear_total = Decimal("0.00")
+        equipment_manual = equipment_override
+        seats_total = boosters_total = gear_total = Decimal("0")
     else:
-        equipment_manual = Decimal("0.00")
+        equipment_manual = Decimal("0")
 
-    extras_total = (airport_total + night_total + delivery_total + seats_total + boosters_total + gear_total + equipment_manual).quantize(Decimal("0.01"))
-    subtotal = (base_total + extras_total).quantize(Decimal("0.01"))
+    extras_total = _round_money(airport_total + night_total + delivery_total + seats_total + boosters_total + gear_total + equipment_manual)
+    subtotal = _round_money(base_total + extras_total)
 
-    discount_value = _to_decimal(discount_amount)
-    discount_value = max(min(discount_value, subtotal), Decimal("0.00"))
+    discount_value = _round_money(discount_amount)
+    discount_value = max(min(discount_value, subtotal), Decimal("0"))
 
     percent_raw = _to_decimal(discount_percent)
     if percent_raw < 0:
         percent_raw = Decimal("0.00")
     if percent_raw > 100:
         percent_raw = Decimal("100.00")
-    percent_base = max(subtotal - discount_value, Decimal("0.00"))
-    discount_percent_amount = (percent_base * percent_raw / Decimal("100")).quantize(Decimal("0.01"))
+    percent_base = max(subtotal - discount_value, Decimal("0"))
+    discount_percent_amount = _round_money(percent_base * percent_raw / Decimal("100"))
 
-    total_price = (subtotal - discount_value - discount_percent_amount).quantize(Decimal("0.01"))
-    prepayment_value = _to_decimal(prepayment)
+    total_price = _round_money(subtotal - discount_value - discount_percent_amount)
+    prepayment_value = _round_money(prepayment)
     if prepayment_value < 0:
-        prepayment_value = Decimal("0.00")
-    balance_due = max(total_price - prepayment_value, Decimal("0.00")).quantize(Decimal("0.01"))
+        prepayment_value = Decimal("0")
+    balance_due = _round_money(max(total_price - prepayment_value, Decimal("0")))
 
     return PricingBreakdown(
         days=days,
-        daily_rate=base_daily_rate.quantize(Decimal("0.01")),
+        daily_rate=base_daily_rate,
         base_total=base_total,
         airport_total=airport_total,
         night_total=night_total,
@@ -317,6 +351,6 @@ def calculate_rental_pricing(
         discount_percent_amount=discount_percent_amount,
         subtotal=subtotal,
         total_price=total_price,
-        prepayment=prepayment_value.quantize(Decimal("0.01")),
+        prepayment=prepayment_value,
         balance_due=balance_due,
     )

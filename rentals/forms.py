@@ -5,6 +5,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm
 
+from .car_constants import CAR_LOSS_FEE_FIELDS
 from .models import Car, Customer, Rental, ContractTemplate, CustomerTag
 from .services.pricing import DELIVERY_FEES, calculate_rental_pricing
 
@@ -32,11 +33,37 @@ class CarForm(StyledModelForm):
             widget = self.fields["sts_issue_date"].widget
             widget.input_type = "date"
             widget.attrs.setdefault("placeholder", "YYYY-MM-DD")
+        if "fuel_tank_volume_liters" in self.fields:
+            widget = self.fields["fuel_tank_volume_liters"].widget
+            widget.input_type = "number"
+            widget.attrs.setdefault("min", "0")
+            widget.attrs.setdefault("step", "1")
+
+        decimal_fields = [
+            "fuel_tank_cost_rub",
+            "security_deposit",
+            "daily_rate",
+            "rate_1_4_high",
+            "rate_5_14_high",
+            "rate_15_plus_high",
+            "rate_1_4_low",
+            "rate_5_14_low",
+            "rate_15_plus_low",
+            *[field for field, _ in CAR_LOSS_FEE_FIELDS],
+        ]
+        for name in decimal_fields:
+            if name in self.fields:
+                widget = self.fields[name].widget
+                widget.attrs.setdefault("min", "0")
+                widget.attrs.setdefault("step", "0.01")
 
     class Meta:
         model = Car
         fields = [
             "plate_number",
+            "region_code",
+            "color",
+            "photo_url",
             "vin",
             "make",
             "model",
@@ -44,6 +71,10 @@ class CarForm(StyledModelForm):
             "sts_number",
             "sts_issue_date",
             "sts_issued_by",
+            "registration_certificate_info",
+            "fuel_tank_volume_liters",
+            "fuel_tank_cost_rub",
+            "security_deposit",
             "rate_1_4_high",
             "rate_5_14_high",
             "rate_15_plus_high",
@@ -52,6 +83,7 @@ class CarForm(StyledModelForm):
             "rate_15_plus_low",
             "daily_rate",
             "is_active",
+            *[field for field, _ in CAR_LOSS_FEE_FIELDS],
         ]
         labels = {
             "daily_rate": "Fallback daily rate",
@@ -59,6 +91,13 @@ class CarForm(StyledModelForm):
             "sts_number": "СТС номер",
             "sts_issue_date": "СТС выдана",
             "sts_issued_by": "Кем выдана СТС",
+            "registration_certificate_info": "Свидетельство о регистрации",
+            "fuel_tank_volume_liters": "Объем бака (л)",
+            "fuel_tank_cost_rub": "Объем бака (руб.)",
+            "security_deposit": "Залог",
+            "color": "Цвет",
+            "photo_url": "Фото (ссылка)",
+            "region_code": "Регион (26 или 82)",
             "rate_1_4_high": "1-4 days (вс)",
             "rate_5_14_high": "5-14 days (вс)",
             "rate_15_plus_high": "15+ days (вс)",
@@ -66,12 +105,18 @@ class CarForm(StyledModelForm):
             "rate_5_14_low": "5-14 days (нс)",
             "rate_15_plus_low": "15+ days (нс)",
         }
+        labels.update({field: label for field, label in CAR_LOSS_FEE_FIELDS})
         help_texts = {
             "daily_rate": "Used if a tiered rate is missing.",
             "vin": "17 символов, можно оставить пустым.",
             "sts_number": "Номер свидетельства о регистрации (СТС).",
             "sts_issue_date": "Дата выдачи СТС.",
             "sts_issued_by": "Кем выдано свидетельство.",
+            "registration_certificate_info": "Оригинал/копия/где хранится.",
+            "fuel_tank_volume_liters": "Полный объем бака в литрах.",
+            "fuel_tank_cost_rub": "Стоимость полного бака (руб.), если фиксируете ее.",
+            "security_deposit": "Сумма залога по автомобилю.",
+            "photo_url": "При желании можно добавить ссылку на фото авто.",
             "rate_1_4_high": "Высокий сезон (вс) за сутки при аренде 1-4 дней.",
             "rate_5_14_high": "Высокий сезон (вс) за сутки при аренде 5-14 дней.",
             "rate_15_plus_high": "Высокий сезон (вс) за сутки при аренде 15+ дней.",
@@ -79,12 +124,13 @@ class CarForm(StyledModelForm):
             "rate_5_14_low": "Низкий сезон (нс) за сутки при аренде 5-14 дней.",
             "rate_15_plus_low": "Низкий сезон (нс) за сутки при аренде 15+ дней.",
         }
+        help_texts.update({field: "Стоимость при утере, ₽." for field, _ in CAR_LOSS_FEE_FIELDS})
 
 
 class CustomerForm(StyledModelForm):
     tags_text = forms.CharField(
         required=False,
-        label="Tags",
+        label="Теги",
         help_text="Через запятую: VIP, корпоративный, проблемный. Можно добавлять новые.",
     )
 
@@ -92,61 +138,72 @@ class CustomerForm(StyledModelForm):
         model = Customer
         fields = [
             "full_name",
+            "birth_date",
             "email",
             "phone",
             "license_number",
+            "license_issued_by",
+            "driving_since",
             "passport_series",
             "passport_number",
             "passport_issued_by",
             "passport_issue_date",
-            "address",
             "registration_address",
-            "residence_address",
-            "notes",
+            "discount_percent",
         ]
         labels = {
-            "full_name": "Full name",
-            "license_number": "License number",
-            "address": "Address",
-            "passport_series": "Passport series",
-            "passport_number": "Passport number",
-            "passport_issued_by": "Passport issued by",
-            "passport_issue_date": "Passport issue date",
-            "registration_address": "Registration address (прописка)",
-            "residence_address": "Residence address",
-            "notes": "Notes",
+            "full_name": "ФИО",
+            "birth_date": "Дата рождения",
+            "license_number": "Номер ВУ",
+            "license_issued_by": "В.у. выдано",
+            "driving_since": "Стаж с",
+            "passport_series": "Серия паспорта",
+            "passport_number": "Номер паспорта",
+            "passport_issued_by": "Кем выдан паспорт",
+            "passport_issue_date": "Дата выдачи паспорта",
+            "registration_address": "Адрес прописки",
+            "discount_percent": "Скидка, %",
         }
         help_texts = {
-            "address": "Основной/почтовый адрес клиента.",
+            "birth_date": "Формат ГГГГ-ММ-ДД.",
+            "license_number": "Номер водительского удостоверения.",
+            "license_issued_by": "Кем выдано водительское удостоверение.",
+            "driving_since": "Дата начала стажа вождения.",
             "passport_series": "Серия паспорта (4 цифры).",
             "passport_number": "Номер паспорта (6 цифр) или иной документ.",
             "passport_issue_date": "Дата выдачи документа.",
             "registration_address": "Адрес регистрации (прописка).",
-            "residence_address": "Фактический адрес проживания.",
+            "discount_percent": "Персональная скидка в процентах.",
         }
 
     field_order = [
         "full_name",
+        "birth_date",
         "email",
         "phone",
         "license_number",
+        "license_issued_by",
+        "driving_since",
         "passport_series",
         "passport_number",
         "passport_issued_by",
         "passport_issue_date",
-        "address",
         "registration_address",
-        "residence_address",
+        "discount_percent",
         "tags_text",
-        "notes",
     ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if "passport_issue_date" in self.fields:
-            widget = self.fields["passport_issue_date"].widget
-            widget.input_type = "date"
-            widget.attrs.setdefault("placeholder", "YYYY-MM-DD")
+        for date_field in ("birth_date", "driving_since", "passport_issue_date"):
+            if date_field in self.fields:
+                widget = self.fields[date_field].widget
+                widget.input_type = "date"
+                widget.attrs.setdefault("placeholder", "YYYY-MM-DD")
+        if "discount_percent" in self.fields:
+            widget = self.fields["discount_percent"].widget
+            widget.attrs.setdefault("step", "0.1")
+            widget.attrs.setdefault("min", "0")
         if "tags_text" in self.fields and self.instance.pk:
             existing = ", ".join(self.instance.tags.values_list("name", flat=True))
             self.initial.setdefault("tags_text", existing)
@@ -255,7 +312,7 @@ class RentalForm(StyledModelForm):
             if name in self.fields:
                 self.fields[name].required = False
                 self.fields[name].widget.attrs.setdefault("min", "0")
-                self.fields[name].widget.attrs.setdefault("step", "0.01")
+                self.fields[name].widget.attrs.setdefault("step", "1")
 
         for name in integer_optional:
             if name in self.fields:

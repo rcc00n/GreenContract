@@ -3,8 +3,8 @@
 {% block content %}
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-      <h1 class="h4 mb-0">Customers</h1>
-      <p class="text-muted small mb-0">Driver dossiers with contacts, passport data, addresses, and tags.</p>
+      <h1 class="h4 mb-0">Клиенты</h1>
+      <p class="text-muted small mb-0">Карточки водителей с контактами, документами, стажем и тегами.</p>
     </div>
     <div class="d-flex flex-wrap gap-2">
       <form method="post" action="{% url 'rentals:customer_delete_all' %}" class="d-inline">
@@ -12,14 +12,14 @@
         <button
           type="submit"
           class="btn btn-outline-danger"
-          onclick="return confirm('Delete all customers without rentals?');"
+          onclick="return confirm('Удалить всех клиентов без аренды?');"
         >
-          Delete all
+          Удалить без аренды
         </button>
       </form>
-      <a href="{% url 'rentals:import_customers_csv' %}" class="btn btn-outline-secondary">Import CSV</a>
-      <a href="{% url 'rentals:export_customers_csv' %}" class="btn btn-outline-secondary">Export CSV</a>
-      <a href="{% url 'rentals:customer_create' %}" class="btn btn-primary">Add customer</a>
+      <a href="{% url 'rentals:import_customers_csv' %}" class="btn btn-outline-secondary">Импорт CSV/XLS</a>
+      <a href="{% url 'rentals:export_customers_csv' %}" class="btn btn-outline-secondary">Экспорт CSV</a>
+      <a href="{% url 'rentals:customer_create' %}" class="btn btn-primary">Добавить клиента</a>
     </div>
   </div>
 
@@ -27,7 +27,7 @@
     <div class="card-body">
       <div class="row g-3 align-items-end">
         <div class="col-lg-6">
-          <label class="form-label fw-semibold" for="customerSearchInput">Search</label>
+          <label class="form-label fw-semibold" for="customerSearchInput">Поиск</label>
           <div class="input-group">
             <span class="input-group-text text-muted">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -41,19 +41,19 @@
               id="customerSearchInput"
               name="q"
               value="{{ search_query }}"
-              placeholder="Имя, телефон, email, права, паспорт, адрес или тег"
+              placeholder="ФИО, телефон, email, ВУ, паспорт, адрес прописки или тег"
               autocomplete="off"
             >
             <input type="hidden" name="page" value="1">
             <input type="hidden" name="page_size" value="{{ current_page_size }}">
           </div>
           <div class="form-text text-muted small">
-            Поиск сразу по нескольким атрибутам: ФИО, телефон, email, номер прав, паспорт, адреса, теги и заметки.
+            Поиск сразу по нескольким атрибутам: ФИО, телефон, email, номер ВУ, паспорт, адрес прописки, стаж, теги.
             Вводите несколько слов — фильтр применится автоматически.
           </div>
         </div>
         <div class="col-lg-6">
-          <label class="form-label fw-semibold">Tags</label>
+          <label class="form-label fw-semibold">Теги</label>
           <div class="d-flex flex-wrap gap-2">
             {% for tag in available_tags %}
               <div class="form-check form-check-inline">
@@ -88,11 +88,11 @@
         <thead class="table-light">
           <tr>
             <th class="text-muted small" style="width: 70px;">#</th>
-            <th>Customer</th>
-            <th>Contacts</th>
-            <th>Documents</th>
-            <th>Addresses</th>
-            <th class="text-end">Actions</th>
+            <th>Клиент</th>
+            <th>Контакты</th>
+            <th>Документы и стаж</th>
+            <th>Адрес прописки</th>
+            <th class="text-end">Действия</th>
           </tr>
         </thead>
         <tbody>
@@ -102,88 +102,108 @@
                 {{ customer.full_name }}
                 {{ customer.phone }}
                 {{ customer.email }}
-                {{ customer.license_number }}
+                {{ customer.license_number }} {{ customer.license_issued_by }}
                 {{ customer.passport_series }} {{ customer.passport_number }}
                 {{ customer.passport_issued_by }}
-                {{ customer.address }} {{ customer.registration_address }} {{ customer.residence_address }}
-                {{ customer.notes }}
+                {{ customer.registration_address }}
+                {{ customer.birth_date }}
+                {{ customer.driving_since }}
+                {{ customer.discount_percent }}
                 {% for tag in tags %}{{ tag.name }} {% endfor %}
               ">
               {% if page_obj %}
                 {% with row_number=page_obj.start_index|add:forloop.counter0 %}
                   <td class="text-muted small">{{ row_number }}</td>
                 {% endwith %}
-              {% else %}
-                <td class="text-muted small">{{ forloop.counter }}</td>
+            {% else %}
+              <td class="text-muted small">{{ forloop.counter }}</td>
+            {% endif %}
+            <td>
+              <div class="fw-semibold">{{ customer.full_name }}</div>
+              {% if customer.birth_date %}<div class="text-muted small">Дата рождения: {{ customer.birth_date|date:"Y-m-d" }}</div>{% endif %}
+              {% if customer.discount_percent is not None %}
+                <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle mt-1">
+                  Скидка {{ customer.discount_percent|floatformat:"-2" }}%
+                </span>
               {% endif %}
-              <td>
-                <div class="fw-semibold">{{ customer.full_name }}</div>
-                <div class="text-muted small">License {{ customer.license_number }}</div>
-                {% if tags %}
-                  <div class="d-flex flex-wrap gap-1 mt-1">
-                    {% for tag in tags %}
-                      <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle">{{ tag.name }}</span>
-                    {% endfor %}
-                  </div>
-                {% endif %}
-                {% if customer.notes %}
-                  <div class="text-muted small mt-1">Note: {{ customer.notes|truncatechars:80 }}</div>
-                {% endif %}
-              </td>
-              <td>
-                <div class="fw-semibold">{{ customer.phone }}</div>
-                <div class="text-muted small">{{ customer.email|default:"—" }}</div>
-              </td>
-              <td class="small">
-                <div class="fw-semibold">
-                  Passport:
-                  {% if customer.passport_series or customer.passport_number %}
-                    {{ customer.passport_series|default:"" }} {{ customer.passport_number|default:"" }}
-                  {% else %}
-                    —
-                  {% endif %}
+              {% if tags %}
+                <div class="d-flex flex-wrap gap-1 mt-1">
+                  {% for tag in tags %}
+                    <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle">{{ tag.name }}</span>
+                  {% endfor %}
                 </div>
-                <div class="text-muted">
-                  {% if customer.passport_issued_by or customer.passport_issue_date %}
-                    {{ customer.passport_issued_by|default:"Кем выдан не заполнено" }}
-                    {% if customer.passport_issue_date %} · {{ customer.passport_issue_date|date:"Y-m-d" }}{% endif %}
-                  {% else %}
-                    Issued data not set
-                  {% endif %}
-                </div>
-              </td>
-              <td class="small text-muted">
-                {% if customer.address %}<div>Адрес: {{ customer.address|truncatechars:70 }}</div>{% endif %}
-                {% if customer.residence_address %}<div>Проживание: {{ customer.residence_address|truncatechars:70 }}</div>{% endif %}
-                {% if customer.registration_address %}<div>Прописка: {{ customer.registration_address|truncatechars:70 }}</div>{% endif %}
-                {% if not customer.address and not customer.registration_address and not customer.residence_address %}
+              {% endif %}
+            </td>
+            <td>
+              <div class="fw-semibold">{{ customer.phone|default:"—" }}</div>
+              <div class="text-muted small">{{ customer.email|default:"—" }}</div>
+            </td>
+            <td class="small">
+              <div class="fw-semibold">
+                Паспорт:
+                {% if customer.passport_series or customer.passport_number %}
+                  {{ customer.passport_series|default:"" }} {{ customer.passport_number|default:"" }}
+                {% else %}
+                  —
+                {% endif %}
+              </div>
+              <div class="text-muted">
+                {% if customer.passport_issued_by or customer.passport_issue_date %}
+                  {{ customer.passport_issued_by|default:"Кем выдан не заполнено" }}
+                  {% if customer.passport_issue_date %} · {{ customer.passport_issue_date|date:"Y-m-d" }}{% endif %}
+                {% else %}
+                  Данные о выдаче не заполнены
+                {% endif %}
+              </div>
+              <div class="fw-semibold mt-2">
+                Вод. удостоверение:
+                {% if customer.license_number %}
+                  {{ customer.license_number }}
+                {% else %}
+                  —
+                {% endif %}
+              </div>
+              <div class="text-muted">
+                {% if customer.license_issued_by %}Выдано: {{ customer.license_issued_by }}{% endif %}
+                {% if customer.driving_since %}
+                  {% if customer.license_issued_by %} · {% endif %}
+                  Стаж с {{ customer.driving_since|date:"Y-m-d" }}
+                {% endif %}
+                {% if not customer.license_issued_by and not customer.driving_since %}
+                  —
+                {% endif %}
+              </div>
+            </td>
+            <td class="small text-muted">
+                {% if customer.registration_address %}<div>Адрес прописки: {{ customer.registration_address|truncatechars:90 }}</div>{% endif %}
+                {% if not customer.registration_address %}
                   <div>—</div>
                 {% endif %}
-              </td>
-              <td class="text-end">
-                <div class="d-inline-flex gap-2 justify-content-end">
-                  <a href="{% url 'rentals:customer_update' customer.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+            </td>
+            <td class="text-end">
+              <div class="d-inline-flex gap-2 justify-content-end">
+                  <a href="{% url 'rentals:customer_update' customer.pk %}" class="btn btn-sm btn-outline-secondary">Изменить</a>
                   <form method="post" action="{% url 'rentals:customer_delete' customer.pk %}" class="d-inline">
                     {% csrf_token %}
                     <button
                       type="submit"
                       class="btn btn-sm btn-outline-danger"
-                      onclick="return confirm('Delete {{ customer.full_name }}?');"
+                      onclick="return confirm('Удалить {{ customer.full_name }}?');"
                     >
-                      Delete
+                      Удалить
                     </button>
                   </form>
-                </div>
-              </td>
-            </tr>
+              </div>
+            </td>
+          </tr>
             {% endwith %}
           {% empty %}
             <tr>
               <td colspan="6" class="text-center text-muted py-4">
                 {% if filters_active %}
-                  No customers match current filters yet.
+                  Нет клиентов по текущим фильтрам.
                 {% else %}
-                  No customers yet. Add your first driver profile.
+                  Клиентов пока нет. Добавьте первую карточку водителя.
                 {% endif %}
               </td>
             </tr>
@@ -192,9 +212,9 @@
       </table>
     </div>
     {% if page_obj %}
-      <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between p-3 border-top">
+      <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between p-3 border-top pagination-bar">
         <div class="d-flex align-items-center gap-2">
-          <span class="text-muted small">Rows per page</span>
+          <span class="text-muted small">Строк на странице</span>
           <form method="get" class="d-flex align-items-center gap-2">
             <input type="hidden" name="page" value="1">
             {% if search_query %}
@@ -212,10 +232,10 @@
         </div>
         <div class="d-flex flex-wrap align-items-center gap-3">
           <span class="text-muted small">
-            Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }}
+            Показано {{ page_obj.start_index }}-{{ page_obj.end_index }} из {{ page_obj.paginator.count }}
           </span>
           {% with page_size=page_obj.paginator.per_page %}
-            <nav aria-label="Customers pagination">
+            <nav aria-label="Навигация по страницам клиентов">
               <ul class="pagination pagination-sm mb-0">
                 <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
                   {% if page_obj.has_previous %}
@@ -232,7 +252,7 @@
                   {% endif %}
                 </li>
                 <li class="page-item disabled">
-                  <span class="page-link text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                  <span class="page-link text-muted">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
                 </li>
                 <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
                   {% if page_obj.has_next %}

@@ -12,6 +12,14 @@ class Car(models.Model):
     make = models.CharField(max_length=50)
     model = models.CharField(max_length=50)
     year = models.PositiveIntegerField()
+    color = models.CharField(max_length=50, blank=True, null=True)
+    region_code = models.CharField(
+        max_length=10,
+        blank=True,
+        null=True,
+        help_text="Регион номера (например, 26 или 82).",
+    )
+    photo_url = models.URLField(max_length=500, blank=True, null=True)
     vin = models.CharField(max_length=50, blank=True, null=True, help_text="VIN / номер кузова.")
     sts_number = models.CharField(
         max_length=50,
@@ -25,6 +33,21 @@ class Car(models.Model):
         blank=True,
         null=True,
         help_text="Кем выдано СТС.",
+    )
+    registration_certificate_info = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Статус/комментарий по свидетельству о регистрации.",
+    )
+    fuel_tank_volume_liters = models.PositiveIntegerField(blank=True, null=True)
+    fuel_tank_cost_rub = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    security_deposit = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Залог по автомобилю.",
     )
     daily_rate = models.DecimalField(max_digits=8, decimal_places=2)
     rate_1_4_high = models.DecimalField(
@@ -63,6 +86,23 @@ class Car(models.Model):
         default=Decimal("0.00"),
         help_text="15+ days, low season (нс).",
     )
+    loss_child_seat_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    loss_reflective_vest_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    loss_registration_certificate_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    loss_alloy_wheel_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    loss_steel_wheel_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    loss_warning_triangle_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    loss_radio_panel_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    loss_ski_mount_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    loss_car_keys_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    loss_hubcaps_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    loss_gps_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    loss_license_plate_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    loss_external_antenna_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    loss_tire_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    loss_first_aid_kit_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    loss_jack_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    loss_fire_extinguisher_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
@@ -96,9 +136,21 @@ class Car(models.Model):
 
 class Customer(models.Model):
     full_name = models.CharField(max_length=100)
+    birth_date = models.DateField(blank=True, null=True, help_text="Дата рождения.")
     email = models.EmailField(blank=True, null=True)
     phone = models.CharField(max_length=30)
     license_number = models.CharField(max_length=50)
+    license_issued_by = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Кем выдано водительское удостоверение.",
+    )
+    driving_since = models.DateField(
+        blank=True,
+        null=True,
+        help_text="Дата начала стажа вождения (Стаж с ...).",
+    )
     passport_series = models.CharField(max_length=10, blank=True, null=True)
     passport_number = models.CharField(max_length=20, blank=True, null=True)
     passport_issue_date = models.DateField(blank=True, null=True)
@@ -107,6 +159,13 @@ class Customer(models.Model):
     registration_address = models.TextField(blank=True, null=True, help_text="Адрес прописки / регистрации.")
     residence_address = models.TextField(blank=True, null=True, help_text="Адрес фактического проживания.")
     notes = models.TextField(blank=True, null=True)
+    discount_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Персональная скидка, %.",
+    )
     tags = models.ManyToManyField(
         "CustomerTag",
         blank=True,

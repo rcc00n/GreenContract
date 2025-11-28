@@ -26,6 +26,24 @@
                 {% for error in form.plate_number.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
               <div class="col-md-3">
+                <label class="form-label" for="{{ form.region_code.id_for_label }}">{{ form.region_code.label }}</label>
+                {{ form.region_code }}
+                {% if form.region_code.help_text %}<div class="form-text">{{ form.region_code.help_text }}</div>{% endif %}
+                {% for error in form.region_code.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="{{ form.color.id_for_label }}">{{ form.color.label }}</label>
+                {{ form.color }}
+                {% if form.color.help_text %}<div class="form-text">{{ form.color.help_text }}</div>{% endif %}
+                {% for error in form.color.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="{{ form.photo_url.id_for_label }}">{{ form.photo_url.label }}</label>
+                {{ form.photo_url }}
+                {% if form.photo_url.help_text %}<div class="form-text">{{ form.photo_url.help_text }}</div>{% endif %}
+                {% for error in form.photo_url.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-3">
                 <label class="form-label" for="{{ form.vin.id_for_label }}">{{ form.vin.label }}</label>
                 {{ form.vin }}
                 {% if form.vin.help_text %}<div class="form-text">{{ form.vin.help_text }}</div>{% endif %}
@@ -66,6 +84,30 @@
                 {{ form.sts_issued_by }}
                 {% if form.sts_issued_by.help_text %}<div class="form-text">{{ form.sts_issued_by.help_text }}</div>{% endif %}
                 {% for error in form.sts_issued_by.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="{{ form.registration_certificate_info.id_for_label }}">{{ form.registration_certificate_info.label }}</label>
+                {{ form.registration_certificate_info }}
+                {% if form.registration_certificate_info.help_text %}<div class="form-text">{{ form.registration_certificate_info.help_text }}</div>{% endif %}
+                {% for error in form.registration_certificate_info.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="{{ form.fuel_tank_volume_liters.id_for_label }}">{{ form.fuel_tank_volume_liters.label }}</label>
+                {{ form.fuel_tank_volume_liters }}
+                {% if form.fuel_tank_volume_liters.help_text %}<div class="form-text">{{ form.fuel_tank_volume_liters.help_text }}</div>{% endif %}
+                {% for error in form.fuel_tank_volume_liters.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="{{ form.fuel_tank_cost_rub.id_for_label }}">{{ form.fuel_tank_cost_rub.label }}</label>
+                {{ form.fuel_tank_cost_rub }}
+                {% if form.fuel_tank_cost_rub.help_text %}<div class="form-text">{{ form.fuel_tank_cost_rub.help_text }}</div>{% endif %}
+                {% for error in form.fuel_tank_cost_rub.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="{{ form.security_deposit.id_for_label }}">{{ form.security_deposit.label }}</label>
+                {{ form.security_deposit }}
+                {% if form.security_deposit.help_text %}<div class="form-text">{{ form.security_deposit.help_text }}</div>{% endif %}
+                {% for error in form.security_deposit.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
               <div class="col-md-3">
                 <label class="form-label" for="{{ form.daily_rate.id_for_label }}">{{ form.daily_rate.label }}</label>
@@ -128,6 +170,24 @@
                   {% if form.rate_15_plus_low.help_text %}<div class="form-text">{{ form.rate_15_plus_low.help_text }}</div>{% endif %}
                   {% for error in form.rate_15_plus_low.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
                 </div>
+              </div>
+            </div>
+
+            <hr class="my-4">
+            <div class="mb-2">
+              <div class="small fw-semibold text-muted">Стоимость деталей и документов при утере</div>
+              <p class="text-muted small mb-2">Заполните сумму в рублях, оставьте пустым если не применимо.</p>
+              <div class="row g-3">
+                {% for field_name, _ in loss_fee_fields %}
+                  {% with field=form[field_name] %}
+                    <div class="col-md-4">
+                      <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                      {{ field }}
+                      {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                      {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                  {% endwith %}
+                {% endfor %}
               </div>
             </div>
 

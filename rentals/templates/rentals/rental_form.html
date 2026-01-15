@@ -34,22 +34,34 @@
               <div class="col-md-6">
                 <label class="form-label" for="customer-search">Customer</label>
                 {{ form.customer }}
-                <div class="position-relative">
-                  <input
-                    type="search"
-                    class="form-control{% if form.customer.errors %} is-invalid{% endif %}"
-                    id="customer-search"
-                    placeholder="Начните вводить имя, телефон или email"
-                    autocomplete="off"
-                    data-search-url="{% url 'rentals:customer_search' %}"
-                    data-initial-label="{{ customer_initial_label|default_if_none:'' }}"
+                <div class="d-flex align-items-start gap-2">
+                  <div class="flex-grow-1 position-relative">
+                    <input
+                      type="search"
+                      class="form-control{% if form.customer.errors %} is-invalid{% endif %}"
+                      id="customer-search"
+                      placeholder="Начните вводить имя, телефон или email"
+                      autocomplete="off"
+                      data-search-url="{% url 'rentals:customer_search' %}"
+                      data-initial-label="{{ customer_initial_label|default_if_none:'' }}"
+                    >
+                    <div
+                      class="dropdown-menu w-100 shadow-sm"
+                      id="customer-search-results"
+                      aria-label="Customer search results"
+                      style="max-height: 280px; overflow-y: auto;"
+                    ></div>
+                  </div>
+                  <a
+                    href="#"
+                    class="btn btn-sm btn-outline-secondary align-self-start d-none"
+                    id="customer-edit-link"
+                    data-edit-url-template="{% url 'rentals:customer_update' 0 %}"
+                    target="_blank"
+                    rel="noopener"
                   >
-                  <div
-                    class="dropdown-menu w-100 shadow-sm"
-                    id="customer-search-results"
-                    aria-label="Customer search results"
-                    style="max-height: 280px; overflow-y: auto;"
-                  ></div>
+                    Edit customer
+                  </a>
                 </div>
                 <div class="form-text">
                   Поиск по имени, телефону, email или номеру удостоверения. Минимум 2 символа.
@@ -297,7 +309,7 @@
                     <div class="col-md-4">
                       <label class="form-label" for="{{ form.discount_percent.id_for_label }}">Скидка %</label>
                       {{ form.discount_percent }}
-                      <div class="form-text">Применяется после фиксированной скидки.</div>
+                      <div class="form-text">Применяется к суточному тарифу после фиксированной скидки. Доп. услуги без скидки.</div>
                       {% for error in form.discount_percent.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
                     </div>
                     <div class="col-md-4">
@@ -382,6 +394,8 @@
         const resultsMenu = document.getElementById("customer-search-results");
         const hiddenField = document.getElementById("id_customer");
         const summary = document.getElementById("customer-selected-summary");
+        const editLink = document.getElementById("customer-edit-link");
+        const editUrlTemplate = editLink?.dataset.editUrlTemplate;
         const searchUrl = searchInput?.dataset.searchUrl;
         const initialLabel = searchInput?.dataset.initialLabel;
         let debounceTimer = null;
@@ -403,6 +417,18 @@
           resultsMenu.classList.remove("show");
         }
 
+        function setEditLink(customerId) {
+          if (!editLink) return;
+          if (!customerId || !editUrlTemplate) {
+            editLink.classList.add("d-none");
+            editLink.removeAttribute("href");
+            return;
+          }
+          const url = editUrlTemplate.replace("/0/", `/${customerId}/`);
+          editLink.href = url;
+          editLink.classList.remove("d-none");
+        }
+
         function selectCustomer(item) {
           if (!item) return;
           hiddenField.value = item.id;
@@ -411,6 +437,7 @@
           searchInput.value = item.name;
           lastSelectedLabel = label;
           setSummary(label);
+          setEditLink(item.id);
           document.dispatchEvent(new CustomEvent("rental:customer-change", { detail: { name: item.name } }));
           clearResults();
         }
@@ -486,6 +513,7 @@
           const term = searchInput.value.trim();
           if (term !== lastSelectedLabel && hiddenField.value) {
             hiddenField.value = "";
+            setEditLink("");
           }
 
           if (term.length < 2) {
@@ -521,13 +549,16 @@
         if (initialLabel && hiddenField.value) {
           searchInput.value = initialLabel;
           setSummary(initialLabel);
+          setEditLink(hiddenField.value);
           document.dispatchEvent(
             new CustomEvent("rental:customer-change", { detail: { name: searchInput.value || initialLabel } })
           );
         } else if (hiddenField.value) {
           setSummary("Клиент выбран");
+          setEditLink(hiddenField.value);
         } else {
           setSummary("Введите минимум 2 символа для поиска.", true);
+          setEditLink("");
         }
       })();
     </script>
@@ -597,9 +628,23 @@
 
         function parseDate(value) {
           if (!value) return null;
-          const parts = value.split("-");
+          const normalized = value.replace(/[./]/g, "-");
+          const parts = normalized.split("-");
           if (parts.length !== 3) return null;
-          const [year, month, day] = parts.map((p) => parseInt(p, 10));
+          let year;
+          let month;
+          let day;
+          if (parts[0].length === 4) {
+            year = parseInt(parts[0], 10);
+            month = parseInt(parts[1], 10);
+            day = parseInt(parts[2], 10);
+          } else if (parts[2].length === 4) {
+            day = parseInt(parts[0], 10);
+            month = parseInt(parts[1], 10);
+            year = parseInt(parts[2], 10);
+          } else {
+            return null;
+          }
           if (!year || !month || !day) return null;
           return new Date(Date.UTC(year, month - 1, day));
         }
@@ -844,8 +889,12 @@
 
           const discountAmount = Math.min(Math.max(parseNumber(discountAmountInput), 0), subtotal);
           const discountPercent = Math.min(Math.max(parseNumber(discountPercentInput), 0), 100);
-          const percentBase = Math.max(subtotal - discountAmount, 0);
-          const discountPercentAmount = roundMoney(percentBase * (discountPercent / 100));
+          const percentBase = Math.max(baseTotal - discountAmount, 0);
+          let discountPercentAmount = roundMoney(percentBase * (discountPercent / 100));
+          const maxPercentDiscount = Math.max(subtotal - discountAmount, 0);
+          if (discountPercentAmount > maxPercentDiscount) {
+            discountPercentAmount = maxPercentDiscount;
+          }
 
           const contractTotal = roundMoney(subtotal - discountAmount - discountPercentAmount);
           const prepayment = Math.max(parseNumber(prepaymentInput), 0);
@@ -883,7 +932,7 @@
               const y = date.getUTCFullYear();
               const m = String(date.getUTCMonth() + 1).padStart(2, "0");
               const d = String(date.getUTCDate()).padStart(2, "0");
-              return `${y}-${m}-${d}`;
+              return `${d}-${m}-${y}`;
             };
             if (startInput && !startInput.value) {
               startInput.value = format(startDate);

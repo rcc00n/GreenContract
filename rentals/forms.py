@@ -9,6 +9,17 @@ from .car_constants import CAR_LOSS_FEE_FIELDS
 from .models import Car, Customer, Rental, ContractTemplate, CustomerTag
 from .services.pricing import DELIVERY_FEES, calculate_rental_pricing
 
+DATE_INPUT_FORMATS = ("%d-%m-%Y", "%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y")
+DATE_PLACEHOLDER = "DD-MM-YYYY"
+
+
+def _configure_date_field(field: forms.DateField):
+    widget = field.widget
+    widget.input_type = "text"
+    widget.format = "%d-%m-%Y"
+    widget.attrs.setdefault("placeholder", DATE_PLACEHOLDER)
+    field.input_formats = DATE_INPUT_FORMATS
+
 
 class StyledModelForm(forms.ModelForm):
     """Apply basic Bootstrap classes to all widgets."""
@@ -30,9 +41,7 @@ class CarForm(StyledModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if "sts_issue_date" in self.fields:
-            widget = self.fields["sts_issue_date"].widget
-            widget.input_type = "date"
-            widget.attrs.setdefault("placeholder", "YYYY-MM-DD")
+            _configure_date_field(self.fields["sts_issue_date"])
         if "fuel_tank_volume_liters" in self.fields:
             widget = self.fields["fuel_tank_volume_liters"].widget
             widget.input_type = "number"
@@ -110,7 +119,7 @@ class CarForm(StyledModelForm):
             "daily_rate": "Used if a tiered rate is missing.",
             "vin": "17 символов, можно оставить пустым.",
             "sts_number": "Номер свидетельства о регистрации (СТС).",
-            "sts_issue_date": "Дата выдачи СТС.",
+            "sts_issue_date": "Дата выдачи СТС (ДД-ММ-ГГГГ).",
             "sts_issued_by": "Кем выдано свидетельство.",
             "registration_certificate_info": "Оригинал/копия/где хранится.",
             "fuel_tank_volume_liters": "Полный объем бака в литрах.",
@@ -165,13 +174,13 @@ class CustomerForm(StyledModelForm):
             "discount_percent": "Скидка, %",
         }
         help_texts = {
-            "birth_date": "Формат ГГГГ-ММ-ДД.",
+            "birth_date": "Формат ДД-ММ-ГГГГ.",
             "license_number": "Номер водительского удостоверения.",
             "license_issued_by": "Кем выдано водительское удостоверение.",
-            "driving_since": "Дата начала стажа вождения.",
+            "driving_since": "Дата начала стажа вождения (ДД-ММ-ГГГГ).",
             "passport_series": "Серия паспорта (4 цифры).",
             "passport_number": "Номер паспорта (6 цифр) или иной документ.",
-            "passport_issue_date": "Дата выдачи документа.",
+            "passport_issue_date": "Дата выдачи документа (ДД-ММ-ГГГГ).",
             "registration_address": "Адрес регистрации (прописка).",
             "discount_percent": "Персональная скидка в процентах.",
         }
@@ -197,9 +206,7 @@ class CustomerForm(StyledModelForm):
         super().__init__(*args, **kwargs)
         for date_field in ("birth_date", "driving_since", "passport_issue_date"):
             if date_field in self.fields:
-                widget = self.fields[date_field].widget
-                widget.input_type = "date"
-                widget.attrs.setdefault("placeholder", "YYYY-MM-DD")
+                _configure_date_field(self.fields[date_field])
         if "discount_percent" in self.fields:
             widget = self.fields["discount_percent"].widget
             widget.attrs.setdefault("step", "0.1")
@@ -261,9 +268,7 @@ class RentalForm(StyledModelForm):
             self.initial.setdefault("end_date", today + timedelta(days=1))
 
         for name in ("start_date", "end_date"):
-            widget = self.fields[name].widget
-            widget.input_type = "date"
-            widget.attrs.setdefault("placeholder", "YYYY-MM-DD")
+            _configure_date_field(self.fields[name])
 
         for name in ("start_time", "end_time"):
             if name in self.fields:
@@ -322,7 +327,10 @@ class RentalForm(StyledModelForm):
         if "discount_percent" in self.fields:
             self.fields["discount_percent"].widget.attrs.setdefault("max", "100")
 
-        delivery_choices = [("", "Без доставки")] + [(city, city) for city in sorted(DELIVERY_FEES.keys())]
+        priority_cities = ["Симферополь", "Минеральные Воды"]
+        ordered_cities = [city for city in priority_cities if city in DELIVERY_FEES]
+        ordered_cities += sorted(city for city in DELIVERY_FEES.keys() if city not in priority_cities)
+        delivery_choices = [("", "Без доставки")] + [(city, city) for city in ordered_cities]
         for name in ("delivery_issue_city", "delivery_return_city"):
             if name in self.fields:
                 self.fields[name].required = False

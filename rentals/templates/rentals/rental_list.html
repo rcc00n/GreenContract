@@ -29,7 +29,7 @@
         >
       </div>
       <div class="form-text text-muted">
-        Ищет по номеру договора, фамилии/телефону клиента, номеру/марке авто, VIN/СТС и датам (YYYY-MM-DD).
+        Ищет по номеру договора, фамилии/телефону клиента, номеру/марке авто, VIN/СТС и датам (DD-MM-YYYY).
         Работает на лету и по кнопке поиска.
       </div>
     </div>
@@ -70,7 +70,7 @@
                 {{ rental.deal_name }}
                 {{ rental.customer.full_name }} {{ rental.customer.phone }} {{ rental.customer.email }} {{ rental.customer.license_number }}
                 {{ rental.car.plate_number }} {{ rental.car.make }} {{ rental.car.model }} {{ rental.car.vin }} {{ rental.car.sts_number }}
-                {{ rental.start_date|date:'Y-m-d' }} {{ rental.end_date|date:'Y-m-d' }} {{ rental.get_status_display }}
+                {{ rental.start_date|date:'d-m-Y' }} {{ rental.end_date|date:'d-m-Y' }} {{ rental.get_status_display }}
               "
               data-status="{{ rental.status }}"
             >
@@ -80,7 +80,7 @@
                     <div class="fw-semibold">{{ rental.deal_name }}</div>
                     <div class="text-muted small">
                       Номер договора: {{ rental.contract_number }}<br>
-                      С {{ rental.start_date|date:"Y-m-d" }} по {{ rental.end_date|date:"Y-m-d" }}
+                      С {{ rental.start_date|date:"d-m-Y" }} по {{ rental.end_date|date:"d-m-Y" }}
                     </div>
                   </div>
                   {% if rental.status == "active" %}
@@ -109,8 +109,8 @@
                 </div>
               </td>
               <td>
-                <div class="fw-semibold">{{ rental.start_date|date:"Y-m-d" }}</div>
-                <div class="text-muted small">до {{ rental.end_date|date:"Y-m-d" }}</div>
+                <div class="fw-semibold">{{ rental.start_date|date:"d-m-Y" }}</div>
+                <div class="text-muted small">до {{ rental.end_date|date:"d-m-Y" }}</div>
               </td>
               <td>
                 <div class="fw-semibold">₽{{ rental.total_price }}</div>

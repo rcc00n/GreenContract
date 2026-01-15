@@ -72,6 +72,9 @@ LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
+DATE_FORMAT = "d-m-Y"
+DATETIME_FORMAT = "d-m-Y H:i"
+TIME_FORMAT = "H:i"
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"

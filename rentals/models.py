@@ -1,10 +1,30 @@
 import random
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django.db import IntegrityError, models
 from django.contrib.auth import get_user_model
 
+try:
+    from num2words import num2words
+except ImportError:  # pragma: no cover - dependency installed via requirements
+    num2words = None
+
 User = get_user_model()
+
+
+def _format_money_words(value: Decimal | None) -> str:
+    if value is None:
+        return ""
+    try:
+        amount = Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    except (InvalidOperation, TypeError, ValueError):
+        return ""
+    if num2words is None:
+        return str(amount)
+    try:
+        return num2words(amount, lang="ru", to="currency", currency="RUB")
+    except Exception:
+        return str(amount)
 
 
 class Car(models.Model):
@@ -321,8 +341,28 @@ class Rental(models.Model):
         car_piece = ""
         if self.car_id:
             car_piece = f"{self.car.plate_number} {self.car.make}".strip()
-        date_piece = self.start_date.strftime("%Y-%m-%d") if self.start_date else ""
+        date_piece = self.start_date.strftime("%d-%m-%Y") if self.start_date else ""
         return f"{contract}/{last_name}/{car_piece}/{date_piece}"
+
+    @property
+    def duration_days(self) -> int:
+        if not self.start_date or not self.end_date:
+            return 0
+        return max((self.end_date - self.start_date).days, 0)
+
+    @property
+    def date_range(self) -> str:
+        if not self.start_date and not self.end_date:
+            return ""
+        start = self.start_date.strftime("%d-%m-%Y") if self.start_date else ""
+        end = self.end_date.strftime("%d-%m-%Y") if self.end_date else ""
+        if start and end:
+            return f"{start} — {end}"
+        return start or end
+
+    @property
+    def advance_payment_text(self) -> str:
+        return _format_money_words(self.prepayment)
 
     def save(self, *args, **kwargs):
         attempts = 0

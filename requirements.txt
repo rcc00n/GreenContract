@@ -8,3 +8,4 @@ reportlab
 whitenoise
 xlrd<2
 openpyxl
+num2words

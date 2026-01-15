@@ -120,8 +120,8 @@
                 {{ customer.passport_series }} {{ customer.passport_number }}
                 {{ customer.passport_issued_by }}
                 {{ customer.registration_address }}
-                {{ customer.birth_date }}
-                {{ customer.driving_since }}
+                {{ customer.birth_date|date:"d-m-Y" }}
+                {{ customer.driving_since|date:"d-m-Y" }}
                 {{ customer.discount_percent }}
                 {% for tag in tags %}{{ tag.name }} {% endfor %}
               ">
@@ -134,7 +134,7 @@
             {% endif %}
             <td>
               <div class="fw-semibold">{{ customer.full_name }}</div>
-              {% if customer.birth_date %}<div class="text-muted small">Дата рождения: {{ customer.birth_date|date:"Y-m-d" }}</div>{% endif %}
+              {% if customer.birth_date %}<div class="text-muted small">Дата рождения: {{ customer.birth_date|date:"d-m-Y" }}</div>{% endif %}
               {% if customer.discount_percent is not None %}
                 <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle mt-1">
                   Скидка {{ customer.discount_percent|floatformat:"-2" }}%
@@ -164,7 +164,7 @@
               <div class="text-muted">
                 {% if customer.passport_issued_by or customer.passport_issue_date %}
                   {{ customer.passport_issued_by|default:"Кем выдан не заполнено" }}
-                  {% if customer.passport_issue_date %} · {{ customer.passport_issue_date|date:"Y-m-d" }}{% endif %}
+                  {% if customer.passport_issue_date %} · {{ customer.passport_issue_date|date:"d-m-Y" }}{% endif %}
                 {% else %}
                   Данные о выдаче не заполнены
                 {% endif %}
@@ -181,7 +181,7 @@
                 {% if customer.license_issued_by %}Выдано: {{ customer.license_issued_by }}{% endif %}
                 {% if customer.driving_since %}
                   {% if customer.license_issued_by %} · {% endif %}
-                  Стаж с {{ customer.driving_since|date:"Y-m-d" }}
+                  Стаж с {{ customer.driving_since|date:"d-m-Y" }}
                 {% endif %}
                 {% if not customer.license_issued_by and not customer.driving_since %}
                   —

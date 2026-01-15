@@ -80,7 +80,7 @@ def _parse_date(value):
     if isinstance(value, datetime):
         return value.date()
     text = str(value).strip()
-    for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y"):
+    for fmt in ("%d-%m-%Y", "%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y"):
         try:
             return datetime.strptime(text, fmt).date()
         except ValueError:
@@ -218,7 +218,7 @@ def _serialize_car_pricing(car: Car):
         "year": car.year,
         "vin": car.vin or "",
         "sts_number": car.sts_number or "",
-        "sts_issue_date": car.sts_issue_date.isoformat() if car.sts_issue_date else "",
+        "sts_issue_date": car.sts_issue_date.strftime("%d-%m-%Y") if car.sts_issue_date else "",
         "sts_issued_by": car.sts_issued_by or "",
         "edit_url": reverse("rentals:car_update", args=[car.pk]),
     }
@@ -1096,7 +1096,7 @@ def export_cars_csv(request):
                 smart_str(car.region_code),
                 smart_str(car.photo_url),
                 smart_str(car.sts_number),
-                car.sts_issue_date.isoformat() if car.sts_issue_date else "",
+                car.sts_issue_date.strftime("%d-%m-%Y") if car.sts_issue_date else "",
                 smart_str(car.sts_issued_by),
                 smart_str(car.registration_certificate_info),
                 car.fuel_tank_volume_liters if car.fuel_tank_volume_liters is not None else "",
@@ -1150,15 +1150,15 @@ def export_customers_csv(request):
         writer.writerow(
             [
                 smart_str(customer.full_name),
-                customer.birth_date.isoformat() if customer.birth_date else "",
+                customer.birth_date.strftime("%d-%m-%Y") if customer.birth_date else "",
                 smart_str(customer.email or ""),
                 smart_str(customer.phone or ""),
                 smart_str(customer.license_number),
                 smart_str(customer.license_issued_by or ""),
-                customer.driving_since.isoformat() if customer.driving_since else "",
+                customer.driving_since.strftime("%d-%m-%Y") if customer.driving_since else "",
                 smart_str(customer.passport_series or ""),
                 smart_str(customer.passport_number or ""),
-                customer.passport_issue_date.isoformat() if customer.passport_issue_date else "",
+                customer.passport_issue_date.strftime("%d-%m-%Y") if customer.passport_issue_date else "",
                 smart_str(customer.passport_issued_by or ""),
                 smart_str(customer.registration_address or ""),
                 smart_str(customer.discount_percent if customer.discount_percent is not None else ""),
@@ -1196,8 +1196,8 @@ def export_rentals_csv(request):
                 smart_str(rental.car.plate_number),
                 smart_str(rental.customer.license_number),
                 smart_str(rental.customer.full_name),
-                rental.start_date.isoformat(),
-                rental.end_date.isoformat(),
+                rental.start_date.strftime("%d-%m-%Y"),
+                rental.end_date.strftime("%d-%m-%Y"),
                 rental.daily_rate,
                 rental.total_price,
                 rental.status,
@@ -1368,7 +1368,7 @@ def import_cars_csv(request):
                 "model",
                 "year",
                 "sts_number",
-                "sts_issue_date (YYYY-MM-DD)",
+                "sts_issue_date (DD-MM-YYYY)",
                 "sts_issued_by",
                 "registration_certificate_info",
                 "fuel_tank_volume_liters",
@@ -1566,7 +1566,7 @@ def import_customers_csv(request):
                 "passport_series / Серия паспорта",
                 "passport_number / Номер паспорта",
                 "passport_issued_by / Кем выдан паспорт",
-                "passport_issue_date (YYYY-MM-DD / ДД.ММ.ГГГГ)",
+                "passport_issue_date (DD-MM-YYYY / ДД.ММ.ГГГГ)",
                 "tags / теги через запятую",
                 "ID (используется как резервный идентификатор)",
             ],

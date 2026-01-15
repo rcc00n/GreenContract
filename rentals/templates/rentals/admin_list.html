@@ -33,7 +33,7 @@
                   <tr>
                     <td>
                       <div class="fw-semibold">{{ admin.username }}</div>
-                      <div class="text-muted small">Создан: {{ admin.date_joined|date:"Y-m-d H:i" }}</div>
+                      <div class="text-muted small">Создан: {{ admin.date_joined|date:"d-m-Y H:i" }}</div>
                     </td>
                     <td class="text-muted">
                       {{ admin.email|default:"—" }}
@@ -47,7 +47,7 @@
                     </td>
                     <td class="text-muted small">
                       {% if admin.last_login %}
-                        {{ admin.last_login|date:"Y-m-d H:i" }}
+                        {{ admin.last_login|date:"d-m-Y H:i" }}
                       {% else %}
                         —
                       {% endif %}

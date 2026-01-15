@@ -63,6 +63,7 @@ PLACEHOLDER_GUIDE = [
             "rental.total_price": "Стоимость",
             "rental.balance_due": "К оплате после предоплаты",
             "rental.prepayment": "Предоплата",
+            "rental.advance_payment_text": "Предоплата прописью",
             "rental.discount_amount": "Скидка суммой",
             "rental.discount_percent": "Скидка, %",
             "rental.airport_fee_start": "Сбор при выдаче в аэропорту",
@@ -97,16 +98,44 @@ PLACEHOLDER_GUIDE = [
 ]
 
 
+class _BoolDisplay:
+    def __init__(self, value: bool):
+        self._value = bool(value)
+
+    def __bool__(self):
+        return self._value
+
+    def __str__(self):
+        return "Да" if self._value else "Нет"
+
+    def __eq__(self, other):
+        if isinstance(other, _BoolDisplay):
+            return self._value == other._value
+        return self._value == other
+
+
+class _RentalTemplateProxy:
+    def __init__(self, rental: Rental):
+        self._rental = rental
+        self.child_seat_included = _BoolDisplay(rental.child_seat_included)
+        self.booster_included = _BoolDisplay(rental.booster_included)
+        self.ski_rack_included = _BoolDisplay(rental.ski_rack_included)
+        self.roof_box_included = _BoolDisplay(rental.roof_box_included)
+        self.crossbars_included = _BoolDisplay(rental.crossbars_included)
+        self.car = rental.car
+        self.customer = rental.customer
+
+    def __getattr__(self, name):
+        return getattr(self._rental, name)
+
+
 def get_contract_context(rental: Rental) -> dict:
     start_date = rental.start_date
     end_date = rental.end_date
-    duration_days = None
-    date_range = ""
-    if start_date and end_date:
-        duration_days = (end_date - start_date).days + 1
-        date_range = f"{_fmt_date(start_date)} — {_fmt_date(end_date)}"
+    duration_days = rental.duration_days if start_date and end_date else None
+    date_range = rental.date_range or ""
     return {
-        "rental": rental,
+        "rental": _RentalTemplateProxy(rental),
         "car": rental.car,
         "customer": rental.customer,
         "rental_duration_days": duration_days,
@@ -150,7 +179,11 @@ def _normalize_html_charset(html: str, target: str = "utf-8") -> str:
 
 
 def _fmt_date(value) -> str:
-    return value.strftime("%Y-%m-%d") if value else ""
+    return value.strftime("%d-%m-%Y") if value else ""
+
+
+def _fmt_datetime(value) -> str:
+    return value.strftime("%d-%m-%Y %H:%M") if value else ""
 
 
 def _fmt_time(value) -> str:
@@ -177,10 +210,8 @@ def build_placeholder_values(rental: Rental) -> dict[str, str]:
     car = rental.car
     start_date = rental.start_date
     end_date = rental.end_date
-    duration_days = (end_date - start_date).days + 1 if start_date and end_date else None
-    date_range = ""
-    if start_date or end_date:
-        date_range = " — ".join(filter(None, (_fmt_date(start_date), _fmt_date(end_date))))
+    duration_days = rental.duration_days if start_date and end_date else None
+    date_range = rental.date_range or ""
     address_primary = customer.registration_address or customer.address or customer.residence_address
 
     values = {
@@ -222,6 +253,7 @@ def build_placeholder_values(rental: Rental) -> dict[str, str]:
         "rental.total_price": _fmt_decimal(rental.total_price),
         "rental.balance_due": _fmt_decimal(rental.balance_due),
         "rental.prepayment": _fmt_decimal(rental.prepayment),
+        "rental.advance_payment_text": rental.advance_payment_text,
         "rental.discount_amount": _fmt_decimal(rental.discount_amount),
         "rental.discount_percent": _fmt_decimal(rental.discount_percent),
         "rental.airport_fee_start": _fmt_decimal(rental.airport_fee_start),
@@ -246,7 +278,7 @@ def build_placeholder_values(rental: Rental) -> dict[str, str]:
         "rental.deal_name": rental.deal_name,
         # Meta
         "meta.today": _fmt_date(timezone.localdate()),
-        "meta.generated_at": timezone.localtime().strftime("%Y-%m-%d %H:%M"),
+        "meta.generated_at": _fmt_datetime(timezone.localtime()),
     }
 
     return {key: "" if value is None else str(value) for key, value in values.items()}

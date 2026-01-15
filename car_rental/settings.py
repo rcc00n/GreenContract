@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+from urllib.parse import urlparse, unquote
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -50,8 +51,27 @@ TEMPLATES = [
 WSGI_APPLICATION = "car_rental.wsgi:application"
 ASGI_APPLICATION = "car_rental.asgi:application"
 
+
+def _database_from_url(url: str | None):
+    if not url:
+        return None
+    parsed = urlparse(url)
+    if parsed.scheme not in {"postgres", "postgresql"}:
+        return None
+    return {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": parsed.path.lstrip("/") or "",
+        "USER": unquote(parsed.username or ""),
+        "PASSWORD": unquote(parsed.password or ""),
+        "HOST": parsed.hostname or "",
+        "PORT": int(parsed.port or 5432),
+    }
+
+
+_db_from_url = _database_from_url(os.environ.get("DATABASE_URL"))
 DATABASES = {
-    "default": {
+    "default": _db_from_url
+    or {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.environ.get("POSTGRES_DB", "car_rental"),
         "USER": os.environ.get("POSTGRES_USER", "car_rental"),

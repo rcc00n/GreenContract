@@ -95,6 +95,8 @@ USE_TZ = True
 DATE_FORMAT = "d-m-Y"
 DATETIME_FORMAT = "d-m-Y H:i"
 TIME_FORMAT = "H:i"
+DATE_INPUT_FORMATS = ["%d-%m-%Y", "%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y"]
+DATETIME_INPUT_FORMATS = ["%d-%m-%Y %H:%M", "%Y-%m-%d %H:%M", "%d.%m.%Y %H:%M", "%d/%m/%Y %H:%M"]
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"

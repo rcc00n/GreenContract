@@ -54,13 +54,15 @@
                   </div>
                   <a
                     href="#"
-                    class="btn btn-sm btn-outline-secondary align-self-start d-none"
+                    class="btn btn-sm btn-outline-secondary align-self-start disabled"
                     id="customer-edit-link"
                     data-edit-url-template="{% url 'rentals:customer_update' 0 %}"
                     target="_blank"
                     rel="noopener"
+                    aria-disabled="true"
+                    tabindex="-1"
                   >
-                    Edit customer
+                    Редактировать клиента
                   </a>
                 </div>
                 <div class="form-text">
@@ -420,13 +422,17 @@
         function setEditLink(customerId) {
           if (!editLink) return;
           if (!customerId || !editUrlTemplate) {
-            editLink.classList.add("d-none");
+            editLink.classList.add("disabled");
+            editLink.setAttribute("aria-disabled", "true");
+            editLink.setAttribute("tabindex", "-1");
             editLink.removeAttribute("href");
             return;
           }
           const url = editUrlTemplate.replace("/0/", `/${customerId}/`);
           editLink.href = url;
-          editLink.classList.remove("d-none");
+          editLink.classList.remove("disabled");
+          editLink.removeAttribute("aria-disabled");
+          editLink.removeAttribute("tabindex");
         }
 
         function selectCustomer(item) {

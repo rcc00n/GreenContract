@@ -895,7 +895,7 @@
 
           const discountAmount = Math.min(Math.max(parseNumber(discountAmountInput), 0), subtotal);
           const discountPercent = Math.min(Math.max(parseNumber(discountPercentInput), 0), 100);
-          const percentBase = Math.max(baseTotal - discountAmount, 0);
+          const percentBase = Math.max(baseTotal, 0);
           let discountPercentAmount = roundMoney(percentBase * (discountPercent / 100));
           const maxPercentDiscount = Math.max(subtotal - discountAmount, 0);
           if (discountPercentAmount > maxPercentDiscount) {

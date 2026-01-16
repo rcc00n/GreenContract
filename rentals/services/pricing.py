@@ -326,7 +326,7 @@ def calculate_rental_pricing(
         percent_raw = Decimal("0.00")
     if percent_raw > 100:
         percent_raw = Decimal("100.00")
-    percent_base = max(base_total - discount_value, Decimal("0"))
+    percent_base = max(base_total, Decimal("0"))
     discount_percent_amount = _round_money(percent_base * percent_raw / Decimal("100"))
     max_percent_discount = max(subtotal - discount_value, Decimal("0"))
     if discount_percent_amount > max_percent_discount:

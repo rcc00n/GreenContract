@@ -16,7 +16,7 @@ except ImportError:  # pragma: no cover - optional dependency for .xlsx
     openpyxl = None
 
 from django.contrib import messages
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
 from django.db import transaction
@@ -32,7 +32,15 @@ from django.views.generic import CreateView, ListView, UpdateView
 from django.views.decorators.http import require_POST
 
 from .car_constants import CAR_LOSS_FEE_FIELDS
-from .forms import AdminUserCreationForm, CarForm, ContractTemplateForm, CustomerForm, RentalForm
+from .forms import (
+    AdminUserCreationForm,
+    CarForm,
+    ContractTemplateForm,
+    CustomerForm,
+    RentalForm,
+    StyledPasswordChangeForm,
+    StyledSetPasswordForm,
+)
 from .models import Car, ContractTemplate, Customer, CustomerTag, Rental
 from .services.contract_renderer import placeholder_guide, render_docx, render_html_template, render_pdf
 from .services.pricing import calculate_rental_pricing, pricing_config
@@ -608,8 +616,57 @@ def admin_user_list(request):
     context = {
         "admins": admins,
         "form": form,
+        "superuser_count": User.objects.filter(is_superuser=True).count(),
     }
     return render(request, "rentals/admin_list.html", context)
+
+
+@login_required
+def admin_user_password_reset(request, user_id):
+    if not request.user.is_superuser:
+        raise PermissionDenied
+    target_user = get_object_or_404(User, pk=user_id)
+    form = StyledSetPasswordForm(target_user, request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, f"Пароль обновлен для {target_user.get_username()}.")
+        return redirect("rentals:admin_user_list")
+    return render(
+        request,
+        "rentals/admin_password_reset.html",
+        {
+            "target_user": target_user,
+            "form": form,
+        },
+    )
+
+
+@login_required
+@require_POST
+def admin_user_delete(request, user_id):
+    if not request.user.is_superuser:
+        raise PermissionDenied
+    target_user = get_object_or_404(User, pk=user_id)
+    if target_user == request.user:
+        messages.error(request, "Нельзя удалить собственный аккаунт.")
+        return redirect("rentals:admin_user_list")
+    if target_user.is_superuser and User.objects.filter(is_superuser=True).exclude(pk=target_user.pk).count() == 0:
+        messages.error(request, "Нельзя удалить последнего суперпользователя.")
+        return redirect("rentals:admin_user_list")
+    target_user.delete()
+    messages.success(request, f"Пользователь {target_user.get_username()} удален.")
+    return redirect("rentals:admin_user_list")
+
+
+@login_required
+def password_change_self(request):
+    form = StyledPasswordChangeForm(request.user, request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        user = form.save()
+        update_session_auth_hash(request, user)
+        messages.success(request, "Пароль обновлен.")
+        return redirect("rentals:password_change")
+    return render(request, "rentals/password_change.html", {"form": form})
 
 
 @login_required

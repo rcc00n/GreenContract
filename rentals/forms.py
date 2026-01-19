@@ -3,7 +3,7 @@ from datetime import date, timedelta
 
 from django import forms
 from django.contrib.auth import get_user_model
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import PasswordChangeForm, SetPasswordForm, UserCreationForm
 
 from .car_constants import CAR_LOSS_FEE_FIELDS
 from .models import Car, Customer, Rental, ContractTemplate, CustomerTag
@@ -21,20 +21,24 @@ def _configure_date_field(field: forms.DateField):
     field.input_formats = DATE_INPUT_FORMATS
 
 
+def _apply_bootstrap_classes(fields):
+    for field in fields.values():
+        widget = field.widget
+        css = widget.attrs.get("class", "")
+        if isinstance(widget, forms.CheckboxInput):
+            widget.attrs["class"] = f"form-check-input {css}".strip()
+        else:
+            widget.attrs["class"] = f"form-control {css}".strip()
+        if isinstance(widget, forms.Textarea):
+            widget.attrs.setdefault("rows", 3)
+
+
 class StyledModelForm(forms.ModelForm):
     """Apply basic Bootstrap classes to all widgets."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for field in self.fields.values():
-            widget = field.widget
-            css = widget.attrs.get("class", "")
-            if isinstance(widget, forms.CheckboxInput):
-                widget.attrs["class"] = f"form-check-input {css}".strip()
-            else:
-                widget.attrs["class"] = f"form-control {css}".strip()
-            if isinstance(widget, forms.Textarea):
-                widget.attrs.setdefault("rows", 3)
+        _apply_bootstrap_classes(self.fields)
 
 
 class CarForm(StyledModelForm):
@@ -557,6 +561,29 @@ class AdminUserCreationForm(UserCreationForm):
         self.fields["password2"].label = "Подтверждение пароля"
         self.fields["password2"].help_text = "Повторите пароль для проверки."
         self.order_fields(["username", "email", "password1", "password2", "make_superuser"])
+
+
+class StyledSetPasswordForm(SetPasswordForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _apply_bootstrap_classes(self.fields)
+        self.fields["new_password1"].label = "Новый пароль"
+        self.fields["new_password1"].help_text = "Минимум 8 символов, лучше длиннее."
+        self.fields["new_password2"].label = "Подтверждение пароля"
+        self.fields["new_password2"].help_text = "Повторите пароль для проверки."
+        self.order_fields(["new_password1", "new_password2"])
+
+
+class StyledPasswordChangeForm(PasswordChangeForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _apply_bootstrap_classes(self.fields)
+        self.fields["old_password"].label = "Текущий пароль"
+        self.fields["new_password1"].label = "Новый пароль"
+        self.fields["new_password1"].help_text = "Минимум 8 символов, лучше длиннее."
+        self.fields["new_password2"].label = "Подтверждение пароля"
+        self.fields["new_password2"].help_text = "Повторите пароль для проверки."
+        self.order_fields(["old_password", "new_password1", "new_password2"])
 
         for field in self.fields.values():
             widget = field.widget

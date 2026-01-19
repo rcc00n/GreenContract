@@ -26,6 +26,7 @@
                   <th>Email</th>
                   <th>Роль</th>
                   <th>Последний вход</th>
+                  <th class="text-end">Действия</th>
                 </tr>
               </thead>
               <tbody>
@@ -52,10 +53,32 @@
                         —
                       {% endif %}
                     </td>
+                    <td class="text-end">
+                      <div class="d-inline-flex gap-2">
+                        <a class="btn btn-sm btn-outline-primary" href="{% url 'rentals:admin_user_password' admin.pk %}">
+                          Пароль
+                        </a>
+                        <form
+                          method="post"
+                          action="{% url 'rentals:admin_user_delete' admin.pk %}"
+                          class="d-inline"
+                          onsubmit="return confirm('Удалить пользователя {{ admin.username }}?');"
+                        >
+                          {% csrf_token %}
+                          {% if admin == user %}
+                            <button class="btn btn-sm btn-outline-danger" type="submit" disabled>Удалить</button>
+                          {% elif admin.is_superuser and superuser_count == 1 %}
+                            <button class="btn btn-sm btn-outline-danger" type="submit" disabled>Удалить</button>
+                          {% else %}
+                            <button class="btn btn-sm btn-outline-danger" type="submit">Удалить</button>
+                          {% endif %}
+                        </form>
+                      </div>
+                    </td>
                   </tr>
                 {% empty %}
                   <tr>
-                    <td colspan="4" class="text-center text-muted py-4">
+                    <td colspan="5" class="text-center text-muted py-4">
                       Пока нет администраторов.
                     </td>
                   </tr>

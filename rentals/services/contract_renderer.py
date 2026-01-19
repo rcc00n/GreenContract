@@ -114,6 +114,34 @@ class _BoolDisplay:
         return self._value == other
 
 
+class _DateFormattingProxy:
+    def __init__(
+        self,
+        obj,
+        *,
+        date_fields: Iterable[str] = (),
+        time_fields: Iterable[str] = (),
+        datetime_fields: Iterable[str] = (),
+    ):
+        self._obj = obj
+        self._date_fields = set(date_fields)
+        self._time_fields = set(time_fields)
+        self._datetime_fields = set(datetime_fields)
+
+    def __getattr__(self, name):
+        value = getattr(self._obj, name)
+        if name in self._date_fields:
+            return _fmt_date(value)
+        if name in self._time_fields:
+            return _fmt_time(value)
+        if name in self._datetime_fields:
+            return _fmt_datetime(value)
+        return value
+
+    def __str__(self):
+        return str(self._obj)
+
+
 class _RentalTemplateProxy:
     def __init__(self, rental: Rental):
         self._rental = rental
@@ -122,10 +150,21 @@ class _RentalTemplateProxy:
         self.ski_rack_included = _BoolDisplay(rental.ski_rack_included)
         self.roof_box_included = _BoolDisplay(rental.roof_box_included)
         self.crossbars_included = _BoolDisplay(rental.crossbars_included)
-        self.car = rental.car
-        self.customer = rental.customer
+        self.car = _DateFormattingProxy(rental.car, date_fields={"sts_issue_date"})
+        self.customer = _DateFormattingProxy(
+            rental.customer,
+            date_fields={"birth_date", "driving_since", "passport_issue_date"},
+        )
 
     def __getattr__(self, name):
+        if name in {"start_date", "end_date"}:
+            return _fmt_date(getattr(self._rental, name))
+        if name in {"start_time", "end_time"}:
+            return _fmt_time(getattr(self._rental, name))
+        if name == "date_range":
+            return _format_date_range(self._rental.start_date, self._rental.end_date)
+        if name == "deal_name":
+            return _format_deal_name(self._rental)
         return getattr(self._rental, name)
 
 
@@ -133,16 +172,17 @@ def get_contract_context(rental: Rental) -> dict:
     start_date = rental.start_date
     end_date = rental.end_date
     duration_days = rental.duration_days if start_date and end_date else None
-    date_range = rental.date_range or ""
+    date_range = _format_date_range(start_date, end_date)
+    rental_proxy = _RentalTemplateProxy(rental)
     return {
-        "rental": _RentalTemplateProxy(rental),
-        "car": rental.car,
-        "customer": rental.customer,
+        "rental": rental_proxy,
+        "car": rental_proxy.car,
+        "customer": rental_proxy.customer,
         "rental_duration_days": duration_days,
         "rental_date_range": date_range,
         "meta": {
-            "generated_at": timezone.localtime(),
-            "today": timezone.localdate(),
+            "generated_at": _fmt_datetime(timezone.localtime()),
+            "today": _fmt_date(timezone.localdate()),
         },
     }
 
@@ -179,15 +219,35 @@ def _normalize_html_charset(html: str, target: str = "utf-8") -> str:
 
 
 def _fmt_date(value) -> str:
-    return value.strftime("%d-%m-%Y") if value else ""
+    return value.strftime("%d.%m.%Y") if value else ""
 
 
 def _fmt_datetime(value) -> str:
-    return value.strftime("%d-%m-%Y %H:%M") if value else ""
+    return value.strftime("%d.%m.%Y %H:%M") if value else ""
 
 
 def _fmt_time(value) -> str:
     return value.strftime("%H:%M") if value else ""
+
+
+def _format_date_range(start_date, end_date) -> str:
+    if not start_date and not end_date:
+        return ""
+    start = _fmt_date(start_date)
+    end = _fmt_date(end_date)
+    if start and end:
+        return f"{start} — {end}"
+    return start or end
+
+
+def _format_deal_name(rental: Rental) -> str:
+    contract = rental.contract_number or "-----"
+    last_name = rental.customer_last_name or "—"
+    car_piece = ""
+    if rental.car_id:
+        car_piece = f"{rental.car.plate_number} {rental.car.make}".strip()
+    date_piece = _fmt_date(rental.start_date) if rental.start_date else ""
+    return f"{contract}/{last_name}/{car_piece}/{date_piece}"
 
 
 def _fmt_decimal(value) -> str:
@@ -211,7 +271,7 @@ def build_placeholder_values(rental: Rental) -> dict[str, str]:
     start_date = rental.start_date
     end_date = rental.end_date
     duration_days = rental.duration_days if start_date and end_date else None
-    date_range = rental.date_range or ""
+    date_range = _format_date_range(start_date, end_date)
     address_primary = customer.registration_address or customer.address or customer.residence_address
 
     values = {

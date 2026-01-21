@@ -3,10 +3,10 @@
 {% block content %}
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-      <h1 class="h4 mb-0">{% if object %}Edit rental{% else %}Create rental{% endif %}</h1>
-      <p class="text-muted small mb-0">Set rental dates, pricing, and status.</p>
+      <h1 class="h4 mb-0">{% if object %}Редактировать аренду{% else %}Создать аренду{% endif %}</h1>
+      <p class="text-muted small mb-0">Выберите даты, тариф и статус аренды.</p>
     </div>
-    <a href="{% url 'rentals:rental_list' %}" class="btn btn-outline-secondary">Back to list</a>
+    <a href="{% url 'rentals:rental_list' %}" class="btn btn-outline-secondary">Назад к списку</a>
   </div>
 
   <form method="post" novalidate>
@@ -20,19 +20,19 @@
             {% endif %}
             <div class="row g-3">
               <div class="col-md-4 col-lg-3">
-                <label class="form-label" for="{{ form.contract_number.id_for_label }}">Contract number</label>
+                <label class="form-label" for="{{ form.contract_number.id_for_label }}">Номер договора</label>
                 {{ form.contract_number }}
                 {% for error in form.contract_number.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
 
               <div class="col-md-6">
-                <label class="form-label" for="{{ form.car.id_for_label }}">Car</label>
+                <label class="form-label" for="{{ form.car.id_for_label }}">Автомобиль</label>
                 {{ form.car }}
                 <div class="form-text">Авто из списка автоматически подтягивает цену по длительности.</div>
                 {% for error in form.car.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
               <div class="col-md-6">
-                <label class="form-label" for="customer-search">Customer</label>
+                <label class="form-label" for="customer-search">Клиент</label>
                 {{ form.customer }}
                 <div class="d-flex align-items-start gap-2">
                   <div class="flex-grow-1 position-relative">
@@ -40,7 +40,7 @@
                       type="search"
                       class="form-control{% if form.customer.errors %} is-invalid{% endif %}"
                       id="customer-search"
-                      placeholder="Начните вводить имя, телефон или email"
+                      placeholder="Начните вводить имя, телефон или эл. почту"
                       autocomplete="off"
                       data-search-url="{% url 'rentals:customer_search' %}"
                       data-initial-label="{{ customer_initial_label|default_if_none:'' }}"
@@ -48,7 +48,7 @@
                     <div
                       class="dropdown-menu w-100 shadow-sm"
                       id="customer-search-results"
-                      aria-label="Customer search results"
+                      aria-label="Результаты поиска клиентов"
                       style="max-height: 280px; overflow-y: auto;"
                     ></div>
                   </div>
@@ -66,7 +66,7 @@
                   </a>
                 </div>
                 <div class="form-text">
-                  Поиск по имени, телефону, email или номеру удостоверения. Минимум 2 символа.
+                  Поиск по имени, телефону, эл. почте или номеру удостоверения. Минимум 2 символа.
                 </div>
                 <div class="small text-muted mt-1" id="customer-selected-summary">
                   {% if customer_initial_label %}{{ customer_initial_label }}{% else %}Клиент не выбран{% endif %}
@@ -79,10 +79,10 @@
                   <div class="d-flex justify-content-between align-items-center mb-2">
                     <div>
                       <div class="fw-semibold">Данные выбранного авто</div>
-                      <div class="text-muted small">VIN, СТС и год подтягиваются автоматически.</div>
+                      <div class="text-muted small">ВИН, СТС и год подтягиваются автоматически.</div>
                     </div>
                     <a href="#" class="btn btn-sm btn-outline-secondary d-none" id="car-edit-link" target="_blank" rel="noopener">
-                      Edit car
+                      Редактировать авто
                     </a>
                   </div>
                   <div id="car-details" class="row small gy-1">
@@ -92,7 +92,7 @@
                       <div>Год: <span data-field="year">—</span></div>
                     </div>
                     <div class="col-md-4">
-                      <div>VIN: <span data-field="vin">—</span></div>
+                      <div>ВИН: <span data-field="vin">—</span></div>
                       <div>СТС: <span data-field="sts_number">—</span></div>
                     </div>
                     <div class="col-md-4">
@@ -100,30 +100,30 @@
                       <div>Кем: <span data-field="sts_issued_by">—</span></div>
                     </div>
                   </div>
-                  <div class="text-muted small" id="car-details-empty">Выберите авто, чтобы увидеть VIN и СТС.</div>
+                  <div class="text-muted small" id="car-details-empty">Выберите авто, чтобы увидеть ВИН и СТС.</div>
                 </div>
               </div>
 
               <div class="col-lg-3 col-md-6">
-                <label class="form-label" for="{{ form.start_date.id_for_label }}">Start date</label>
+                <label class="form-label" for="{{ form.start_date.id_for_label }}">Дата начала</label>
                 {{ form.start_date }}
                 <div class="form-text">Выберите дату начала аренды.</div>
                 {% for error in form.start_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
               <div class="col-lg-3 col-md-6">
-                <label class="form-label" for="{{ form.start_time.id_for_label }}">Start time</label>
+                <label class="form-label" for="{{ form.start_time.id_for_label }}">Время выдачи</label>
                 {{ form.start_time }}
                 <div class="form-text">Нужен для расчёта аэропортового/ночного сбора.</div>
                 {% for error in form.start_time.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
               <div class="col-lg-3 col-md-6">
-                <label class="form-label" for="{{ form.end_date.id_for_label }}">End date</label>
+                <label class="form-label" for="{{ form.end_date.id_for_label }}">Дата окончания</label>
                 {{ form.end_date }}
                 <div class="form-text">Система подставит цену в зависимости от количества дней.</div>
                 {% for error in form.end_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
               <div class="col-lg-3 col-md-6">
-                <label class="form-label" for="{{ form.end_time.id_for_label }}">End time</label>
+                <label class="form-label" for="{{ form.end_time.id_for_label }}">Время возврата</label>
                 {{ form.end_time }}
                 <div class="form-text">Для ночных/аэропортовых сборов при возврате.</div>
                 {% for error in form.end_time.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
@@ -146,13 +146,13 @@
                 {% for error in form.unique_daily_rate.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
               <div class="col-lg-3 col-md-6">
-                <label class="form-label" for="{{ form.daily_rate.id_for_label }}">Daily rate</label>
+                <label class="form-label" for="{{ form.daily_rate.id_for_label }}">Суточный тариф</label>
                 {{ form.daily_rate }}
                 <div class="form-text">Автозаполнение по тарифу автомобиля.</div>
                 {% for error in form.daily_rate.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
               <div class="col-lg-3 col-md-6">
-                <label class="form-label" for="{{ form.total_price.id_for_label }}">Total price</label>
+                <label class="form-label" for="{{ form.total_price.id_for_label }}">Итоговая сумма</label>
                 {{ form.total_price }}
                 <div class="form-text">Сумма договора после доп. услуг и скидок.</div>
                 {% for error in form.total_price.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
@@ -321,7 +321,7 @@
                       {% for error in form.prepayment.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
                     </div>
                     <div class="col-md-4">
-                      <label class="form-label" for="{{ form.status.id_for_label }}">Status</label>
+                      <label class="form-label" for="{{ form.status.id_for_label }}">Статус</label>
                       {{ form.status }}
                       {% for error in form.status.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
                     </div>
@@ -340,7 +340,7 @@
             <div class="card-body">
               <div class="d-flex align-items-center gap-2 mb-3">
                 <div class="spinner-border spinner-border-sm text-primary d-none" id="price-spinner" role="status">
-                  <span class="visually-hidden">Loading...</span>
+                  <span class="visually-hidden">Загрузка...</span>
                 </div>
                 <div>
                   <div class="fw-semibold text-uppercase small text-muted mb-1">Текущий расчёт</div>
@@ -1067,8 +1067,8 @@
     </script>
 
     <div class="d-flex justify-content-end gap-2 pt-3">
-      <a href="{% url 'rentals:rental_list' %}" class="btn btn-outline-secondary">Cancel</a>
-      <button class="btn btn-primary" type="submit">Save rental</button>
+      <a href="{% url 'rentals:rental_list' %}" class="btn btn-outline-secondary">Отмена</a>
+      <button class="btn btn-primary" type="submit">Сохранить аренду</button>
     </div>
   </form>
 {% endblock %}

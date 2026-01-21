@@ -3,13 +3,13 @@
 {% block content %}
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-      <h1 class="h4 mb-0">Rentals</h1>
+      <h1 class="h4 mb-0">Аренды</h1>
       <p class="text-muted small mb-0">Гибкий поиск по договорам, клиентам, авто и датам.</p>
     </div>
     <div class="d-flex flex-wrap gap-2">
-      <a href="{% url 'rentals:import_rentals_csv' %}" class="btn btn-outline-secondary">Import CSV</a>
-      <a href="{% url 'rentals:export_rentals_csv' %}" class="btn btn-outline-secondary">Export CSV</a>
-      <a href="{% url 'rentals:rental_create' %}" class="btn btn-primary">Create rental</a>
+      <a href="{% url 'rentals:import_rentals_csv' %}" class="btn btn-outline-secondary">Импорт таблицы</a>
+      <a href="{% url 'rentals:export_rentals_csv' %}" class="btn btn-outline-secondary">Экспорт таблицы</a>
+      <a href="{% url 'rentals:rental_create' %}" class="btn btn-primary">Создать аренду</a>
     </div>
   </div>
 
@@ -17,19 +17,19 @@
     <div class="col-lg-6">
       <label class="form-label" for="rentalSearchInput">Поиск по сделкам</label>
       <div class="input-group">
-        <span class="input-group-text text-muted">Find</span>
+        <span class="input-group-text text-muted">Поиск</span>
         <input
           type="search"
           class="form-control"
           id="rentalSearchInput"
           name="q"
           value="{{ search_query }}"
-          placeholder="Номер договора, фамилия, авто, VIN/СТС, дата начала"
+          placeholder="Номер договора, фамилия, авто, ВИН/СТС, дата начала"
           autocomplete="off"
         >
       </div>
       <div class="form-text text-muted">
-        Ищет по номеру договора, фамилии/телефону клиента, номеру/марке авто, VIN/СТС и датам (DD-MM-YYYY).
+        Ищет по номеру договора, фамилии/телефону клиента, номеру/марке авто, ВИН/СТС и датам (ДД-ММ-ГГГГ).
         Работает на лету и по кнопке поиска.
       </div>
     </div>
@@ -43,9 +43,9 @@
       </select>
     </div>
     <div class="col-lg-3 col-md-6 d-flex gap-2">
-      <button class="btn btn-primary" type="submit">Search</button>
+      <button class="btn btn-primary" type="submit">Найти</button>
       {% if filters_active %}
-        <a class="btn btn-outline-secondary" href="{% url 'rentals:rental_list' %}">Reset</a>
+        <a class="btn btn-outline-secondary" href="{% url 'rentals:rental_list' %}">Сбросить</a>
       {% endif %}
     </div>
   </form>
@@ -55,12 +55,12 @@
       <table class="table align-middle mb-0">
         <thead class="table-light">
           <tr>
-            <th>Deal</th>
-            <th>Customer</th>
-            <th>Car</th>
-            <th>Dates</th>
-            <th>Total</th>
-            <th class="text-end">Actions</th>
+            <th>Сделка</th>
+            <th>Клиент</th>
+            <th>Авто</th>
+            <th>Даты</th>
+            <th>Итого</th>
+            <th class="text-end">Действия</th>
           </tr>
         </thead>
         <tbody>
@@ -105,7 +105,7 @@
                 <div class="fw-semibold">{{ rental.car.plate_number }}</div>
                 <div class="text-muted small">{{ rental.car.make }} {{ rental.car.model }}</div>
                 <div class="text-muted small">
-                  VIN: {{ rental.car.vin|default:"—" }}{% if rental.car.sts_number %} · СТС {{ rental.car.sts_number }}{% endif %}
+                  ВИН: {{ rental.car.vin|default:"—" }}{% if rental.car.sts_number %} · СТС {{ rental.car.sts_number }}{% endif %}
                 </div>
               </td>
               <td>
@@ -120,11 +120,11 @@
                 </div>
               </td>
               <td class="text-end">
-                <a href="{% url 'rentals:rental_update' rental.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                <a href="{% url 'rentals:rental_update' rental.pk %}" class="btn btn-sm btn-outline-secondary">Изменить</a>
                 {% if contract_templates %}
                   <div class="btn-group ms-2">
                     <button type="button" class="btn btn-sm btn-primary dropdown-toggle" data-bs-toggle="dropdown">
-                      Contract
+                      Договор
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
                       {% for ct in contract_templates %}
@@ -141,7 +141,7 @@
             </tr>
           {% empty %}
             <tr>
-              <td colspan="6" class="text-center text-muted py-4">No rentals yet. Create your first booking.</td>
+              <td colspan="6" class="text-center text-muted py-4">Аренд пока нет. Создайте первую сделку.</td>
             </tr>
           {% endfor %}
           <tr id="rentalNoMatchesRow" class="d-none">

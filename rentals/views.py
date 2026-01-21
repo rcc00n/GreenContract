@@ -4,6 +4,7 @@ import os
 import re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+from urllib.parse import quote
 
 try:
     import xlrd
@@ -63,7 +64,7 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_bool(value):
-    return str(value).strip().lower() in {"true", "1", "yes", "y", "t"}
+    return str(value).strip().lower() in {"true", "1", "yes", "y", "t", "да", "активен", "активный"}
 
 
 def _parse_decimal(value):
@@ -97,9 +98,12 @@ def _parse_date(value):
 
 
 def _clean_status(value):
-    value = (value or "").lower()
+    value = (value or "").strip().lower()
     valid_statuses = {choice[0] for choice in Rental.STATUS_CHOICES}
-    return value if value in valid_statuses else "draft"
+    if value in valid_statuses:
+        return value
+    label_map = {label.lower(): code for code, label in Rental.STATUS_CHOICES}
+    return label_map.get(value, "draft")
 
 
 def _pick_value(row, keys):
@@ -235,24 +239,28 @@ def _serialize_car_pricing(car: Car):
 def _read_csv_rows(upload):
     raw = upload.read()
     decoded_text = None
-    last_error = None
     for encoding in ("utf-8-sig", "cp1251"):
         try:
             decoded_text = raw.decode(encoding)
             break
         except UnicodeDecodeError as exc:
-            last_error = exc
             continue
 
     if decoded_text is None:
-        raise UnicodeDecodeError("utf-8", raw, 0, 0, f"Failed to decode CSV: {last_error}")
+        raise UnicodeDecodeError(
+            "utf-8",
+            raw,
+            0,
+            0,
+            "Не удалось декодировать файл с разделителями. Проверьте кодировку.",
+        )
 
     return list(csv.DictReader(decoded_text.splitlines()))
 
 
 def _read_excel_rows(upload):
     if xlrd is None:
-        raise ImportError("xlrd is required to read .xls files.")
+        raise ImportError("Чтение таблиц Эксель в старом формате недоступно.")
 
     book = xlrd.open_workbook(file_contents=upload.read())
     sheet = book.sheet_by_index(0)
@@ -274,7 +282,7 @@ def _read_excel_rows(upload):
 
 def _read_xlsx_rows(upload):
     if openpyxl is None:
-        raise ImportError("openpyxl is required to read .xlsx files.")
+        raise ImportError("Чтение таблиц Эксель в новом формате недоступно.")
 
     upload.seek(0)
     wb = openpyxl.load_workbook(upload, read_only=True, data_only=True)
@@ -320,6 +328,9 @@ def _normalize_car_row(row):
             "Регистрационный знак",
             "гос.номера",
             "Гос.номера",
+            "Госномер",
+            "Гос. номер",
+            "Государственный номер",
         ],
     )
     if plate:
@@ -345,7 +356,7 @@ def _normalize_car_row(row):
         if len(parts) == 2:
             model = parts[1]
 
-    year_val = _pick_value(row, ["year", "Year", "год выпуска", "Год выпуска"])
+    year_val = _pick_value(row, ["year", "Year", "год выпуска", "Год выпуска", "Год"])
     try:
         year = int(float(year_val))
     except (TypeError, ValueError):
@@ -363,17 +374,42 @@ def _normalize_car_row(row):
             "Свидетельство",
             "СТС номер",
             "номер СТС",
+            "Номер СТС",
         ],
     )
-    sts_issue_date_raw = _pick_value(row, ["sts_issue_date", "дата выдачи стс", "СТС выдано"])
-    sts_issued_by = _pick_value(row, ["sts_issued_by", "кем выдано стс", "кем выдано"])
+    sts_issue_date_raw = _pick_value(
+        row,
+        [
+            "sts_issue_date",
+            "дата выдачи стс",
+            "СТС выдано",
+            "Дата выдачи СТС",
+        ],
+    )
+    sts_issued_by = _pick_value(
+        row,
+        [
+            "sts_issued_by",
+            "кем выдано стс",
+            "кем выдано",
+            "Кем выдана СТС",
+        ],
+    )
     registration_certificate_info = _pick_value(
         row,
         ["registration_certificate_info", "Свидетельство о регистрации", "свидетельство о регистрации"],
     )
     fuel_tank_volume_raw = _pick_value(
         row,
-        ["fuel_tank_volume_liters", "Объем бака", "Объём бака", "объем бака", "объём бака"],
+        [
+            "fuel_tank_volume_liters",
+            "Объем бака",
+            "Объём бака",
+            "объем бака",
+            "объём бака",
+            "Объем бака, л",
+            "Объём бака, л",
+        ],
     )
     fuel_tank_cost_raw = _pick_value(
         row,
@@ -383,24 +419,45 @@ def _normalize_car_row(row):
             "Объём бака(руб.)",
             "Объем бака (руб)",
             "Объём бака (руб)",
+            "Стоимость полного бака, ₽",
         ],
     )
     security_deposit_raw = _pick_value(row, ["security_deposit", "Залог", "залог"])
 
-    rate_1_4_high = _pick_value(row, ["rate_1_4_high", "1-4 дней(вс)", "1-4 дней (вс)"])
-    rate_5_14_high = _pick_value(row, ["rate_5_14_high", "5-14 дней(вс)", "5-14 дней (вс)"])
+    rate_1_4_high = _pick_value(
+        row, ["rate_1_4_high", "1-4 дней(вс)", "1-4 дней (вс)", "1-4 дня(вс)", "1-4 дня (вс)"]
+    )
+    rate_5_14_high = _pick_value(
+        row, ["rate_5_14_high", "5-14 дней(вс)", "5-14 дней (вс)", "5-14 дня (вс)"]
+    )
     rate_15_high = _pick_value(
-        row, ["rate_15_plus_high", "15 дней и более(вс)", "15 дней и более (вс)"]
+        row,
+        [
+            "rate_15_plus_high",
+            "15 дней и более(вс)",
+            "15 дней и более (вс)",
+            "15+ дней (вс)",
+        ],
     )
 
-    rate_1_4_low = _pick_value(row, ["rate_1_4_low", "1-4 дней(нс)", "1-4 дней (нс)"])
-    rate_5_14_low = _pick_value(row, ["rate_5_14_low", "5-14 дней(нс)", "5-14 дней (нс)"])
+    rate_1_4_low = _pick_value(
+        row, ["rate_1_4_low", "1-4 дней(нс)", "1-4 дней (нс)", "1-4 дня (нс)"]
+    )
+    rate_5_14_low = _pick_value(
+        row, ["rate_5_14_low", "5-14 дней(нс)", "5-14 дней (нс)", "5-14 дня (нс)"]
+    )
     rate_15_low = _pick_value(
-        row, ["rate_15_plus_low", "15 дней и более(нс)", "15 дней и более (нс)"]
+        row,
+        [
+            "rate_15_plus_low",
+            "15 дней и более(нс)",
+            "15 дней и более (нс)",
+            "15+ дней (нс)",
+        ],
     )
 
-    rate_raw = _pick_value(row, ["daily_rate", "Daily rate"])
-    active_raw = _pick_value(row, ["is_active", "active", "активен", "активный"])
+    rate_raw = _pick_value(row, ["daily_rate", "Daily rate", "Базовый тариф", "Суточный тариф"])
+    active_raw = _pick_value(row, ["is_active", "active", "активен", "активный", "Активен"])
     is_active = _parse_bool(active_raw) if active_raw not in (None, "") else True
 
     daily_rate = _parse_decimal(rate_raw) if rate_raw not in (None, "") else None
@@ -500,9 +557,9 @@ def _normalize_customer_row(row, row_index: int):
                     return cleaned
         return ""
 
-    crm_id = pick(["ID", "Id", "id"])
+    crm_id = pick(["ID", "Id", "id", "ИД"])
 
-    full_name = pick(["full_name", "Full name", "fullname", "ФИО", "fio", "Наименование"])
+    full_name = pick(["full_name", "Full name", "fullname", "ФИО", "fio", "Наименование", "Клиент"])
     first_name = pick(["Имя", "First name", "first_name"])
     last_name = pick(["Фамилия", "Last name", "last_name"])
 
@@ -537,21 +594,35 @@ def _normalize_customer_row(row, row_index: int):
             "Водит. удостоверение. (контакт)",
             "Паспорт (контакт)",
             "Контракт (контакт)",
+            "Номер ВУ",
         ]
     )
     license_number = (
         license_candidate
-        or (crm_id and f"AMO-{crm_id}")
-        or (cleaned_phone and f"PHONE-{cleaned_phone}")
-        or f"AUTO-{row_index}"
+        or (crm_id and f"АМО-{crm_id}")
+        or (cleaned_phone and f"ТЕЛ-{cleaned_phone}")
+        or f"АВТО-{row_index}"
     )
     license_number = _limit_length(license_number, LICENSE_MAX_LEN)
 
     email = _limit_length(
-        pick(["email", "Email", "Рабочий email", "Личный email", "Другой email"]), EMAIL_MAX_LEN
+        pick(
+            [
+                "email",
+                "Email",
+                "Рабочий email",
+                "Личный email",
+                "Другой email",
+                "Эл. почта",
+                "Электронная почта",
+            ]
+        ),
+        EMAIL_MAX_LEN,
     )
     birth_date_raw = pick(["birth_date", "Birth date", "Дата рождения"])
-    license_issued_by = pick(["license_issued_by", "В.у. выдано", "ВУ выдано", "В/У выдано"])
+    license_issued_by = pick(
+        ["license_issued_by", "В.у. выдано", "ВУ выдано", "В/У выдано", "Кем выдано ВУ"]
+    )
     driving_since_raw = pick(["driving_since", "Стаж с", "стаж с"])
     registration_address = pick(
         ["registration_address", "Адрес прописки", "адрес прописки", "Прописка", "прописка"]
@@ -778,11 +849,11 @@ def car_delete(request, pk: int):
     car = get_object_or_404(Car, pk=pk)
     try:
         car.delete()
-        messages.success(request, f"Deleted car {car.plate_number}.")
+        messages.success(request, f"Авто {car.plate_number} удалено.")
     except ProtectedError:
         messages.error(
             request,
-            "Cannot delete this car because it is linked to existing rentals.",
+            "Нельзя удалить авто: есть связанные аренды.",
         )
     return redirect("rentals:car_list")
 
@@ -796,16 +867,16 @@ def car_delete_all(request):
 
     if deletable_count:
         deletable.delete()
-        messages.success(request, f"Deleted {deletable_count} cars.")
+        messages.success(request, f"Удалено автомобилей: {deletable_count}.")
 
     locked_count = with_rentals.count()
     if locked_count:
         messages.warning(
             request,
-            f"Skipped {locked_count} car(s) that are linked to rentals.",
+            f"Пропущено авто, связанные с арендами: {locked_count}.",
         )
     elif deletable_count == 0:
-        messages.info(request, "No cars to delete.")
+        messages.info(request, "Нет авто для удаления.")
 
     return redirect("rentals:car_list")
 
@@ -816,11 +887,11 @@ def customer_delete(request, pk: int):
     customer = get_object_or_404(Customer, pk=pk)
     try:
         customer.delete()
-        messages.success(request, f"Deleted customer {customer.full_name}.")
+        messages.success(request, f"Клиент {customer.full_name} удален.")
     except ProtectedError:
         messages.error(
             request,
-            "Cannot delete this customer because they are linked to existing rentals.",
+            "Нельзя удалить клиента: есть связанные аренды.",
         )
     return redirect("rentals:customer_list")
 
@@ -834,16 +905,16 @@ def customer_delete_all(request):
 
     if deletable_count:
         deletable.delete()
-        messages.success(request, f"Deleted {deletable_count} customers.")
+        messages.success(request, f"Удалено клиентов: {deletable_count}.")
 
     locked_count = with_rentals.count()
     if locked_count:
         messages.warning(
             request,
-            f"Skipped {locked_count} customer(s) that are linked to rentals.",
+            f"Пропущено клиентов, связанных с арендами: {locked_count}.",
         )
     elif deletable_count == 0:
-        messages.info(request, "No customers to delete.")
+        messages.info(request, "Нет клиентов для удаления.")
 
     return redirect("rentals:customer_list")
 
@@ -1109,35 +1180,36 @@ def customer_search(request):
 @login_required
 def export_cars_csv(request):
     response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = 'attachment; filename="cars.csv"'
+    filename = "автомобили.csv"
+    response["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(filename)}"
 
     writer = csv.writer(response)
     writer.writerow(
         [
-            "plate_number",
-            "make",
-            "model",
-            "year",
-            "vin",
-            "color",
-            "region_code",
-            "photo_url",
-            "sts_number",
-            "sts_issue_date",
-            "sts_issued_by",
-            "registration_certificate_info",
-            "fuel_tank_volume_liters",
-            "fuel_tank_cost_rub",
-            "security_deposit",
-            "daily_rate",
-            "rate_1_4_high",
-            "rate_5_14_high",
-            "rate_15_plus_high",
-            "rate_1_4_low",
-            "rate_5_14_low",
-            "rate_15_plus_low",
-            "is_active",
-            *[field for field, _ in CAR_LOSS_FEE_FIELDS],
+            "Госномер",
+            "Марка",
+            "Модель",
+            "Год выпуска",
+            "ВИН",
+            "Цвет",
+            "Регион",
+            "Фото (ссылка)",
+            "Номер СТС",
+            "Дата выдачи СТС",
+            "Кем выдана СТС",
+            "Свидетельство о регистрации",
+            "Объем бака, л",
+            "Стоимость полного бака, ₽",
+            "Залог",
+            "Базовый тариф",
+            "1-4 дня (вс)",
+            "5-14 дней (вс)",
+            "15+ дней (вс)",
+            "1-4 дня (нс)",
+            "5-14 дней (нс)",
+            "15+ дней (нс)",
+            "Активен",
+            *[label for _, label in CAR_LOSS_FEE_FIELDS],
         ]
     )
 
@@ -1166,7 +1238,7 @@ def export_cars_csv(request):
                 car.rate_1_4_low,
                 car.rate_5_14_low,
                 car.rate_15_plus_low,
-                car.is_active,
+                "Да" if car.is_active else "Нет",
                 *[
                     getattr(car, field) if getattr(car, field) is not None else ""
                     for field, _ in CAR_LOSS_FEE_FIELDS
@@ -1180,25 +1252,26 @@ def export_cars_csv(request):
 @login_required
 def export_customers_csv(request):
     response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = 'attachment; filename="customers.csv"'
+    filename = "клиенты.csv"
+    response["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(filename)}"
 
     writer = csv.writer(response)
     writer.writerow(
         [
-            "full_name",
-            "birth_date",
-            "email",
-            "phone",
-            "license_number",
-            "license_issued_by",
-            "driving_since",
-            "passport_series",
-            "passport_number",
-            "passport_issue_date",
-            "passport_issued_by",
-            "registration_address",
-            "discount_percent",
-            "tags",
+            "ФИО",
+            "Дата рождения",
+            "Эл. почта",
+            "Телефон",
+            "Номер ВУ",
+            "Кем выдано ВУ",
+            "Стаж с",
+            "Серия паспорта",
+            "Номер паспорта",
+            "Дата выдачи паспорта",
+            "Кем выдан паспорт",
+            "Адрес прописки",
+            "Скидка, %",
+            "Теги",
         ]
     )
 
@@ -1229,20 +1302,21 @@ def export_customers_csv(request):
 @login_required
 def export_rentals_csv(request):
     response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = 'attachment; filename="rentals.csv"'
+    filename = "аренды.csv"
+    response["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(filename)}"
 
     writer = csv.writer(response)
     writer.writerow(
         [
-            "contract_number",
-            "car_plate_number",
-            "customer_license_number",
-            "customer_name",
-            "start_date",
-            "end_date",
-            "daily_rate",
-            "total_price",
-            "status",
+            "Номер договора",
+            "Госномер",
+            "Номер ВУ",
+            "Клиент",
+            "Дата начала",
+            "Дата окончания",
+            "Суточный тариф",
+            "Итоговая сумма",
+            "Статус",
         ]
     )
 
@@ -1257,7 +1331,7 @@ def export_rentals_csv(request):
                 rental.end_date.strftime("%d-%m-%Y"),
                 rental.daily_rate,
                 rental.total_price,
-                rental.status,
+                rental.get_status_display(),
             ]
         )
 
@@ -1269,16 +1343,17 @@ def import_cars_csv(request):
     if request.method == "POST":
         upload = request.FILES.get("file")
         if not upload:
-            messages.error(request, "Please choose a CSV or XLS file to upload.")
+            messages.error(request, "Пожалуйста, выберите таблицу Эксель или файл с разделителями.")
         else:
             try:
                 rows = _load_rows(upload)
             except Exception as exc:  # noqa: BLE001 - present message to user
-                messages.error(request, f"Could not read file: {exc}")
+                logger.exception("Импорт авто: не удалось прочитать файл %s", upload.name)
+                messages.error(request, "Не удалось прочитать файл. Проверьте формат и кодировку.")
                 return redirect("rentals:import_cars_csv")
 
             if not rows:
-                messages.warning(request, "File is empty or missing rows.")
+                messages.warning(request, "Файл пустой или не содержит строк.")
                 return redirect("rentals:import_cars_csv")
 
             imported, skipped = 0, 0
@@ -1404,9 +1479,9 @@ def import_cars_csv(request):
                 imported += 1
 
             if imported:
-                messages.success(request, f"Imported {imported} cars.")
+                messages.success(request, f"Импортировано автомобилей: {imported}.")
             if skipped:
-                messages.warning(request, f"Skipped {skipped} rows due to missing or invalid data.")
+                messages.warning(request, f"Пропущено строк из-за ошибок или неполных данных: {skipped}.")
 
             return redirect("rentals:car_list")
 
@@ -1414,36 +1489,36 @@ def import_cars_csv(request):
         request,
         "rentals/import_csv.html",
         {
-            "title": "Import cars",
+            "title": "Импорт автомобилей",
             "expected_headers": [
-                "plate_number",
-                "vin",
-                "color",
-                "region_code",
-                "photo_url",
-                "make",
-                "model",
-                "year",
-                "sts_number",
-                "sts_issue_date (DD-MM-YYYY)",
-                "sts_issued_by",
-                "registration_certificate_info",
-                "fuel_tank_volume_liters",
-                "fuel_tank_cost_rub",
-                "security_deposit",
-                "daily_rate",
-                "rate_1_4_high",
-                "rate_5_14_high",
-                "rate_15_plus_high",
-                "rate_1_4_low",
-                "rate_5_14_low",
-                "rate_15_plus_low",
-                "is_active",
-                *[field for field, _ in CAR_LOSS_FEE_FIELDS],
+                "Госномер",
+                "ВИН",
+                "Цвет",
+                "Регион",
+                "Фото (ссылка)",
+                "Марка",
+                "Модель",
+                "Год выпуска",
+                "Номер СТС",
+                "Дата выдачи СТС (ДД-ММ-ГГГГ)",
+                "Кем выдана СТС",
+                "Свидетельство о регистрации",
+                "Объем бака, л",
+                "Стоимость полного бака, ₽",
+                "Залог",
+                "Базовый тариф",
+                "1-4 дня (вс)",
+                "5-14 дней (вс)",
+                "15+ дней (вс)",
+                "1-4 дня (нс)",
+                "5-14 дней (нс)",
+                "15+ дней (нс)",
+                "Активен",
+                *[label for _, label in CAR_LOSS_FEE_FIELDS],
             ],
             "xls_headers": [
                 "Регистрационный знак",
-                "VIN / ВИН",
+                "ВИН",
                 "Цвет",
                 "Регион",
                 "Фото (ссылка)",
@@ -1462,7 +1537,7 @@ def import_cars_csv(request):
                 "15 дней и более(нс)",
                 *[label for _, label in CAR_LOSS_FEE_FIELDS],
             ],
-            "help_text": "Upload CSV or Excel (.xls). The Russian XLS template is supported, and tiered prices для высокий/низкий сезон будут импортированы. Дополнительно поддерживаются цвет, регион, ссылка на фото, параметры бака, залог и цены при утере комплектующих. Existing plate numbers will be updated without clearing missing fields.",
+            "help_text": "Загрузите таблицу Эксель или файл с разделителями. Поддерживается русский шаблон Эксель, а также ступенчатые тарифы для высокого/низкого сезона. Можно импортировать цвет, регион, ссылку на фото, параметры бака, залог и цены при утере комплектующих. Авто с совпадающим госномером будут обновлены без очистки пропущенных полей.",
             "back_url": reverse("rentals:car_list"),
         },
     )
@@ -1473,13 +1548,13 @@ def import_customers_csv(request):
     if request.method == "POST":
         upload = request.FILES.get("file")
         if not upload:
-            messages.error(request, "Пожалуйста, выберите CSV или Excel файл.")
+            messages.error(request, "Пожалуйста, выберите таблицу Эксель или файл с разделителями.")
         else:
             try:
                 rows = _load_rows(upload)
             except Exception as exc:  # noqa: BLE001 - show error to user
-                logger.exception("Customer import: failed to read file %s", upload.name)
-                messages.error(request, f"Не удалось прочитать файл: {exc}")
+                logger.exception("Импорт клиентов: не удалось прочитать файл %s", upload.name)
+                messages.error(request, "Не удалось прочитать файл. Проверьте формат и кодировку.")
                 return redirect("rentals:import_customers_csv")
 
             if not rows:
@@ -1590,7 +1665,7 @@ def import_customers_csv(request):
                 )
 
             logger.info(
-                "Customer import finished",
+                "Импорт клиентов завершен",
                 extra={
                     "imported": imported,
                     "created_count": created_count,
@@ -1609,25 +1684,25 @@ def import_customers_csv(request):
         {
             "title": "Импорт клиентов",
             "expected_headers": [
-                "full_name / Наименование",
+                "ФИО / Наименование",
                 "Имя",
                 "Фамилия",
-                "phone / Телефон (контакт) / Мобильный телефон / Рабочий телефон",
-                "license_number / Водит. удостоверение. (контакт)",
-                "license_issued_by / В.у. выдано",
-                "driving_since / Стаж с",
-                "birth_date / Дата рождения",
-                "discount_percent / Скидка %",
-                "email (рабочий/личный/другой)",
-                "registration_address / Адрес прописки",
-                "passport_series / Серия паспорта",
-                "passport_number / Номер паспорта",
-                "passport_issued_by / Кем выдан паспорт",
-                "passport_issue_date (DD-MM-YYYY / ДД.ММ.ГГГГ)",
-                "tags / теги через запятую",
-                "ID (используется как резервный идентификатор)",
+                "Телефон (контакт) / Мобильный телефон / Рабочий телефон",
+                "Номер ВУ / Водит. удостоверение. (контакт)",
+                "Кем выдано ВУ",
+                "Стаж с",
+                "Дата рождения",
+                "Скидка, %",
+                "Эл. почта (рабочая/личная/другая)",
+                "Адрес прописки",
+                "Серия паспорта",
+                "Номер паспорта",
+                "Кем выдан паспорт",
+                "Дата выдачи паспорта (ДД-ММ-ГГГГ / ДД.ММ.ГГГГ)",
+                "Теги (через запятую)",
+                "ИД (резервный идентификатор)",
             ],
-            "help_text": "Загрузите CSV или Excel (.xls, .xlsx). Строки сопоставляются по номеру ВУ, затем по ID/телефону из AmoCRM. Пустые значения заполняются автоматически. Адрес (контакт/фактический) при импорте кладётся в адрес прописки.",
+            "help_text": "Загрузите таблицу Эксель или файл с разделителями. Строки сопоставляются по номеру ВУ, затем по идентификатору/телефону из АмоСРМ. Пустые значения заполняются автоматически. Адрес (контакт/фактический) при импорте кладётся в адрес прописки.",
             "back_url": reverse("rentals:customer_list"),
         },
     )
@@ -1638,19 +1713,36 @@ def import_rentals_csv(request):
     if request.method == "POST":
         upload = request.FILES.get("file")
         if not upload:
-            messages.error(request, "Please choose a CSV file to upload.")
+            messages.error(request, "Пожалуйста, выберите файл с разделителями.")
         else:
             decoded = upload.read().decode("utf-8-sig").splitlines()
             reader = csv.DictReader(decoded)
             imported, missing_relations, skipped = 0, 0, 0
 
             for row in reader:
-                plate = (row.get("car_plate_number") or row.get("plate_number") or "").strip()
-                license_number = (
-                    row.get("customer_license_number") or row.get("license_number") or ""
-                ).strip()
-                start_date = _parse_date(row.get("start_date"))
-                end_date = _parse_date(row.get("end_date"))
+                plate = _pick_value(
+                    row,
+                    [
+                        "car_plate_number",
+                        "plate_number",
+                        "Госномер",
+                        "Гос. номер",
+                        "Регистрационный знак",
+                    ],
+                )
+                license_number = _pick_value(
+                    row,
+                    [
+                        "customer_license_number",
+                        "license_number",
+                        "Номер ВУ",
+                        "Водительское удостоверение",
+                    ],
+                )
+                start_date = _parse_date(_pick_value(row, ["start_date", "Дата начала"]))
+                end_date = _parse_date(_pick_value(row, ["end_date", "Дата окончания"]))
+                plate = (plate or "").strip()
+                license_number = (license_number or "").strip()
 
                 if not all([plate, license_number, start_date, end_date]):
                     skipped += 1
@@ -1673,19 +1765,20 @@ def import_rentals_csv(request):
                     skipped += 1
                     continue
 
-                daily_rate_raw = row.get("daily_rate")
+                daily_rate_raw = _pick_value(row, ["daily_rate", "Суточный тариф", "Базовый тариф"])
                 daily_rate = (
                     _parse_decimal(daily_rate_raw) if daily_rate_raw not in (None, "") else breakdown.daily_rate
                 )
 
-                total_price_value = row.get("total_price")
+                total_price_value = _pick_value(row, ["total_price", "Итоговая сумма"])
                 total_price = (
                     _parse_decimal(total_price_value)
                     if total_price_value not in (None, "")
                     else daily_rate * Decimal(breakdown.days)
                 )
 
-                contract_number = (row.get("contract_number") or "").strip()
+                contract_number = (_pick_value(row, ["contract_number", "Номер договора"]) or "").strip()
+                status_value = _pick_value(row, ["status", "Статус"])
                 if contract_number:
                     exists_conflict = Rental.objects.exclude(
                         car=car, customer=customer, start_date=start_date, end_date=end_date
@@ -1701,21 +1794,21 @@ def import_rentals_csv(request):
                     defaults={
                         "daily_rate": daily_rate,
                         "total_price": total_price,
-                        "status": _clean_status(row.get("status")),
+                        "status": _clean_status(status_value),
                         **({"contract_number": contract_number} if contract_number else {}),
                     },
                 )
                 imported += 1
 
             if imported:
-                messages.success(request, f"Imported {imported} rentals.")
+                messages.success(request, f"Импортировано аренд: {imported}.")
             if missing_relations:
                 messages.warning(
                     request,
-                    f"Skipped {missing_relations} rows because the related car or customer was not found.",
+                    f"Пропущено строк из-за отсутствия авто или клиента: {missing_relations}.",
                 )
             if skipped:
-                messages.warning(request, f"Skipped {skipped} rows due to missing or invalid data.")
+                messages.warning(request, f"Пропущено строк из-за ошибок или неполных данных: {skipped}.")
 
             return redirect("rentals:rental_list")
 
@@ -1723,21 +1816,22 @@ def import_rentals_csv(request):
         request,
         "rentals/import_csv.html",
         {
-            "title": "Import rentals",
+            "title": "Импорт аренд",
             "expected_headers": [
-                "car_plate_number",
-                "customer_license_number",
-            "start_date",
-            "end_date",
-            "daily_rate",
-            "total_price",
-            "status",
-            "contract_number (optional)",
-        ],
-        "help_text": "Cars and customers must exist before importing rentals.",
-        "back_url": reverse("rentals:rental_list"),
-    },
-)
+                "Номер договора",
+                "Госномер",
+                "Номер ВУ",
+                "Клиент",
+                "Дата начала",
+                "Дата окончания",
+                "Суточный тариф",
+                "Итоговая сумма",
+                "Статус",
+            ],
+            "help_text": "Перед импортом аренды должны быть заведены автомобили и клиенты. Номер договора можно не указывать.",
+            "back_url": reverse("rentals:rental_list"),
+        },
+    )
 
 
 @login_required
@@ -1749,8 +1843,11 @@ def generate_contract(request, rental_id, template_id):
         try:
             html = render_html_template(ct, rental)
         except Exception as exc:  # pragma: no cover - defensive logging
-            logger.exception("Failed to render HTML contract", extra={"template_id": ct.id, "rental_id": rental.id})
-            return HttpResponse(f"Could not render HTML: {exc}", status=500)
+            logger.exception(
+                "Не удалось сформировать договор из веб-шаблона",
+                extra={"template_id": ct.id, "rental_id": rental.id},
+            )
+            return HttpResponse("Не удалось сформировать договор из веб-шаблона.", status=500)
         response = HttpResponse(html, content_type="text/html; charset=utf-8")
         return response
 
@@ -1758,25 +1855,33 @@ def generate_contract(request, rental_id, template_id):
         try:
             file_io = render_docx(ct, rental)
         except Exception as exc:  # pragma: no cover - defensive logging
-            logger.exception("Failed to render DOCX contract", extra={"template_id": ct.id, "rental_id": rental.id})
-            return HttpResponse(f"Could not render DOCX: {exc}", status=500)
+            logger.exception(
+                "Не удалось сформировать документ Ворд",
+                extra={"template_id": ct.id, "rental_id": rental.id},
+            )
+            return HttpResponse("Не удалось сформировать документ Ворд.", status=500)
         response = HttpResponse(
             file_io.getvalue(),
             content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         )
-        response["Content-Disposition"] = f'attachment; filename="contract_{rental.id}.docx"'
+        filename = f"договор_{rental.id}.docx"
+        response["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(filename)}"
         return response
 
     elif ct.format == "pdf":
         try:
             file_io = render_pdf(ct, rental)
         except Exception as exc:  # pragma: no cover - defensive logging
-            logger.exception("Failed to generate PDF contract", extra={"template_id": ct.id, "rental_id": rental.id})
-            return HttpResponse(f"Could not render PDF: {exc}", status=500)
+            logger.exception(
+                "Не удалось сформировать ПДФ-договор",
+                extra={"template_id": ct.id, "rental_id": rental.id},
+            )
+            return HttpResponse("Не удалось сформировать ПДФ-договор.", status=500)
 
         response = HttpResponse(file_io.getvalue(), content_type="application/pdf")
-        response["Content-Disposition"] = f'attachment; filename="contract_{rental.id}.pdf"'
+        filename = f"договор_{rental.id}.pdf"
+        response["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(filename)}"
         return response
 
     else:
-        return HttpResponse("Unknown template format", status=400)
+        return HttpResponse("Неизвестный формат шаблона", status=400)

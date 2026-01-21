@@ -1,14 +1,14 @@
-<h1>Rental Agreement</h1>
-<p><strong>Customer:</strong> {{ customer.full_name }}</p>
-<p><strong>Car:</strong> {{ car.plate_number }} ({{ car.make }} {{ car.model }} {{ car.year }})</p>
-<p><strong>Rental dates:</strong> {{ rental.start_date }} to {{ rental.end_date }}</p>
-<p><strong>Total price:</strong> ${{ rental.total_price }}</p>
+<h1>Договор аренды</h1>
+<p><strong>Клиент:</strong> {{ клиент.фио }}</p>
+<p><strong>Авто:</strong> {{ авто.госномер }} ({{ авто.марка }} {{ авто.модель }} {{ авто.год }})</p>
+<p><strong>Даты аренды:</strong> {{ аренда.дата_начала }} по {{ аренда.дата_окончания }}</p>
+<p><strong>Итоговая сумма:</strong> ₽{{ аренда.итоговая_сумма }}</p>
 
-<h2>Terms</h2>
+<h2>Условия</h2>
 <ol>
-  <li>Vehicle must be returned with a full tank of fuel.</li>
-  <li>Late returns may incur additional charges.</li>
-  <li>All traffic violations during the rental period are the renter's responsibility.</li>
+  <li>Автомобиль возвращается с полным баком топлива.</li>
+  <li>При просрочке возврата возможны дополнительные начисления.</li>
+  <li>Все нарушения ПДД в период аренды несет арендатор.</li>
 </ol>
 
-<p>Signature: ________________________________</p>
+<p>Подпись: ________________________________</p>

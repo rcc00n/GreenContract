@@ -23,7 +23,7 @@ PLACEHOLDER_GUIDE = [
             "customer.full_name": "ФИО клиента",
             "customer.birth_date": "Дата рождения",
             "customer.phone": "Телефон",
-            "customer.email": "Email",
+            "customer.email": "Эл. почта",
             "customer.license_number": "Водительское удостоверение",
             "customer.license_issued_by": "В.у. выдано",
             "customer.driving_since": "Стаж с",
@@ -42,7 +42,7 @@ PLACEHOLDER_GUIDE = [
             "car.make": "Марка",
             "car.model": "Модель",
             "car.year": "Год",
-            "car.vin": "VIN / номер кузова",
+            "car.vin": "ВИН / номер кузова",
             "car.sts_number": "Номер СТС",
             "car.sts_issue_date": "Дата выдачи СТС",
             "car.sts_issued_by": "Кем выдано СТС",
@@ -96,6 +96,69 @@ PLACEHOLDER_GUIDE = [
         },
     ),
 ]
+
+PLACEHOLDER_ALIASES_RU = {
+    "customer.full_name": "клиент.фио",
+    "customer.birth_date": "клиент.дата_рождения",
+    "customer.phone": "клиент.телефон",
+    "customer.email": "клиент.эл_почта",
+    "customer.license_number": "клиент.номер_ву",
+    "customer.license_issued_by": "клиент.кем_выдано_ву",
+    "customer.driving_since": "клиент.стаж_с",
+    "customer.discount_percent": "клиент.скидка_процент",
+    "customer.passport_series": "клиент.паспорт_серия",
+    "customer.passport_number": "клиент.паспорт_номер",
+    "customer.passport_issue_date": "клиент.паспорт_дата_выдачи",
+    "customer.passport_issued_by": "клиент.паспорт_кем_выдан",
+    "customer.registration_address": "клиент.адрес_регистрации",
+    "customer.address": "клиент.адрес",
+    "customer.residence_address": "клиент.адрес_проживания",
+    "car.plate_number": "авто.госномер",
+    "car.make": "авто.марка",
+    "car.model": "авто.модель",
+    "car.year": "авто.год",
+    "car.vin": "авто.вин",
+    "car.sts_number": "авто.стс_номер",
+    "car.sts_issue_date": "авто.стс_дата_выдачи",
+    "car.sts_issued_by": "авто.стс_кем_выдано",
+    "car.label": "авто.название",
+    "rental.contract_number": "аренда.номер_договора",
+    "rental.start_date": "аренда.дата_начала",
+    "rental.end_date": "аренда.дата_окончания",
+    "rental.start_time": "аренда.время_начала",
+    "rental.end_time": "аренда.время_окончания",
+    "rental.date_range": "аренда.период",
+    "rental.duration_days": "аренда.дней",
+    "rental.daily_rate": "аренда.суточный_тариф",
+    "rental.total_price": "аренда.итоговая_сумма",
+    "rental.balance_due": "аренда.к_оплате",
+    "rental.prepayment": "аренда.предоплата",
+    "rental.advance_payment_text": "аренда.предоплата_прописью",
+    "rental.discount_amount": "аренда.скидка_сумма",
+    "rental.discount_percent": "аренда.скидка_процент",
+    "rental.airport_fee_start": "аренда.аэропорт_выдача",
+    "rental.airport_fee_end": "аренда.аэропорт_возврат",
+    "rental.night_fee_start": "аренда.ночной_выход_выдача",
+    "rental.night_fee_end": "аренда.ночной_выход_возврат",
+    "rental.delivery_issue_city": "аренда.доставка_город_выдачи",
+    "rental.delivery_issue_fee": "аренда.доставка_стоимость_выдачи",
+    "rental.delivery_return_city": "аренда.доставка_город_возврата",
+    "rental.delivery_return_fee": "аренда.доставка_стоимость_возврата",
+    "rental.child_seat_included": "аренда.кресло_включено",
+    "rental.child_seat_count": "аренда.кресло_количество",
+    "rental.booster_included": "аренда.бустер_включен",
+    "rental.booster_count": "аренда.бустер_количество",
+    "rental.ski_rack_included": "аренда.крепления_лыжи_включены",
+    "rental.ski_rack_count": "аренда.крепления_лыжи_количество",
+    "rental.roof_box_included": "аренда.автобокс_включен",
+    "rental.roof_box_count": "аренда.автобокс_количество",
+    "rental.crossbars_included": "аренда.поперечины_включены",
+    "rental.crossbars_count": "аренда.поперечины_количество",
+    "rental.equipment_manual_total": "аренда.оборудование_сумма",
+    "rental.deal_name": "аренда.имя_сделки",
+    "meta.today": "мета.сегодня",
+    "meta.generated_at": "мета.дата_генерации",
+}
 
 
 class _BoolDisplay:
@@ -174,16 +237,21 @@ def get_contract_context(rental: Rental) -> dict:
     duration_days = rental.duration_days if start_date and end_date else None
     date_range = _format_date_range(start_date, end_date)
     rental_proxy = _RentalTemplateProxy(rental)
+    meta = {
+        "generated_at": _fmt_datetime(timezone.localtime()),
+        "today": _fmt_date(timezone.localdate()),
+    }
     return {
         "rental": rental_proxy,
         "car": rental_proxy.car,
         "customer": rental_proxy.customer,
+        "аренда": rental_proxy,
+        "авто": rental_proxy.car,
+        "клиент": rental_proxy.customer,
         "rental_duration_days": duration_days,
         "rental_date_range": date_range,
-        "meta": {
-            "generated_at": _fmt_datetime(timezone.localtime()),
-            "today": _fmt_date(timezone.localdate()),
-        },
+        "meta": meta,
+        "мета": meta,
     }
 
 
@@ -341,6 +409,10 @@ def build_placeholder_values(rental: Rental) -> dict[str, str]:
         "meta.generated_at": _fmt_datetime(timezone.localtime()),
     }
 
+    for eng_key, ru_key in PLACEHOLDER_ALIASES_RU.items():
+        if eng_key in values and ru_key not in values:
+            values[ru_key] = values[eng_key]
+
     return {key: "" if value is None else str(value) for key, value in values.items()}
 
 
@@ -374,8 +446,8 @@ def placeholder_guide() -> list[dict]:
                 "title": title,
                 "items": [
                     {
-                        "token": f"{{{{ {key} }}}}",
-                        "alt": key.replace(".", "_"),
+                        "token": f"{{{{ {PLACEHOLDER_ALIASES_RU.get(key, key)} }}}}",
+                        "alt": PLACEHOLDER_ALIASES_RU.get(key, key).replace(".", "_"),
                         "description": description,
                     }
                     for key, description in items.items()
@@ -387,7 +459,7 @@ def placeholder_guide() -> list[dict]:
 
 def render_html_template(contract_template: ContractTemplate, rental: Rental) -> str:
     if not contract_template.body_html:
-        raise ValueError("HTML template body is empty.")
+        raise ValueError("Разметка веб-шаблона пуста.")
 
     django_engine = engines["django"]
     template = django_engine.from_string(contract_template.body_html)
@@ -402,7 +474,7 @@ def render_html_to_pdf(html: str) -> bytes:
     result = pisa.CreatePDF(html, dest=output, encoding="utf-8")
     output.seek(0)
     if result.err:
-        raise ValueError("Could not render PDF from HTML template.")
+        raise ValueError("Не удалось сформировать ПДФ из веб-шаблона.")
     return output.getvalue()
 
 
@@ -420,8 +492,8 @@ def _replace_in_paragraphs(paragraphs: Iterable, mapping: dict[str, str]):
 
 def render_docx(contract_template: ContractTemplate, rental: Rental) -> BytesIO:
     """
-    Load a DOCX template and replace placeholders like {{ customer.full_name }}.
-    Applies replacements in paragraphs, tables, headers and footers.
+    Загружает DOCX-шаблон и заменяет плейсхолдеры вида {{ клиент.фио }}.
+    Применяет замену в абзацах, таблицах, колонтитулах и нижних колонтитулах.
     """
     document = Document(contract_template.file.path)
     mapping = placeholder_token_map(rental)
@@ -455,13 +527,13 @@ def render_pdf(contract_template: ContractTemplate, rental: Rental) -> BytesIO:
         pdf_bytes = render_html_to_pdf(html)
         return BytesIO(pdf_bytes)
 
-    raise ValueError("PDF template requires either HTML body or an uploaded PDF file.")
+    raise ValueError("Для ПДФ требуется разметка веб-шаблона или загруженный файл ПДФ.")
 
 
 def _fill_pdf_form(template_path: str, rental: Rental) -> BytesIO:
     """
     Fill a PDF with form fields that match placeholder names (underscored),
-    e.g. customer_full_name or rental_contract_number.
+    например клиент_фио или аренда_номер_договора.
     """
     field_values = {key.replace(".", "_"): value for key, value in build_placeholder_values(rental).items()}
     reader = PdfReader(template_path)
@@ -478,7 +550,7 @@ def _fill_pdf_form(template_path: str, rental: Rental) -> BytesIO:
         if acroform is not None:
             acroform.update({NameObject("/NeedAppearances"): BooleanObject(True)})
     except Exception:
-        logger.debug("Could not mark PDF appearance stream; continuing with raw output.")
+        logger.debug("Не удалось пометить поток отображения ПДФ; продолжаем с исходным выводом.")
 
     output = BytesIO()
     writer.write(output)

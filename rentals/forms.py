@@ -10,7 +10,7 @@ from .models import Car, Customer, Rental, ContractTemplate, CustomerTag
 from .services.pricing import DELIVERY_FEES, calculate_rental_pricing
 
 DATE_INPUT_FORMATS = ("%d-%m-%Y", "%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y")
-DATE_PLACEHOLDER = "DD-MM-YYYY"
+DATE_PLACEHOLDER = "ДД-ММ-ГГГГ"
 
 
 def _configure_date_field(field: forms.DateField):
@@ -99,8 +99,8 @@ class CarForm(StyledModelForm):
             *[field for field, _ in CAR_LOSS_FEE_FIELDS],
         ]
         labels = {
-            "daily_rate": "Fallback daily rate",
-            "vin": "VIN",
+            "daily_rate": "Базовый тариф (если нет градации)",
+            "vin": "ВИН",
             "sts_number": "СТС номер",
             "sts_issue_date": "СТС выдана",
             "sts_issued_by": "Кем выдана СТС",
@@ -111,16 +111,16 @@ class CarForm(StyledModelForm):
             "color": "Цвет",
             "photo_url": "Фото (ссылка)",
             "region_code": "Регион (26 или 82)",
-            "rate_1_4_high": "1-4 days (вс)",
-            "rate_5_14_high": "5-14 days (вс)",
-            "rate_15_plus_high": "15+ days (вс)",
-            "rate_1_4_low": "1-4 days (нс)",
-            "rate_5_14_low": "5-14 days (нс)",
-            "rate_15_plus_low": "15+ days (нс)",
+            "rate_1_4_high": "1-4 дня (вс)",
+            "rate_5_14_high": "5-14 дней (вс)",
+            "rate_15_plus_high": "15+ дней (вс)",
+            "rate_1_4_low": "1-4 дня (нс)",
+            "rate_5_14_low": "5-14 дней (нс)",
+            "rate_15_plus_low": "15+ дней (нс)",
         }
         labels.update({field: label for field, label in CAR_LOSS_FEE_FIELDS})
         help_texts = {
-            "daily_rate": "Used if a tiered rate is missing.",
+            "daily_rate": "Используется, если тариф по градации не заполнен.",
             "vin": "17 символов, можно оставить пустым.",
             "sts_number": "Номер свидетельства о регистрации (СТС).",
             "sts_issue_date": "Дата выдачи СТС (ДД-ММ-ГГГГ).",
@@ -144,7 +144,7 @@ class CustomerForm(StyledModelForm):
     tags_text = forms.CharField(
         required=False,
         label="Теги",
-        help_text="Через запятую: VIP, корпоративный, проблемный. Можно добавлять новые.",
+        help_text="Через запятую: ВИП, корпоративный, проблемный. Можно добавлять новые.",
     )
 
     class Meta:
@@ -167,6 +167,8 @@ class CustomerForm(StyledModelForm):
         labels = {
             "full_name": "ФИО",
             "birth_date": "Дата рождения",
+            "email": "Эл. почта",
+            "phone": "Телефон",
             "license_number": "Номер ВУ",
             "license_issued_by": "В.у. выдано",
             "driving_since": "Стаж с",
@@ -278,7 +280,7 @@ class RentalForm(StyledModelForm):
             if name in self.fields:
                 widget = self.fields[name].widget
                 widget.input_type = "time"
-                widget.attrs.setdefault("placeholder", "HH:MM")
+                widget.attrs.setdefault("placeholder", "ЧЧ:ММ")
 
         for name in (
             "child_seat_included",
@@ -380,10 +382,16 @@ class RentalForm(StyledModelForm):
             "status",
         ]
         labels = {
-            "contract_number": "Contract number",
+            "contract_number": "Номер договора",
+            "car": "Автомобиль",
+            "customer": "Клиент",
+            "start_date": "Дата начала",
+            "end_date": "Дата окончания",
             "start_time": "Время выдачи",
             "end_time": "Время возврата",
             "unique_daily_rate": "Уникальный тариф (за сутки)",
+            "daily_rate": "Суточный тариф",
+            "total_price": "Итоговая сумма",
             "airport_fee_start": "Аэропорт (выдача)",
             "airport_fee_end": "Аэропорт (возврат)",
             "night_fee_start": "Ночной выход (выдача)",
@@ -407,6 +415,7 @@ class RentalForm(StyledModelForm):
             "discount_percent": "Скидка, %",
             "prepayment": "Предоплата",
             "balance_due": "К оплате после предоплаты",
+            "status": "Статус",
         }
 
     def clean(self):
@@ -417,7 +426,7 @@ class RentalForm(StyledModelForm):
         car = cleaned_data.get("car")
 
         if start_date and end_date and end_date <= start_date:
-            self.add_error("end_date", "End date must be after start date.")
+            self.add_error("end_date", "Дата окончания должна быть позже даты начала.")
             return cleaned_data
 
         if start_date and end_date:
@@ -516,20 +525,20 @@ class ContractTemplateForm(StyledModelForm):
 
         if format_choice == "html":
             if not body_html:
-                _add_error("body_html", "Добавьте HTML тело для шаблона.")
+                _add_error("body_html", "Добавьте разметку веб-шаблона.")
 
         elif format_choice == "docx":
             if not uploaded_file:
-                _add_error("file", "Загрузите DOCX-файл шаблона.")
+                _add_error("file", "Загрузите файл Ворд для шаблона.")
             elif not uploaded_file.name.lower().endswith(".docx"):
-                _add_error("file", "Для формата DOCX нужен файл с расширением .docx")
+                _add_error("file", "Для формата Ворд нужен файл в формате ДОКС.")
 
         elif format_choice == "pdf":
             if not uploaded_file and not body_html:
-                _add_error("file", "Загрузите PDF или заполните HTML для конвертации в PDF.")
-                _add_error("body_html", "Заполните HTML или приложите готовый PDF.")
+                _add_error("file", "Загрузите ПДФ или заполните веб-шаблон для конвертации в ПДФ.")
+                _add_error("body_html", "Заполните разметку веб-шаблона или приложите готовый ПДФ.")
             if uploaded_file and not uploaded_file.name.lower().endswith(".pdf"):
-                _add_error("file", "Для формата PDF нужен файл с расширением .pdf")
+                _add_error("file", "Для формата ПДФ нужен файл ПДФ.")
 
         return cleaned
 
@@ -553,7 +562,7 @@ class AdminUserCreationForm(UserCreationForm):
         self.fields["username"].label = "Логин"
         self.fields["username"].help_text = "Только латиница, цифры и @/./+/-/_."
         if "email" in self.fields:
-            self.fields["email"].label = "Email"
+            self.fields["email"].label = "Эл. почта"
             self.fields["email"].required = False
             self.fields["email"].help_text = "Необязательно, но пригодится для восстановления."
         self.fields["password1"].label = "Пароль"

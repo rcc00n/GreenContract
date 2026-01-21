@@ -86,13 +86,28 @@ def monthly_rental_performance(months=6):
         }
 
     timeline = []
+    month_labels = [
+        "Янв",
+        "Фев",
+        "Мар",
+        "Апр",
+        "Май",
+        "Июн",
+        "Июл",
+        "Авг",
+        "Сен",
+        "Окт",
+        "Ноя",
+        "Дек",
+    ]
     for idx in range(months):
         month_point = _add_months(window_start, idx)
         row = by_month.get(month_point, {"count": 0, "revenue": 0})
+        label = f"{month_labels[month_point.month - 1]} {month_point.year}"
         timeline.append(
             {
                 "month": month_point,
-                "label": month_point.strftime("%b %Y"),
+                "label": label,
                 "count": row["count"],
                 "revenue": row["revenue"],
             }

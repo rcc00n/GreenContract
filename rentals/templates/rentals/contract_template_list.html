@@ -3,10 +3,10 @@
 {% block content %}
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-      <h1 class="h4 mb-0">Contract templates</h1>
-      <p class="text-muted small mb-0">Загружайте DOCX/PDF или пишите HTML, который сразу конвертируется в PDF.</p>
+      <h1 class="h4 mb-0">Шаблоны договоров</h1>
+      <p class="text-muted small mb-0">Загружайте документ Ворд/ПДФ или создавайте веб-шаблон, который сразу конвертируется в ПДФ.</p>
     </div>
-    <a href="{% url 'rentals:contract_template_create' %}" class="btn btn-primary">New template</a>
+    <a href="{% url 'rentals:contract_template_create' %}" class="btn btn-primary">Новый шаблон</a>
   </div>
 
   <div class="card shadow-sm">
@@ -14,11 +14,11 @@
       <table class="table align-middle mb-0">
         <thead class="table-light">
           <tr>
-            <th>Name</th>
-            <th>Format</th>
+            <th>Название</th>
+            <th>Формат</th>
             <th>Источник</th>
-            <th>Description</th>
-            <th class="text-end">Actions</th>
+            <th>Описание</th>
+            <th class="text-end">Действия</th>
           </tr>
         </thead>
         <tbody>
@@ -29,10 +29,10 @@
               <td>
                   <div class="d-flex flex-wrap gap-2">
                     {% if template.body_html %}
-                      <span class="badge text-bg-info">HTML body</span>
+                      <span class="badge text-bg-info">Веб-шаблон</span>
                     {% endif %}
                     {% if template.file %}
-                      <span class="badge text-bg-success">File</span>
+                      <span class="badge text-bg-success">Файл</span>
                     {% endif %}
                     {% if not template.file and not template.body_html %}
                       <span class="badge text-bg-secondary">Пусто</span>
@@ -41,12 +41,12 @@
               </td>
               <td class="text-muted">{{ template.description|default:"-"|truncatechars:50 }}</td>
               <td class="text-end">
-                <a href="{% url 'rentals:contract_template_update' template.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                <a href="{% url 'rentals:contract_template_update' template.pk %}" class="btn btn-sm btn-outline-secondary">Изменить</a>
               </td>
             </tr>
           {% empty %}
             <tr>
-              <td colspan="5" class="text-center text-muted py-4">Шаблонов пока нет. Загрузите DOCX/PDF или создайте HTML.</td>
+              <td colspan="5" class="text-center text-muted py-4">Шаблонов пока нет. Загрузите документ Ворд/ПДФ или создайте веб-шаблон.</td>
             </tr>
           {% endfor %}
         </tbody>

@@ -5,10 +5,10 @@
     <div class="col-lg-9 mx-auto">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-          <h1 class="h4 mb-0">{% if object %}Edit contract template{% else %}New contract template{% endif %}</h1>
-          <p class="text-muted small mb-0">Поддерживаются HTML → PDF, DOCX и заполнение готовых PDF с полями.</p>
+          <h1 class="h4 mb-0">{% if object %}Редактировать шаблон{% else %}Новый шаблон{% endif %}</h1>
+          <p class="text-muted small mb-0">Поддерживаются веб-шаблоны → ПДФ, документы Ворд и заполнение готовых ПДФ с полями.</p>
         </div>
-        <a href="{% url 'rentals:contract_template_list' %}" class="btn btn-outline-secondary">Back to list</a>
+        <a href="{% url 'rentals:contract_template_list' %}" class="btn btn-outline-secondary">Назад к списку</a>
       </div>
 
       <div class="card shadow-sm">
@@ -27,7 +27,7 @@
               <div class="col-md-6">
                 <label class="form-label" for="{{ form.format.id_for_label }}">Формат</label>
                 {{ form.format }}
-                <div class="form-text">HTML конвертируется в PDF, DOCX и PDF используют загруженный файл.</div>
+                <div class="form-text">Веб-шаблон конвертируется в ПДФ, документы Ворд и ПДФ используют загруженный файл.</div>
                 {% for error in form.format.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
 
@@ -35,18 +35,18 @@
                 <label class="form-label" for="{{ form.file.id_for_label }}">Файл шаблона</label>
                 {{ form.file }}
                 <div class="form-text">
-                  DOCX: будут заменены плейсхолдеры. PDF: заполняются поля формы (AcroForm) с именами вроде <code>customer_full_name</code>.
+                  Ворд: будут заменены плейсхолдеры. ПДФ: заполняются поля формы с именами вроде <code>клиент_фио</code>.
                 </div>
                 {% for error in form.file.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
 
               <div class="col-12 format-html">
                 <div class="d-flex justify-content-between align-items-center">
-                  <label class="form-label mb-0" for="{{ form.body_html.id_for_label }}">HTML тело</label>
-                  <span class="badge text-bg-info">Опционально для PDF: будет сконвертировано</span>
+                  <label class="form-label mb-0" for="{{ form.body_html.id_for_label }}">Разметка веб-шаблона</label>
+                  <span class="badge text-bg-info">Опционально для ПДФ: будет сконвертировано</span>
                 </div>
                 {{ form.body_html }}
-                <div class="form-text">Используйте Django-подобные плейсхолдеры {% templatetag openvariable %} customer.full_name {% templatetag closevariable %} или {% templatetag openvariable %} rental.contract_number {% templatetag closevariable %}.</div>
+                <div class="form-text">Используйте плейсхолдеры {% templatetag openvariable %} клиент.фио {% templatetag closevariable %} или {% templatetag openvariable %} аренда.номер_договора {% templatetag closevariable %}.</div>
                 {% for error in form.body_html.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
 
@@ -63,8 +63,8 @@
               </div>
             </div>
             <div class="d-flex justify-content-end gap-2 pt-3">
-              <a href="{% url 'rentals:contract_template_list' %}" class="btn btn-outline-secondary">Cancel</a>
-              <button class="btn btn-primary" type="submit">Save template</button>
+              <a href="{% url 'rentals:contract_template_list' %}" class="btn btn-outline-secondary">Отмена</a>
+              <button class="btn btn-primary" type="submit">Сохранить шаблон</button>
             </div>
           </form>
         </div>
@@ -76,9 +76,9 @@
             <div class="d-flex justify-content-between align-items-start mb-3">
               <div>
                 <div class="fw-semibold">Быстрая вставка плейсхолдеров</div>
-                <div class="text-muted small">Нажмите на бейдж, чтобы скопировать значение в буфер. Первый бейдж — для HTML/DOCX, второй — имя поля для PDF-форм.</div>
+                <div class="text-muted small">Нажмите на бейдж, чтобы скопировать значение в буфер. Первый бейдж — для веб-шаблона/Ворда, второй — имя поля для ПДФ-форм.</div>
               </div>
-              <div class="text-muted small" id="templateFormatHint">Формат: {{ form.format.value|default:"html" }}</div>
+              <div class="text-muted small" id="templateFormatHint">Формат: Веб-шаблон</div>
             </div>
             <div class="row g-3">
               {% for group in placeholder_guide %}
@@ -90,8 +90,8 @@
                         <div class="placeholder-row">
                           <div class="fw-semibold small text-truncate">{{ item.description }}</div>
                           <div class="d-flex flex-wrap gap-2 mt-1">
-                            <span class="badge text-bg-primary placeholder-copy" data-copy-placeholder="{{ item.token }}" title="HTML/DOCX">{{ item.token }}</span>
-                            <span class="badge text-bg-secondary placeholder-copy" data-copy-placeholder="{{ item.alt }}" title="Поле формы PDF">{{ item.alt }}</span>
+                            <span class="badge text-bg-primary placeholder-copy" data-copy-placeholder="{{ item.token }}" title="Веб-шаблон/Ворд">{{ item.token }}</span>
+                            <span class="badge text-bg-secondary placeholder-copy" data-copy-placeholder="{{ item.alt }}" title="Поле формы ПДФ">{{ item.alt }}</span>
                           </div>
                         </div>
                       {% endfor %}
@@ -109,19 +109,19 @@
           <div class="d-flex justify-content-between align-items-start mb-2">
             <div>
               <div class="fw-semibold">Шаблон-рыба для быстрого старта</div>
-              <div class="text-muted small">Скопируйте и вставьте в HTML, DOCX или как подсказку к полям PDF.</div>
+              <div class="text-muted small">Скопируйте и вставьте в веб-шаблон, Ворд или как подсказку к полям ПДФ.</div>
             </div>
             <button class="btn btn-sm btn-outline-primary" type="button" data-copy-template="#contractSnippet">Скопировать пример</button>
           </div>
           {% verbatim %}
-          <pre class="bg-body-tertiary rounded p-3 small" id="contractSnippet">Договор № {{ rental.contract_number }}
-г. {{ customer.registration_address }}
+          <pre class="bg-body-tertiary rounded p-3 small" id="contractSnippet">Договор № {{ аренда.номер_договора }}
+г. {{ клиент.адрес_регистрации }}
 
-Арендодатель передает во временное пользование автомобиль {{ car.make }} {{ car.model }} ({{ car.plate_number }}) сроком с {{ rental.start_date }} по {{ rental.end_date }}.
+Арендодатель передает во временное пользование автомобиль {{ авто.марка }} {{ авто.модель }} ({{ авто.госномер }}) сроком с {{ аренда.дата_начала }} по {{ аренда.дата_окончания }}.
 
-Арендатор: {{ customer.full_name }}, паспорт {{ customer.passport_series }} {{ customer.passport_number }}, выдан {{ customer.passport_issue_date }} {{ customer.passport_issued_by }}. Телефон: {{ customer.phone }}.
+Арендатор: {{ клиент.фио }}, паспорт {{ клиент.паспорт_серия }} {{ клиент.паспорт_номер }}, выдан {{ клиент.паспорт_дата_выдачи }} {{ клиент.паспорт_кем_выдан }}. Телефон: {{ клиент.телефон }}.
 
-Стоимость проката: {{ rental.total_price }}, предоплата: {{ rental.prepayment }}, к оплате при возврате: {{ rental.balance_due }}.</pre>
+Стоимость проката: {{ аренда.итоговая_сумма }}, предоплата: {{ аренда.предоплата }}, к оплате при возврате: {{ аренда.к_оплате }}.</pre>
           {% endverbatim %}
         </div>
       </div>
@@ -132,11 +132,17 @@
     (() => {
       const formatSelect = document.getElementById("id_format");
       const formatHint = document.getElementById("templateFormatHint");
+      const formatLabels = {
+        html: "Веб-шаблон",
+        docx: "Документ Ворд",
+        pdf: "ПДФ-форма",
+      };
+
       const toggleSections = () => {
         const value = formatSelect?.value || "html";
         document.querySelectorAll(".format-html").forEach((el) => el.classList.toggle("d-none", value === "docx"));
         document.querySelectorAll(".format-file").forEach((el) => el.classList.toggle("d-none", value === "html"));
-        if (formatHint) formatHint.textContent = `Формат: ${value.toUpperCase()}`;
+        if (formatHint) formatHint.textContent = `Формат: ${formatLabels[value] || formatLabels.html}`;
       };
       formatSelect?.addEventListener("change", toggleSections);
       toggleSections();

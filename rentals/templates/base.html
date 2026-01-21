@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Car Rental Tool</title>
+    <title>Система аренды авто</title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -14,22 +14,22 @@
   <body data-theme="light" data-bs-theme="light">
     <nav class="navbar navbar-expand-lg theme-navbar mb-3 shadow-sm px-2 px-lg-3">
       <div class="container-fluid">
-        <a class="navbar-brand" href="{% url 'rentals:dashboard' %}">Car Rental</a>
+        <a class="navbar-brand" href="{% url 'rentals:dashboard' %}">Аренда авто</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="mainNav">
           <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-            <li class="nav-item"><a class="nav-link" href="{% url 'rentals:car_list' %}">Cars</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'rentals:customer_list' %}">Customers</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'rentals:rental_list' %}">Rentals</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'rentals:contract_template_list' %}">Contract templates</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'rentals:car_list' %}">Автомобили</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'rentals:customer_list' %}">Клиенты</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'rentals:rental_list' %}">Аренды</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'rentals:contract_template_list' %}">Шаблоны договоров</a></li>
             {% if user.is_superuser %}
-              <li class="nav-item"><a class="nav-link" href="{% url 'rentals:admin_user_list' %}">Admins</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'rentals:admin_user_list' %}">Администраторы</a></li>
             {% endif %}
           </ul>
           <div class="d-flex align-items-center gap-2 flex-wrap ms-lg-auto">
-            <button class="btn btn-sm theme-toggle" type="button" id="themeToggle" aria-label="Toggle theme">
+            <button class="btn btn-sm theme-toggle" type="button" id="themeToggle" aria-label="Переключить тему">
               <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="4" />
                 <path d="M12 3v2m0 14v2m9-9h-2M5 12H3m15.5 6.5-1.5-1.5M7 7 5.5 5.5m12 0L16 7M7 17l-1.5 1.5" />
@@ -37,24 +37,24 @@
               <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8Z" />
               </svg>
-              <span class="small fw-semibold" id="themeToggleLabel">Light</span>
+              <span class="small fw-semibold" id="themeToggleLabel">Светлая</span>
             </button>
             <ul class="navbar-nav">
               {% if user.is_authenticated %}
                 <li class="nav-item">
                   <span class="navbar-text text-secondary small me-3">
-                    Hi, {{ user.get_short_name|default:user.username }}
+                    Здравствуйте, {{ user.get_short_name|default:user.username }}
                   </span>
                 </li>
                 <li class="nav-item">
                   <a class="nav-link" href="{% url 'rentals:password_change' %}">Сменить пароль</a>
                 </li>
                 <li class="nav-item">
-                  <a class="nav-link" href="{% url 'logout' %}">Logout</a>
+                  <a class="nav-link" href="{% url 'logout' %}">Выйти</a>
                 </li>
               {% else %}
                 <li class="nav-item">
-                  <a class="nav-link" href="{% url 'login' %}">Login</a>
+                  <a class="nav-link" href="{% url 'login' %}">Войти</a>
                 </li>
               {% endif %}
             </ul>
@@ -68,7 +68,7 @@
         {% for message in messages %}
           <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
             {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
           </div>
         {% endfor %}
       {% endif %}
@@ -94,7 +94,7 @@
             userSelected = true;
           }
           if (label) {
-            label.textContent = nextTheme === "dark" ? "Dark" : "Light";
+            label.textContent = nextTheme === "dark" ? "Темная" : "Светлая";
           }
           document.dispatchEvent(new CustomEvent("theme:changed", { detail: { theme: nextTheme } }));
         };

@@ -3,26 +3,26 @@
 {% block content %}
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-      <h1 class="h4 mb-0">Cars</h1>
-      <p class="text-muted small mb-0">Vehicles available for rental.</p>
+      <h1 class="h4 mb-0">Автомобили</h1>
+      <p class="text-muted small mb-0">Авто, доступные для аренды.</p>
     </div>
     <div class="d-flex flex-wrap gap-2">
       <form method="post" action="{% url 'rentals:car_delete_all' %}" class="d-inline">
         {% csrf_token %}
-        <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Delete all cars without rentals?');">
-          Delete all
+        <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Удалить все авто без аренд?');">
+          Удалить без аренд
         </button>
       </form>
-      <a href="{% url 'rentals:import_cars_csv' %}" class="btn btn-outline-secondary">Import CSV</a>
-      <a href="{% url 'rentals:export_cars_csv' %}" class="btn btn-outline-secondary">Export CSV</a>
-      <a href="{% url 'rentals:car_create' %}" class="btn btn-primary">Add car</a>
+      <a href="{% url 'rentals:import_cars_csv' %}" class="btn btn-outline-secondary">Импорт таблицы</a>
+      <a href="{% url 'rentals:export_cars_csv' %}" class="btn btn-outline-secondary">Экспорт таблицы</a>
+      <a href="{% url 'rentals:car_create' %}" class="btn btn-primary">Добавить авто</a>
     </div>
   </div>
 
   <div class="row g-3 mb-3">
     <div class="col-lg-6 col-xl-5 ms-auto">
       <form method="get" class="input-group" role="search">
-        <span class="input-group-text text-muted">Plate</span>
+        <span class="input-group-text text-muted">Номер</span>
         <input
           type="search"
           class="form-control"
@@ -32,9 +32,9 @@
           value="{{ search_query }}"
           autocomplete="off"
         >
-        <button class="btn btn-outline-secondary" type="submit">Search</button>
+        <button class="btn btn-outline-secondary" type="submit">Найти</button>
         {% if search_query %}
-          <a class="btn btn-outline-secondary" href="{% url 'rentals:car_list' %}">Reset</a>
+          <a class="btn btn-outline-secondary" href="{% url 'rentals:car_list' %}">Сбросить</a>
         {% endif %}
       </form>
       <div class="form-text text-muted small mt-1">
@@ -48,11 +48,11 @@
       <table class="table align-middle mb-0">
         <thead class="table-light">
           <tr>
-            <th>Car</th>
-            <th>Prices (вс)</th>
-            <th>Prices (нс)</th>
-            <th>Status</th>
-            <th class="text-end">Actions</th>
+            <th>Авто</th>
+            <th>Тарифы (вс)</th>
+            <th>Тарифы (нс)</th>
+            <th>Статус</th>
+            <th class="text-end">Действия</th>
           </tr>
         </thead>
         <tbody>
@@ -62,7 +62,7 @@
                 <div class="fw-semibold">{{ car.plate_number }}</div>
                 <div class="text-muted small">{{ car.make }} {{ car.model }} · {{ car.year }}</div>
                 {% if car.vin or car.sts_number %}
-                  <div class="text-muted small">VIN: {{ car.vin|default:"—" }}{% if car.sts_number %} · СТС {{ car.sts_number }}{% endif %}</div>
+                  <div class="text-muted small">ВИН: {{ car.vin|default:"—" }}{% if car.sts_number %} · СТС {{ car.sts_number }}{% endif %}</div>
                 {% endif %}
               </td>
               <td class="small">
@@ -77,22 +77,22 @@
               </td>
               <td>
                 {% if car.is_active %}
-                  <span class="badge text-bg-success">Active</span>
+                  <span class="badge text-bg-success">Активен</span>
                 {% else %}
-                  <span class="badge text-bg-secondary">Inactive</span>
+                  <span class="badge text-bg-secondary">Неактивен</span>
                 {% endif %}
               </td>
               <td class="text-end">
                 <div class="d-inline-flex gap-2 justify-content-end">
-                  <a href="{% url 'rentals:car_update' car.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                  <a href="{% url 'rentals:car_update' car.pk %}" class="btn btn-sm btn-outline-secondary">Изменить</a>
                   <form method="post" action="{% url 'rentals:car_delete' car.pk %}" class="d-inline">
                     {% csrf_token %}
                     <button
                       type="submit"
                       class="btn btn-sm btn-outline-danger"
-                      onclick="return confirm('Delete {{ car.plate_number }}?');"
+                      onclick="return confirm('Удалить {{ car.plate_number }}?');"
                     >
-                      Delete
+                      Удалить
                     </button>
                   </form>
                 </div>
@@ -102,9 +102,9 @@
             <tr>
               <td colspan="5" class="text-center text-muted py-4">
                 {% if search_query %}
-                  No cars match this plate number yet.
+                  Нет авто по этому номеру.
                 {% else %}
-                  No cars yet. Add your first car to start renting.
+                  Авто пока нет. Добавьте первый автомобиль.
                 {% endif %}
               </td>
             </tr>

@@ -17,8 +17,8 @@
           Удалить без аренды
         </button>
       </form>
-      <a href="{% url 'rentals:import_customers_csv' %}" class="btn btn-outline-secondary">Импорт CSV/XLS</a>
-      <a href="{% url 'rentals:export_customers_csv' %}" class="btn btn-outline-secondary">Экспорт CSV</a>
+      <a href="{% url 'rentals:import_customers_csv' %}" class="btn btn-outline-secondary">Импорт таблицы</a>
+      <a href="{% url 'rentals:export_customers_csv' %}" class="btn btn-outline-secondary">Экспорт таблицы</a>
       <a href="{% url 'rentals:customer_create' %}" class="btn btn-primary">Добавить клиента</a>
     </div>
   </div>
@@ -41,14 +41,14 @@
               id="customerSearchInput"
               name="q"
               value="{{ search_query }}"
-              placeholder="ФИО, телефон, email, ВУ, паспорт, адрес прописки или тег"
+              placeholder="ФИО, телефон, эл. почта, ВУ, паспорт, адрес прописки или тег"
               autocomplete="off"
             >
             <input type="hidden" name="page" value="1">
             <input type="hidden" name="page_size" value="{{ current_page_size }}">
           </div>
           <div class="form-text text-muted small">
-            Поиск сразу по нескольким атрибутам: ФИО, телефон, email, номер ВУ, паспорт, адрес прописки, стаж, теги.
+            Поиск сразу по нескольким атрибутам: ФИО, телефон, эл. почта, номер ВУ, паспорт, адрес прописки, стаж, теги.
             Вводите несколько слов — фильтр применится автоматически.
           </div>
         </div>
@@ -253,14 +253,14 @@
               <ul class="pagination pagination-sm mb-0">
                 <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
                   {% if page_obj.has_previous %}
-                    <a class="page-link" href="?page=1&page_size={{ page_size }}{{ querystring }}" aria-label="First">&laquo;</a>
+                    <a class="page-link" href="?page=1&page_size={{ page_size }}{{ querystring }}" aria-label="Первая страница">&laquo;</a>
                   {% else %}
                     <span class="page-link">&laquo;</span>
                   {% endif %}
                 </li>
                 <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
                   {% if page_obj.has_previous %}
-                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}&page_size={{ page_size }}{{ querystring }}" aria-label="Previous">&lsaquo;</a>
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}&page_size={{ page_size }}{{ querystring }}" aria-label="Предыдущая страница">&lsaquo;</a>
                   {% else %}
                     <span class="page-link">&lsaquo;</span>
                   {% endif %}
@@ -270,14 +270,14 @@
                 </li>
                 <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
                   {% if page_obj.has_next %}
-                    <a class="page-link" href="?page={{ page_obj.next_page_number }}&page_size={{ page_size }}{{ querystring }}" aria-label="Next">&rsaquo;</a>
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}&page_size={{ page_size }}{{ querystring }}" aria-label="Следующая страница">&rsaquo;</a>
                   {% else %}
                     <span class="page-link">&rsaquo;</span>
                   {% endif %}
                 </li>
                 <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
                   {% if page_obj.has_next %}
-                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&page_size={{ page_size }}{{ querystring }}" aria-label="Last">&raquo;</a>
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&page_size={{ page_size }}{{ querystring }}" aria-label="Последняя страница">&raquo;</a>
                   {% else %}
                     <span class="page-link">&raquo;</span>
                   {% endif %}

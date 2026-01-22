@@ -281,7 +281,30 @@
                           </div>
                           <div class="col-sm-6">
                             <label class="form-label" for="{{ form.delivery_issue_city.id_for_label }}">Город выдачи</label>
-                            {{ form.delivery_issue_city }}
+                            <div class="city-picker" data-city-picker>
+                              {{ form.delivery_issue_city }}
+                              <button
+                                class="form-control city-picker-trigger{% if form.delivery_issue_city.errors %} is-invalid{% endif %}"
+                                type="button"
+                                aria-haspopup="listbox"
+                                aria-expanded="false"
+                              >
+                                <span data-city-label>Выберите город</span>
+                                <span class="city-picker-caret">▾</span>
+                              </button>
+                              <div class="city-picker-menu" role="listbox" aria-label="Выбор города выдачи">
+                                <div class="city-picker-search">
+                                  <input
+                                    type="search"
+                                    class="form-control form-control-sm"
+                                    placeholder="Поиск города"
+                                    autocomplete="off"
+                                  >
+                                </div>
+                                <div class="city-picker-options"></div>
+                                <div class="city-picker-empty text-muted small d-none">Нет совпадений</div>
+                              </div>
+                            </div>
                             <div class="form-text">Стоимость возьмём из таблицы доставки.</div>
                             {% for error in form.delivery_issue_city.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
                           </div>
@@ -317,7 +340,30 @@
                           </div>
                           <div class="col-sm-6">
                             <label class="form-label" for="{{ form.delivery_return_city.id_for_label }}">Город возврата</label>
-                            {{ form.delivery_return_city }}
+                            <div class="city-picker" data-city-picker>
+                              {{ form.delivery_return_city }}
+                              <button
+                                class="form-control city-picker-trigger{% if form.delivery_return_city.errors %} is-invalid{% endif %}"
+                                type="button"
+                                aria-haspopup="listbox"
+                                aria-expanded="false"
+                              >
+                                <span data-city-label>Выберите город</span>
+                                <span class="city-picker-caret">▾</span>
+                              </button>
+                              <div class="city-picker-menu" role="listbox" aria-label="Выбор города возврата">
+                                <div class="city-picker-search">
+                                  <input
+                                    type="search"
+                                    class="form-control form-control-sm"
+                                    placeholder="Поиск города"
+                                    autocomplete="off"
+                                  >
+                                </div>
+                                <div class="city-picker-options"></div>
+                                <div class="city-picker-empty text-muted small d-none">Нет совпадений</div>
+                              </div>
+                            </div>
                             <div class="form-text">Считается отдельно от выдачи.</div>
                             {% for error in form.delivery_return_city.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
                           </div>
@@ -988,6 +1034,116 @@
           pickers.forEach((picker, index) => {
             if (!picker.contains(event.target)) {
               instances[index]?.closeMenu();
+            }
+          });
+        });
+      })();
+    </script>
+
+    <script>
+      (function() {
+        const pickers = Array.from(document.querySelectorAll("[data-city-picker]"));
+        if (!pickers.length) return;
+
+        function updateTrigger(picker, value) {
+          const select = picker.querySelector("select");
+          const label = picker.querySelector("[data-city-label]");
+          if (!select || !label) return;
+          const selected = Array.from(select.options).find((opt) => opt.value === value) || select.selectedOptions[0];
+          label.textContent = selected ? selected.text : "Выберите город";
+        }
+
+        function buildOptions(picker) {
+          const select = picker.querySelector("select");
+          const optionsWrap = picker.querySelector(".city-picker-options");
+          if (!select || !optionsWrap) return;
+          optionsWrap.innerHTML = "";
+          const fragment = document.createDocumentFragment();
+          Array.from(select.options).forEach((opt) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "city-option";
+            btn.dataset.value = opt.value;
+            btn.dataset.label = opt.text.toLowerCase();
+            btn.textContent = opt.text;
+            fragment.appendChild(btn);
+          });
+          optionsWrap.appendChild(fragment);
+        }
+
+        function highlightSelection(picker, value) {
+          const options = picker.querySelectorAll(".city-option");
+          options.forEach((btn) => {
+            btn.classList.toggle("is-active", btn.dataset.value === value);
+          });
+        }
+
+        function closeMenu(picker) {
+          const menu = picker.querySelector(".city-picker-menu");
+          const trigger = picker.querySelector(".city-picker-trigger");
+          if (menu) menu.classList.remove("show");
+          if (trigger) trigger.setAttribute("aria-expanded", "false");
+        }
+
+        pickers.forEach((picker) => {
+          const select = picker.querySelector("select");
+          const trigger = picker.querySelector(".city-picker-trigger");
+          const menu = picker.querySelector(".city-picker-menu");
+          const search = picker.querySelector(".city-picker-search input");
+          const empty = picker.querySelector(".city-picker-empty");
+
+          if (!select || !trigger || !menu) return;
+
+          buildOptions(picker);
+          updateTrigger(picker, select.value);
+          highlightSelection(picker, select.value);
+
+          trigger.addEventListener("click", () => {
+            const isOpen = menu.classList.contains("show");
+            pickers.forEach((item) => item !== picker && closeMenu(item));
+            menu.classList.toggle("show", !isOpen);
+            trigger.setAttribute("aria-expanded", String(!isOpen));
+            if (!isOpen && search) {
+              search.value = "";
+              search.focus();
+              const options = picker.querySelectorAll(".city-option");
+              options.forEach((btn) => btn.classList.remove("d-none"));
+              empty?.classList.add("d-none");
+            }
+          });
+
+          picker.addEventListener("click", (event) => {
+            const target = event.target instanceof HTMLElement ? event.target.closest(".city-option") : null;
+            if (!target) return;
+            const value = target.dataset.value ?? "";
+            select.value = value;
+            updateTrigger(picker, value);
+            highlightSelection(picker, value);
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+            closeMenu(picker);
+          });
+
+          search?.addEventListener("input", () => {
+            const term = search.value.trim().toLowerCase();
+            let visible = 0;
+            picker.querySelectorAll(".city-option").forEach((btn) => {
+              const match = !term || (btn.dataset.label || "").includes(term);
+              btn.classList.toggle("d-none", !match);
+              if (match) visible += 1;
+            });
+            empty?.classList.toggle("d-none", visible > 0);
+          });
+
+          select.addEventListener("change", () => {
+            updateTrigger(picker, select.value);
+            highlightSelection(picker, select.value);
+          });
+        });
+
+        document.addEventListener("click", (event) => {
+          pickers.forEach((picker) => {
+            if (!picker.contains(event.target)) {
+              closeMenu(picker);
             }
           });
         });

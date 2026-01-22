@@ -314,6 +314,95 @@ body {
   border-color: color-mix(in srgb, var(--brand) 75%, transparent);
 }
 
+.city-picker {
+  position: relative;
+}
+
+.city-picker select {
+  display: none;
+}
+
+.city-picker-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  background: var(--surface-1);
+  cursor: pointer;
+}
+
+.city-picker-caret {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.city-picker-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  padding: 10px;
+  border-radius: 14px;
+  background: var(--surface-1);
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 75%, transparent);
+  box-shadow: var(--shadow-card);
+  display: none;
+}
+
+.city-picker-menu.show {
+  display: block;
+}
+
+.city-picker-search {
+  margin-bottom: 8px;
+}
+
+.city-picker-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.city-picker-options::-webkit-scrollbar {
+  width: 8px;
+}
+
+.city-picker-options::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--brand) 30%, transparent);
+  border-radius: 999px;
+}
+
+.city-option {
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 70%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+  color: var(--text-primary);
+  border-radius: 10px;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+  text-align: left;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.city-option:hover {
+  border-color: color-mix(in srgb, var(--brand) 45%, transparent);
+}
+
+.city-option.is-active {
+  background: color-mix(in srgb, var(--brand) 25%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--brand) 55%, transparent);
+}
+
+@media (max-width: 575.98px) {
+  .city-picker-options {
+    grid-template-columns: 1fr;
+  }
+}
+
 main.container {
   padding-bottom: 3rem;
 }

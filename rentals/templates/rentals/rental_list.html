@@ -69,6 +69,7 @@
               data-search-text="
                 {{ rental.deal_name }}
                 {{ rental.customer.full_name }} {{ rental.customer.phone }} {{ rental.customer.email }} {{ rental.customer.license_number }}
+                {{ rental.second_driver.full_name }} {{ rental.second_driver.phone }} {{ rental.second_driver.email }} {{ rental.second_driver.license_number }}
                 {{ rental.car.plate_number }} {{ rental.car.make }} {{ rental.car.model }} {{ rental.car.vin }} {{ rental.car.sts_number }}
                 {{ rental.start_date|date:'d-m-Y' }} {{ rental.end_date|date:'d-m-Y' }} {{ rental.get_status_display }}
               "
@@ -100,6 +101,12 @@
                   {{ rental.customer.phone|default:"—" }}
                   {% if rental.customer.license_number %} · {{ rental.customer.license_number }}{% endif %}
                 </div>
+                {% if rental.second_driver %}
+                  <div class="text-muted small">
+                    2-й водитель: {{ rental.second_driver.full_name }}
+                    {% if rental.second_driver.phone %} · {{ rental.second_driver.phone }}{% endif %}
+                  </div>
+                {% endif %}
               </td>
               <td>
                 <div class="fw-semibold">{{ rental.car.plate_number }}</div>

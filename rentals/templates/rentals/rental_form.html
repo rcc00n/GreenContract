@@ -72,6 +72,74 @@
                   {% if customer_initial_label %}{{ customer_initial_label }}{% else %}Клиент не выбран{% endif %}
                 </div>
                 {% for error in form.customer.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+
+                <div class="mt-3 pt-2 border-top">
+                  <div class="d-flex justify-content-between align-items-center gap-2">
+                    <div>
+                      <div class="fw-semibold small">Второй водитель</div>
+                      <div class="text-muted small">Опционально для договора.</div>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
+                      id="second-driver-toggle"
+                      aria-expanded="false"
+                      aria-controls="second-driver-panel"
+                    >
+                      <span class="fw-semibold" aria-hidden="true" data-toggle-icon>+</span>
+                      <span data-toggle-label>Добавить</span>
+                    </button>
+                  </div>
+                  <div
+                    class="mt-2{% if second_driver_initial_label or form.second_driver.errors %} {% else %} d-none{% endif %}"
+                    id="second-driver-panel"
+                    data-initial-open="{% if second_driver_initial_label or form.second_driver.errors %}true{% else %}false{% endif %}"
+                  >
+                    {{ form.second_driver }}
+                    <div class="d-flex align-items-start gap-2">
+                      <div class="flex-grow-1 position-relative">
+                        <input
+                          type="search"
+                          class="form-control{% if form.second_driver.errors %} is-invalid{% endif %}"
+                          id="second-driver-search"
+                          placeholder="Начните вводить имя, телефон или эл. почту"
+                          autocomplete="off"
+                          data-search-url="{% url 'rentals:customer_search' %}"
+                          data-initial-label="{{ second_driver_initial_label|default_if_none:'' }}"
+                        >
+                        <div
+                          class="dropdown-menu w-100 shadow-sm"
+                          id="second-driver-search-results"
+                          aria-label="Результаты поиска второго водителя"
+                          style="max-height: 280px; overflow-y: auto;"
+                        ></div>
+                      </div>
+                      <a
+                        href="#"
+                        class="btn btn-sm btn-outline-secondary align-self-start disabled"
+                        id="second-driver-edit-link"
+                        data-edit-url-template="{% url 'rentals:customer_update' 0 %}"
+                        target="_blank"
+                        rel="noopener"
+                        aria-disabled="true"
+                        tabindex="-1"
+                      >
+                        Редактировать
+                      </a>
+                    </div>
+                    <div class="form-text">Поиск по имени, телефону, эл. почте или номеру удостоверения.</div>
+                    <div class="small text-muted mt-1" id="second-driver-selected-summary">
+                      {% if second_driver_initial_label %}
+                        {{ second_driver_initial_label }}
+                      {% else %}
+                        Второй водитель не выбран
+                      {% endif %}
+                    </div>
+                    {% for error in form.second_driver.errors %}
+                      <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
+                  </div>
+                </div>
               </div>
 
               <div class="col-12">
@@ -392,180 +460,276 @@
 
     <script>
       (function() {
-        const searchInput = document.getElementById("customer-search");
-        const resultsMenu = document.getElementById("customer-search-results");
-        const hiddenField = document.getElementById("id_customer");
-        const summary = document.getElementById("customer-selected-summary");
-        const editLink = document.getElementById("customer-edit-link");
-        const editUrlTemplate = editLink?.dataset.editUrlTemplate;
-        const searchUrl = searchInput?.dataset.searchUrl;
-        const initialLabel = searchInput?.dataset.initialLabel;
-        let debounceTimer = null;
-        let activeRequest = null;
-        let lastSelectedLabel = initialLabel && hiddenField?.value ? initialLabel : "";
+        function initCustomerSearch(config) {
+          const searchInput = document.getElementById(config.inputId);
+          const resultsMenu = document.getElementById(config.resultsId);
+          const hiddenField = document.getElementById(config.hiddenId);
+          const summary = document.getElementById(config.summaryId);
+          const editLink = document.getElementById(config.editLinkId);
+          const editUrlTemplate = editLink?.dataset.editUrlTemplate;
+          const searchUrl = searchInput?.dataset.searchUrl;
+          const initialLabel = searchInput?.dataset.initialLabel;
+          let debounceTimer = null;
+          let activeRequest = null;
+          let lastSelectedLabel = initialLabel && hiddenField?.value ? initialLabel : "";
 
-        if (!searchInput || !resultsMenu || !hiddenField || !searchUrl) {
-          return;
-        }
-
-        function setSummary(text, highlight = false) {
-          if (!summary) return;
-          summary.textContent = text;
-          summary.classList.toggle("text-danger", highlight);
-        }
-
-        function clearResults() {
-          resultsMenu.innerHTML = "";
-          resultsMenu.classList.remove("show");
-        }
-
-        function setEditLink(customerId) {
-          if (!editLink) return;
-          if (!customerId || !editUrlTemplate) {
-            editLink.classList.add("disabled");
-            editLink.setAttribute("aria-disabled", "true");
-            editLink.setAttribute("tabindex", "-1");
-            editLink.removeAttribute("href");
-            return;
+          if (!searchInput || !resultsMenu || !hiddenField || !searchUrl) {
+            return {
+              clearSelection() {},
+              setSummary() {},
+              searchInput: null,
+              hiddenField: null,
+            };
           }
-          const url = editUrlTemplate.replace("/0/", `/${customerId}/`);
-          editLink.href = url;
-          editLink.classList.remove("disabled");
-          editLink.removeAttribute("aria-disabled");
-          editLink.removeAttribute("tabindex");
-        }
 
-        function selectCustomer(item) {
-          if (!item) return;
-          hiddenField.value = item.id;
-          const parts = [item.name, item.phone].filter(Boolean);
-          const label = parts.join(" · ") || item.name;
-          searchInput.value = item.name;
-          lastSelectedLabel = label;
-          setSummary(label);
-          setEditLink(item.id);
-          document.dispatchEvent(new CustomEvent("rental:customer-change", { detail: { name: item.name } }));
-          clearResults();
-        }
+          const messages = {
+            minChars: config.minCharsMessage || "Введите минимум 2 символа для поиска.",
+            selection: config.selectionMessage || "Выберите клиента из результатов поиска.",
+            empty: config.emptyMessage || "Клиент не выбран",
+            noResults: config.noResultsMessage || "Ничего не найдено",
+            searching: config.searchingMessage || "Ищем...",
+            selected: config.selectedMessage || "Клиент выбран",
+            error: config.errorMessage || "Не удалось загрузить клиентов. Попробуйте ещё раз.",
+          };
 
-        function renderResults(items) {
-          clearResults();
-          if (!items.length) {
-            const empty = document.createElement("div");
-            empty.className = "dropdown-item text-muted small";
-            empty.textContent = "Ничего не найдено";
-            resultsMenu.appendChild(empty);
+          function setSummary(text, highlight = false) {
+            if (!summary) return;
+            summary.textContent = text;
+            summary.classList.toggle("text-danger", highlight);
+          }
+
+          function clearResults() {
+            resultsMenu.innerHTML = "";
+            resultsMenu.classList.remove("show");
+          }
+
+          function setEditLink(customerId) {
+            if (!editLink) return;
+            if (!customerId || !editUrlTemplate) {
+              editLink.classList.add("disabled");
+              editLink.setAttribute("aria-disabled", "true");
+              editLink.setAttribute("tabindex", "-1");
+              editLink.removeAttribute("href");
+              return;
+            }
+            const url = editUrlTemplate.replace("/0/", `/${customerId}/`);
+            editLink.href = url;
+            editLink.classList.remove("disabled");
+            editLink.removeAttribute("aria-disabled");
+            editLink.removeAttribute("tabindex");
+          }
+
+          function clearSelection() {
+            hiddenField.value = "";
+            searchInput.value = "";
+            lastSelectedLabel = "";
+            setEditLink("");
+            setSummary(messages.empty);
+            clearResults();
+          }
+
+          function selectCustomer(item) {
+            if (!item) return;
+            hiddenField.value = item.id;
+            const parts = [item.name, item.phone].filter(Boolean);
+            const label = parts.join(" · ") || item.name;
+            searchInput.value = item.name;
+            lastSelectedLabel = label;
+            setSummary(label);
+            setEditLink(item.id);
+            if (config.onSelect) {
+              config.onSelect(item);
+            }
+            clearResults();
+          }
+
+          function renderResults(items) {
+            clearResults();
+            if (!items.length) {
+              const empty = document.createElement("div");
+              empty.className = "dropdown-item text-muted small";
+              empty.textContent = messages.noResults;
+              resultsMenu.appendChild(empty);
+              resultsMenu.classList.add("show");
+              return;
+            }
+
+            items.forEach((item) => {
+              const btn = document.createElement("button");
+              btn.type = "button";
+              btn.className = "dropdown-item text-wrap";
+              btn.dataset.id = item.id;
+
+              btn.addEventListener("click", () => selectCustomer(item));
+
+              const title = document.createElement("div");
+              title.className = "fw-semibold";
+              title.textContent = item.name;
+
+              const meta = document.createElement("div");
+              meta.className = "small text-muted";
+              const metaParts = [item.phone, item.email, item.license_number].filter(Boolean);
+              meta.textContent = metaParts.join(" • ");
+
+              btn.appendChild(title);
+              btn.appendChild(meta);
+              resultsMenu.appendChild(btn);
+            });
+
             resultsMenu.classList.add("show");
-            return;
           }
 
-          items.forEach((item) => {
-            const btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "dropdown-item text-wrap";
-            btn.dataset.id = item.id;
+          function fetchResults(term) {
+            if (!term) return;
 
-            btn.addEventListener("click", () => selectCustomer(item));
+            if (activeRequest) {
+              activeRequest.abort();
+            }
 
-            const title = document.createElement("div");
-            title.className = "fw-semibold";
-            title.textContent = item.name;
+            const controller = new AbortController();
+            activeRequest = controller;
 
-            const meta = document.createElement("div");
-            meta.className = "small text-muted";
-            const metaParts = [item.phone, item.email, item.license_number].filter(Boolean);
-            meta.textContent = metaParts.join(" • ");
+            resultsMenu.innerHTML = `<span class="dropdown-item text-muted small">${messages.searching}</span>`;
+            resultsMenu.classList.add("show");
 
-            btn.appendChild(title);
-            btn.appendChild(meta);
-            resultsMenu.appendChild(btn);
+            fetch(`${searchUrl}?q=${encodeURIComponent(term)}`, { signal: controller.signal })
+              .then((response) => (response.ok ? response.json() : Promise.reject()))
+              .then((data) => {
+                if (controller.signal.aborted) return;
+                renderResults((data && data.results) || []);
+              })
+              .catch(() => {
+                if (controller.signal.aborted) return;
+                clearResults();
+                setSummary(messages.error, true);
+              })
+              .finally(() => {
+                if (activeRequest === controller) {
+                  activeRequest = null;
+                }
+              });
+          }
+
+          function handleInput() {
+            const term = searchInput.value.trim();
+            if (term !== lastSelectedLabel && hiddenField.value) {
+              hiddenField.value = "";
+              setEditLink("");
+            }
+
+            if (term.length < 2) {
+              clearResults();
+              if (!hiddenField.value) {
+                setSummary(messages.minChars, true);
+              }
+              return;
+            }
+
+            setSummary(messages.selection);
+
+            if (debounceTimer) {
+              window.clearTimeout(debounceTimer);
+            }
+            debounceTimer = window.setTimeout(() => fetchResults(term), 180);
+          }
+
+          searchInput.addEventListener("input", handleInput);
+          searchInput.addEventListener("focus", () => {
+            if (resultsMenu.innerHTML.trim()) {
+              resultsMenu.classList.add("show");
+            }
           });
 
-          resultsMenu.classList.add("show");
-        }
+          document.addEventListener("click", (event) => {
+            if (event.target === searchInput || resultsMenu.contains(event.target)) {
+              return;
+            }
+            clearResults();
+          });
 
-        function fetchResults(term) {
-          if (!term) return;
-
-          if (activeRequest) {
-            activeRequest.abort();
-          }
-
-          const controller = new AbortController();
-          activeRequest = controller;
-
-          resultsMenu.innerHTML = '<span class="dropdown-item text-muted small">Ищем...</span>';
-          resultsMenu.classList.add("show");
-
-          fetch(`${searchUrl}?q=${encodeURIComponent(term)}`, { signal: controller.signal })
-            .then((response) => (response.ok ? response.json() : Promise.reject()))
-            .then((data) => {
-              if (controller.signal.aborted) return;
-              renderResults((data && data.results) || []);
-            })
-            .catch(() => {
-              if (controller.signal.aborted) return;
-              clearResults();
-              setSummary("Не удалось загрузить клиентов. Попробуйте ещё раз.", true);
-            })
-            .finally(() => {
-              if (activeRequest === controller) {
-                activeRequest = null;
-              }
-            });
-        }
-
-        function handleInput() {
-          const term = searchInput.value.trim();
-          if (term !== lastSelectedLabel && hiddenField.value) {
-            hiddenField.value = "";
+          if (initialLabel && hiddenField.value) {
+            searchInput.value = initialLabel;
+            setSummary(initialLabel);
+            setEditLink(hiddenField.value);
+            if (config.onSelect) {
+              config.onSelect({ id: hiddenField.value, name: searchInput.value || initialLabel });
+            }
+          } else if (hiddenField.value) {
+            setSummary(messages.selected);
+            setEditLink(hiddenField.value);
+          } else {
+            setSummary(messages.minChars, true);
             setEditLink("");
           }
 
-          if (term.length < 2) {
-            clearResults();
-            if (!hiddenField.value) {
-              setSummary("Введите минимум 2 символа для поиска.", true);
-            }
-            return;
-          }
-
-          setSummary("Выберите клиента из результатов поиска.");
-
-          if (debounceTimer) {
-            window.clearTimeout(debounceTimer);
-          }
-          debounceTimer = window.setTimeout(() => fetchResults(term), 180);
+          return {
+            clearSelection,
+            setSummary,
+            searchInput,
+            hiddenField,
+          };
         }
 
-        searchInput.addEventListener("input", handleInput);
-        searchInput.addEventListener("focus", () => {
-          if (resultsMenu.innerHTML.trim()) {
-            resultsMenu.classList.add("show");
-          }
+        const customerSearch = initCustomerSearch({
+          inputId: "customer-search",
+          resultsId: "customer-search-results",
+          hiddenId: "id_customer",
+          summaryId: "customer-selected-summary",
+          editLinkId: "customer-edit-link",
+          onSelect: (item) => {
+            document.dispatchEvent(new CustomEvent("rental:customer-change", { detail: { name: item.name } }));
+          },
+          emptyMessage: "Клиент не выбран",
+          selectedMessage: "Клиент выбран",
         });
 
-        document.addEventListener("click", (event) => {
-          if (event.target === searchInput || resultsMenu.contains(event.target)) {
-            return;
-          }
-          clearResults();
+        const secondDriverSearch = initCustomerSearch({
+          inputId: "second-driver-search",
+          resultsId: "second-driver-search-results",
+          hiddenId: "id_second_driver",
+          summaryId: "second-driver-selected-summary",
+          editLinkId: "second-driver-edit-link",
+          emptyMessage: "Второй водитель не выбран",
+          selectedMessage: "Второй водитель выбран",
+          selectionMessage: "Выберите водителя из результатов поиска.",
+          errorMessage: "Не удалось загрузить водителей. Попробуйте ещё раз.",
         });
 
-        if (initialLabel && hiddenField.value) {
-          searchInput.value = initialLabel;
-          setSummary(initialLabel);
-          setEditLink(hiddenField.value);
-          document.dispatchEvent(
-            new CustomEvent("rental:customer-change", { detail: { name: searchInput.value || initialLabel } })
-          );
-        } else if (hiddenField.value) {
-          setSummary("Клиент выбран");
-          setEditLink(hiddenField.value);
-        } else {
-          setSummary("Введите минимум 2 символа для поиска.", true);
-          setEditLink("");
+        const toggleBtn = document.getElementById("second-driver-toggle");
+        const toggleLabel = toggleBtn?.querySelector("[data-toggle-label]");
+        const toggleIcon = toggleBtn?.querySelector("[data-toggle-icon]");
+        const panel = document.getElementById("second-driver-panel");
+        let isSecondDriverActive = false;
+
+        function setSecondDriverActive(active, { preserveSelection = false } = {}) {
+          isSecondDriverActive = active;
+          if (panel) {
+            panel.classList.toggle("d-none", !active);
+          }
+          if (toggleBtn) {
+            toggleBtn.setAttribute("aria-expanded", String(active));
+          }
+          if (toggleLabel) {
+            toggleLabel.textContent = active ? "Убрать" : "Добавить";
+          }
+          if (toggleIcon) {
+            toggleIcon.textContent = active ? "×" : "+";
+          }
+          if (!active && !preserveSelection) {
+            secondDriverSearch.clearSelection();
+          }
+          if (active && secondDriverSearch.searchInput) {
+            secondDriverSearch.searchInput.focus();
+          }
         }
+
+        const initialSecondOpen =
+          panel?.dataset.initialOpen === "true" || Boolean(secondDriverSearch.hiddenField?.value);
+        setSecondDriverActive(initialSecondOpen, { preserveSelection: true });
+
+        toggleBtn?.addEventListener("click", () => {
+          setSecondDriverActive(!isSecondDriverActive);
+        });
       })();
     </script>
 

@@ -254,7 +254,8 @@ class CustomerForm(StyledModelForm):
 class RentalForm(StyledModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._limit_customer_queryset()
+        self._limit_customer_queryset("customer", "_customer_label")
+        self._limit_customer_queryset("second_driver", "_second_driver_label")
         if "contract_number" in self.fields:
             field = self.fields["contract_number"]
             field.disabled = True
@@ -342,6 +343,7 @@ class RentalForm(StyledModelForm):
                 self.fields[name].required = False
                 self.fields[name].widget = forms.Select(choices=delivery_choices)
         self.initial_customer_label = getattr(self, "_customer_label", "")
+        self.initial_second_driver_label = getattr(self, "_second_driver_label", "")
 
     class Meta:
         model = Rental
@@ -349,6 +351,7 @@ class RentalForm(StyledModelForm):
             "contract_number",
             "car",
             "customer",
+            "second_driver",
             "start_date",
             "start_time",
             "end_date",
@@ -385,6 +388,7 @@ class RentalForm(StyledModelForm):
             "contract_number": "Номер договора",
             "car": "Автомобиль",
             "customer": "Клиент",
+            "second_driver": "Второй водитель",
             "start_date": "Дата начала",
             "end_date": "Дата окончания",
             "start_time": "Время выдачи",
@@ -424,10 +428,14 @@ class RentalForm(StyledModelForm):
         start_date = cleaned_data.get("start_date")
         end_date = cleaned_data.get("end_date")
         car = cleaned_data.get("car")
+        customer = cleaned_data.get("customer")
+        second_driver = cleaned_data.get("second_driver")
 
         if start_date and end_date and end_date <= start_date:
             self.add_error("end_date", "Дата окончания должна быть позже даты начала.")
             return cleaned_data
+        if customer and second_driver and customer == second_driver:
+            self.add_error("second_driver", "Второй водитель не должен совпадать с основным клиентом.")
 
         if start_date and end_date:
             # Синхронизируем чекбоксы с количествами, чтобы в базе сохранялось 1/0.
@@ -478,22 +486,24 @@ class RentalForm(StyledModelForm):
             cleaned_data["balance_due"] = pricing.balance_due
         return cleaned_data
 
-    def _limit_customer_queryset(self):
+    def _limit_customer_queryset(self, field_name: str, label_attr: str):
         """
         Keep the customer queryset tiny so rendering the form does not pull hundreds
         of thousands of rows. Only include the selected customer (if any).
         """
 
-        customer_field = self.fields["customer"]
+        customer_field = self.fields.get(field_name)
+        if not customer_field:
+            return
         customer_field.widget = forms.HiddenInput()
 
         selected_id = None
         if self.is_bound:
-            selected_id = self.data.get(self.add_prefix("customer")) or self.data.get("customer")
-        elif self.initial.get("customer"):
-            selected_id = self.initial.get("customer")
-        elif getattr(self.instance, "customer_id", None):
-            selected_id = self.instance.customer_id
+            selected_id = self.data.get(self.add_prefix(field_name)) or self.data.get(field_name)
+        elif self.initial.get(field_name):
+            selected_id = self.initial.get(field_name)
+        elif getattr(self.instance, f"{field_name}_id", None):
+            selected_id = getattr(self.instance, f"{field_name}_id")
 
         queryset = Customer.objects.none()
         label = ""
@@ -506,7 +516,7 @@ class RentalForm(StyledModelForm):
                 customer_field.initial = customer.pk
 
         customer_field.queryset = queryset
-        self._customer_label = label
+        setattr(self, label_attr, label)
 
 
 class ContractTemplateForm(StyledModelForm):

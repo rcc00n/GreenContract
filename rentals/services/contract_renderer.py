@@ -36,6 +36,24 @@ PLACEHOLDER_GUIDE = [
         },
     ),
     (
+        "Второй водитель",
+        {
+            "second_driver.full_name": "ФИО второго водителя",
+            "second_driver.birth_date": "Дата рождения",
+            "second_driver.phone": "Телефон",
+            "second_driver.email": "Эл. почта",
+            "second_driver.license_number": "Водительское удостоверение",
+            "second_driver.license_issued_by": "В.у. выдано",
+            "second_driver.driving_since": "Стаж с",
+            "second_driver.discount_percent": "Скидка, %",
+            "second_driver.passport_series": "Серия паспорта",
+            "second_driver.passport_number": "Номер паспорта",
+            "second_driver.passport_issue_date": "Дата выдачи паспорта",
+            "second_driver.passport_issued_by": "Кем выдан паспорт",
+            "second_driver.registration_address": "Адрес регистрации",
+        },
+    ),
+    (
         "Авто",
         {
             "car.plate_number": "Госномер",
@@ -113,6 +131,21 @@ PLACEHOLDER_ALIASES_RU = {
     "customer.registration_address": "клиент.адрес_регистрации",
     "customer.address": "клиент.адрес",
     "customer.residence_address": "клиент.адрес_проживания",
+    "second_driver.full_name": "второй_водитель.фио",
+    "second_driver.birth_date": "второй_водитель.дата_рождения",
+    "second_driver.phone": "второй_водитель.телефон",
+    "second_driver.email": "второй_водитель.эл_почта",
+    "second_driver.license_number": "второй_водитель.номер_ву",
+    "second_driver.license_issued_by": "второй_водитель.кем_выдано_ву",
+    "second_driver.driving_since": "второй_водитель.стаж_с",
+    "second_driver.discount_percent": "второй_водитель.скидка_процент",
+    "second_driver.passport_series": "второй_водитель.паспорт_серия",
+    "second_driver.passport_number": "второй_водитель.паспорт_номер",
+    "second_driver.passport_issue_date": "второй_водитель.паспорт_дата_выдачи",
+    "second_driver.passport_issued_by": "второй_водитель.паспорт_кем_выдан",
+    "second_driver.registration_address": "второй_водитель.адрес_регистрации",
+    "second_driver.address": "второй_водитель.адрес",
+    "second_driver.residence_address": "второй_водитель.адрес_проживания",
     "car.plate_number": "авто.госномер",
     "car.make": "авто.марка",
     "car.model": "авто.модель",
@@ -205,6 +238,17 @@ class _DateFormattingProxy:
         return str(self._obj)
 
 
+class _EmptyProxy:
+    def __init__(self, label: str = ""):
+        self._label = label
+
+    def __getattr__(self, name):
+        return ""
+
+    def __str__(self):
+        return self._label
+
+
 class _RentalTemplateProxy:
     def __init__(self, rental: Rental):
         self._rental = rental
@@ -217,6 +261,14 @@ class _RentalTemplateProxy:
         self.customer = _DateFormattingProxy(
             rental.customer,
             date_fields={"birth_date", "driving_since", "passport_issue_date"},
+        )
+        self.second_driver = (
+            _DateFormattingProxy(
+                rental.second_driver,
+                date_fields={"birth_date", "driving_since", "passport_issue_date"},
+            )
+            if rental.second_driver
+            else _EmptyProxy()
         )
 
     def __getattr__(self, name):
@@ -245,9 +297,11 @@ def get_contract_context(rental: Rental) -> dict:
         "rental": rental_proxy,
         "car": rental_proxy.car,
         "customer": rental_proxy.customer,
+        "second_driver": rental_proxy.second_driver,
         "аренда": rental_proxy,
         "авто": rental_proxy.car,
         "клиент": rental_proxy.customer,
+        "второй_водитель": rental_proxy.second_driver,
         "rental_duration_days": duration_days,
         "rental_date_range": date_range,
         "meta": meta,
@@ -335,12 +389,20 @@ def _fmt_bool(value) -> str:
 def build_placeholder_values(rental: Rental) -> dict[str, str]:
     """Flatten rental/car/customer data into string placeholders."""
     customer = rental.customer
+    second_driver = rental.second_driver
     car = rental.car
     start_date = rental.start_date
     end_date = rental.end_date
     duration_days = rental.duration_days if start_date and end_date else None
     date_range = _format_date_range(start_date, end_date)
     address_primary = customer.registration_address or customer.address or customer.residence_address
+    address_second = ""
+    if second_driver:
+        address_second = (
+            second_driver.registration_address
+            or second_driver.address
+            or second_driver.residence_address
+        )
 
     values = {
         # Client
@@ -359,6 +421,22 @@ def build_placeholder_values(rental: Rental) -> dict[str, str]:
         "customer.address": address_primary,
         "customer.registration_address": address_primary,
         "customer.residence_address": address_primary,
+        # Second driver
+        "second_driver.full_name": second_driver.full_name if second_driver else "",
+        "second_driver.birth_date": _fmt_date(second_driver.birth_date) if second_driver else "",
+        "second_driver.phone": second_driver.phone if second_driver else "",
+        "second_driver.email": second_driver.email if second_driver else "",
+        "second_driver.license_number": second_driver.license_number if second_driver else "",
+        "second_driver.license_issued_by": second_driver.license_issued_by if second_driver else "",
+        "second_driver.driving_since": _fmt_date(second_driver.driving_since) if second_driver else "",
+        "second_driver.discount_percent": _fmt_decimal(second_driver.discount_percent) if second_driver else "",
+        "second_driver.passport_series": second_driver.passport_series if second_driver else "",
+        "second_driver.passport_number": second_driver.passport_number if second_driver else "",
+        "second_driver.passport_issue_date": _fmt_date(second_driver.passport_issue_date) if second_driver else "",
+        "second_driver.passport_issued_by": second_driver.passport_issued_by if second_driver else "",
+        "second_driver.address": address_second,
+        "second_driver.registration_address": address_second,
+        "second_driver.residence_address": address_second,
         # Car
         "car.plate_number": car.plate_number,
         "car.make": car.make,

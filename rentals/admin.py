@@ -30,6 +30,7 @@ class RentalAdmin(admin.ModelAdmin):
         "contract_number",
         "car",
         "customer",
+        "second_driver",
         "start_date",
         "end_date",
         "total_price",
@@ -38,7 +39,15 @@ class RentalAdmin(admin.ModelAdmin):
         "status",
     )
     list_filter = ("status", "start_date", "end_date")
-    search_fields = ("contract_number", "car__plate_number", "car__make", "car__model", "customer__full_name")
+    search_fields = (
+        "contract_number",
+        "car__plate_number",
+        "car__make",
+        "car__model",
+        "customer__full_name",
+        "second_driver__full_name",
+        "second_driver__license_number",
+    )
 
 
 @admin.register(ContractTemplate)

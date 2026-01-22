@@ -318,6 +318,15 @@ class Rental(models.Model):
 
     car = models.ForeignKey(Car, verbose_name="Автомобиль", on_delete=models.PROTECT)
     customer = models.ForeignKey(Customer, verbose_name="Клиент", on_delete=models.PROTECT)
+    second_driver = models.ForeignKey(
+        Customer,
+        verbose_name="Второй водитель",
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        related_name="secondary_rentals",
+        help_text="Опциональный второй водитель для договора.",
+    )
     contract_number = models.CharField(
         "Номер договора",
         max_length=5,

@@ -899,7 +899,9 @@ def customer_delete(request, pk: int):
 @login_required
 @require_POST
 def customer_delete_all(request):
-    with_rentals = Customer.objects.filter(rental__isnull=False).distinct()
+    with_rentals = Customer.objects.filter(
+        Q(rental__isnull=False) | Q(secondary_rentals__isnull=False)
+    ).distinct()
     deletable = Customer.objects.exclude(pk__in=with_rentals.values_list("pk", flat=True))
     deletable_count = deletable.count()
 
@@ -1021,7 +1023,7 @@ class RentalListView(ListView):
     template_name = "rentals/rental_list.html"
 
     def get_queryset(self):
-        queryset = super().get_queryset().select_related("car", "customer")
+        queryset = super().get_queryset().select_related("car", "customer", "second_driver")
         self.search_query = (self.request.GET.get("q") or "").strip()
         self.status_filter = (self.request.GET.get("status") or "").strip()
 
@@ -1038,6 +1040,10 @@ class RentalListView(ListView):
                     | Q(customer__phone__icontains=term)
                     | Q(customer__email__icontains=term)
                     | Q(customer__license_number__icontains=term)
+                    | Q(second_driver__full_name__icontains=term)
+                    | Q(second_driver__phone__icontains=term)
+                    | Q(second_driver__email__icontains=term)
+                    | Q(second_driver__license_number__icontains=term)
                     | Q(car__plate_number__icontains=term)
                     | Q(car__make__icontains=term)
                     | Q(car__model__icontains=term)
@@ -1074,6 +1080,9 @@ class RentalCreateView(CreateView):
         context = super().get_context_data(**kwargs)
         context["car_pricing"] = [_serialize_car_pricing(car) for car in Car.objects.all()]
         context["customer_initial_label"] = getattr(context.get("form"), "initial_customer_label", "")
+        context["second_driver_initial_label"] = getattr(
+            context.get("form"), "initial_second_driver_label", ""
+        )
         context["pricing_config"] = pricing_config()
         return context
 
@@ -1089,6 +1098,9 @@ class RentalUpdateView(UpdateView):
         context = super().get_context_data(**kwargs)
         context["car_pricing"] = [_serialize_car_pricing(car) for car in Car.objects.all()]
         context["customer_initial_label"] = getattr(context.get("form"), "initial_customer_label", "")
+        context["second_driver_initial_label"] = getattr(
+            context.get("form"), "initial_second_driver_label", ""
+        )
         context["pricing_config"] = pricing_config()
         return context
 
@@ -1320,7 +1332,7 @@ def export_rentals_csv(request):
         ]
     )
 
-    for rental in Rental.objects.select_related("car", "customer"):
+    for rental in Rental.objects.select_related("car", "customer", "second_driver"):
         writer.writerow(
             [
                 smart_str(rental.contract_number),

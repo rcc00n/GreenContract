@@ -12,7 +12,7 @@
   <form method="post" novalidate>
     {% csrf_token %}
     <div class="row g-4 align-items-start">
-      <div class="col-lg-9">
+      <div class="col-12">
         <div class="card shadow-sm h-100">
           <div class="card-body">
             {% if form.non_field_errors %}
@@ -470,48 +470,46 @@
         </div>
       </div>
 
-      <div class="col-lg-3">
-        <div class="sticky-summary">
-          <div class="card shadow-sm" id="price-summary" role="alert">
-            <div class="card-body">
-              <div class="d-flex align-items-center gap-2 mb-3">
-                <div class="spinner-border spinner-border-sm text-primary d-none" id="price-spinner" role="status">
-                  <span class="visually-hidden">Загрузка...</span>
-                </div>
-                <div>
-                  <div class="fw-semibold text-uppercase small text-muted mb-1">Текущий расчёт</div>
-                  <div class="small text-muted" id="price-summary-text">Выберите авто и даты аренды.</div>
-                </div>
+      <div class="col-12">
+        <div class="card shadow-sm" id="price-summary" role="alert">
+          <div class="card-body">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <div class="spinner-border spinner-border-sm text-primary d-none" id="price-spinner" role="status">
+                <span class="visually-hidden">Загрузка...</span>
               </div>
-              <div class="bg-light rounded p-3 mb-3">
-                <div class="text-muted small">К оплате</div>
-                <div class="h4 mb-0" id="price-summary-due">—</div>
+              <div>
+                <div class="fw-semibold text-uppercase small text-muted mb-1">Текущий расчёт</div>
+                <div class="small text-muted" id="price-summary-text">Выберите авто и даты аренды.</div>
               </div>
-              <div class="small" id="price-summary-breakdown">
-                <div class="d-flex justify-content-between">
-                  <span>Дней</span>
-                  <span id="price-summary-days">—</span>
-                </div>
-                <div class="d-flex justify-content-between">
-                  <span>Тариф</span>
-                  <span id="price-summary-rate">—</span>
-                </div>
-                <div class="d-flex justify-content-between">
-                  <span>Базово</span>
-                  <span id="price-summary-base">—</span>
-                </div>
-                <div class="d-flex justify-content-between">
-                  <span>Доп. услуги</span>
-                  <span id="price-summary-extras">—</span>
-                </div>
-                <div class="d-flex justify-content-between">
-                  <span>Скидки</span>
-                  <span id="price-summary-discounts">—</span>
-                </div>
-                <div class="d-flex justify-content-between fw-semibold">
-                  <span>Итого</span>
-                  <span id="price-summary-total">—</span>
-                </div>
+            </div>
+            <div class="bg-light rounded p-3 mb-3">
+              <div class="text-muted small">К оплате</div>
+              <div class="h4 mb-0" id="price-summary-due">—</div>
+            </div>
+            <div class="small" id="price-summary-breakdown">
+              <div class="d-flex justify-content-between">
+                <span>Дней</span>
+                <span id="price-summary-days">—</span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span>Тариф</span>
+                <span id="price-summary-rate">—</span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span>Базово</span>
+                <span id="price-summary-base">—</span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span>Доп. услуги</span>
+                <span id="price-summary-extras">—</span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span>Скидки</span>
+                <span id="price-summary-discounts">—</span>
+              </div>
+              <div class="d-flex justify-content-between fw-semibold">
+                <span>Итого</span>
+                <span id="price-summary-total">—</span>
               </div>
             </div>
           </div>

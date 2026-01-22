@@ -710,14 +710,3 @@ body[data-theme="dark"] .theme-toggle .icon-moon {
 #contractSnippet {
   white-space: pre-wrap;
 }
-
-.sticky-summary {
-  position: sticky;
-  top: 88px;
-}
-
-@media (max-width: 991.98px) {
-  .sticky-summary {
-    position: static;
-  }
-}

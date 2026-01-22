@@ -53,6 +53,8 @@ body[data-theme="light"] {
   --bs-table-striped-bg: color-mix(in srgb, var(--brand-contrast) 30%, var(--surface-1));
   --bs-table-border-color: color-mix(in srgb, var(--border-subtle) 85%, transparent);
   --bs-body-font-family: var(--font-family);
+  --bg-grid: color-mix(in srgb, var(--brand-strong) 7%, transparent);
+  --bg-sheen: color-mix(in srgb, var(--brand-soft) 10%, transparent);
 }
 
 body[data-theme="dark"] {
@@ -99,6 +101,8 @@ body[data-theme="dark"] {
   --bs-table-striped-bg: color-mix(in srgb, var(--brand-contrast) 30%, var(--surface-1));
   --bs-table-border-color: color-mix(in srgb, var(--border-subtle) 85%, transparent);
   --bs-body-font-family: var(--font-family);
+  --bg-grid: color-mix(in srgb, var(--brand) 9%, transparent);
+  --bg-sheen: color-mix(in srgb, var(--brand-strong) 12%, transparent);
 }
 
 body {
@@ -113,6 +117,21 @@ body {
         1400px at 80% 0%,
         color-mix(in srgb, var(--brand-strong) 12%, transparent),
         transparent 62%
+      ),
+    linear-gradient(180deg, var(--bg-sheen), transparent 55%),
+    repeating-linear-gradient(
+        90deg,
+        var(--bg-grid) 0,
+        var(--bg-grid) 1px,
+        transparent 1px,
+        transparent 140px
+      ),
+    repeating-linear-gradient(
+        0deg,
+        var(--bg-grid) 0,
+        var(--bg-grid) 1px,
+        transparent 1px,
+        transparent 140px
       ),
     var(--surface-0);
   color: var(--text-primary);
@@ -429,6 +448,22 @@ main.container {
 
 .table tbody tr + tr td {
   border-top: 1px solid color-mix(in srgb, var(--border-subtle) 80%, transparent);
+}
+
+.table tbody tr:hover {
+  background: color-mix(in srgb, var(--brand-contrast) 18%, var(--surface-1));
+}
+
+.form-control,
+.form-select {
+  border-color: color-mix(in srgb, var(--border-subtle) 85%, transparent);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: color-mix(in srgb, var(--brand) 45%, var(--border-subtle));
+  box-shadow: 0 0 0 0.15rem color-mix(in srgb, var(--brand) 18%, transparent);
 }
 
 .pagination-bar {

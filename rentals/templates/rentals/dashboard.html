@@ -6,7 +6,7 @@
       <div>
         <p class="text-uppercase text-white-50 fw-semibold small mb-1">Пульс парка</p>
         <h1 class="h4 text-white mb-2">Панель управления</h1>
-        <p class="text-white-50 mb-0">Быстрый обзор аренд, загрузки и выручки.</p>
+        <p class="text-white-50 mb-0">Быстрый обзор аренд и загрузки.</p>
       </div>
       <div class="d-flex gap-4 text-white">
         <div>
@@ -16,10 +16,6 @@
         <div>
           <div class="text-uppercase small text-white-50 mb-1">Завершено</div>
           <div class="fs-3 fw-bold">{{ completed_rentals }}</div>
-        </div>
-        <div>
-          <div class="text-uppercase small text-white-50 mb-1">Выручка</div>
-          <div class="fs-3 fw-bold">₽{{ total_revenue|floatformat:2 }}</div>
         </div>
       </div>
       <div class="d-flex flex-wrap gap-2">
@@ -31,7 +27,7 @@
   </div>
 
   <div class="row g-3 mb-4">
-    <div class="col-md-3">
+    <div class="col-md-4">
       <div class="card shadow-sm h-100">
         <div class="card-body">
           <p class="text-uppercase text-muted fw-semibold small mb-1">Всего аренд</p>
@@ -43,7 +39,7 @@
         </div>
       </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-4">
       <div class="card shadow-sm h-100">
         <div class="card-body">
           <p class="text-uppercase text-muted fw-semibold small mb-1">Активные</p>
@@ -55,7 +51,7 @@
         </div>
       </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-4">
       <div class="card shadow-sm h-100">
         <div class="card-body">
           <p class="text-uppercase text-muted fw-semibold small mb-1">Завершено</p>
@@ -63,19 +59,7 @@
             <div class="display-6 fw-bold">{{ completed_rentals }}</div>
             <span class="badge text-bg-light text-muted">За все время</span>
           </div>
-          <p class="text-muted small mb-0">Завершенные аренды с выручкой.</p>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card shadow-sm h-100">
-        <div class="card-body">
-          <p class="text-uppercase text-muted fw-semibold small mb-1">Выручка</p>
-          <div class="d-flex align-items-center justify-content-between">
-            <div class="display-6 fw-bold">₽{{ total_revenue|floatformat:2 }}</div>
-            <a class="btn btn-outline-primary btn-sm" href="{% url 'rentals:rental_list' %}">Аренды</a>
-          </div>
-          <p class="text-muted small mb-0">Сумма завершенных аренд.</p>
+          <p class="text-muted small mb-0">Завершенные аренды.</p>
         </div>
       </div>
     </div>

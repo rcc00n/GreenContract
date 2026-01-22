@@ -180,7 +180,18 @@
               </div>
               <div class="col-lg-3 col-md-6">
                 <label class="form-label" for="{{ form.start_time.id_for_label }}">Время выдачи</label>
-                {{ form.start_time }}
+                <div class="time-picker" data-time-picker data-time-step="15">
+                  <div class="input-group">
+                    {{ form.start_time }}
+                    <button class="btn btn-outline-secondary time-picker-toggle" type="button" aria-label="Выбрать время">
+                      <svg class="time-picker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 7v6l4 2" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="time-picker-menu" role="listbox" aria-label="Выбор времени"></div>
+                </div>
                 <div class="form-text">Нужен для расчёта аэропортового/ночного сбора.</div>
                 {% for error in form.start_time.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
@@ -192,7 +203,18 @@
               </div>
               <div class="col-lg-3 col-md-6">
                 <label class="form-label" for="{{ form.end_time.id_for_label }}">Время возврата</label>
-                {{ form.end_time }}
+                <div class="time-picker" data-time-picker data-time-step="15">
+                  <div class="input-group">
+                    {{ form.end_time }}
+                    <button class="btn btn-outline-secondary time-picker-toggle" type="button" aria-label="Выбрать время">
+                      <svg class="time-picker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 7v6l4 2" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="time-picker-menu" role="listbox" aria-label="Выбор времени"></div>
+                </div>
                 <div class="form-text">Для ночных/аэропортовых сборов при возврате.</div>
                 {% for error in form.end_time.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
@@ -729,6 +751,245 @@
 
         toggleBtn?.addEventListener("click", () => {
           setSecondDriverActive(!isSecondDriverActive);
+        });
+      })();
+    </script>
+
+    <script>
+      (function() {
+        const pickers = Array.from(document.querySelectorAll("[data-time-picker]"));
+        if (!pickers.length) return;
+
+        const minutesInDay = 24 * 60;
+
+        function pad(value) {
+          return String(value).padStart(2, "0");
+        }
+
+        function formatTime(totalMinutes) {
+          const safe = ((totalMinutes % minutesInDay) + minutesInDay) % minutesInDay;
+          const hours = Math.floor(safe / 60);
+          const minutes = safe % 60;
+          return `${pad(hours)}:${pad(minutes)}`;
+        }
+
+        function parseTime(value) {
+          if (!value) return null;
+          const normalized = String(value).trim();
+          if (!normalized) return null;
+          const match = normalized.match(/^(\d{1,2})\s*[:.]\s*(\d{1,2})$/);
+          if (match) {
+            const hours = Number.parseInt(match[1], 10);
+            const minutes = Number.parseInt(match[2], 10);
+            if (
+              Number.isFinite(hours) &&
+              Number.isFinite(minutes) &&
+              hours >= 0 &&
+              hours <= 23 &&
+              minutes >= 0 &&
+              minutes <= 59
+            ) {
+              return hours * 60 + minutes;
+            }
+            return null;
+          }
+          const digits = normalized.replace(/\D/g, "");
+          if (digits.length === 1 || digits.length === 2) {
+            const hours = Number.parseInt(digits, 10);
+            if (!Number.isFinite(hours) || hours < 0 || hours > 23) return null;
+            return hours * 60;
+          }
+          if (digits.length === 3) {
+            const hours = Number.parseInt(digits.slice(0, 1), 10);
+            const minutes = Number.parseInt(digits.slice(1), 10);
+            if (
+              !Number.isFinite(hours) ||
+              !Number.isFinite(minutes) ||
+              hours < 0 ||
+              hours > 9 ||
+              minutes < 0 ||
+              minutes > 59
+            ) {
+              return null;
+            }
+            return hours * 60 + minutes;
+          }
+          if (digits.length >= 4) {
+            const hours = Number.parseInt(digits.slice(0, 2), 10);
+            const minutes = Number.parseInt(digits.slice(2, 4), 10);
+            if (
+              !Number.isFinite(hours) ||
+              !Number.isFinite(minutes) ||
+              hours < 0 ||
+              hours > 23 ||
+              minutes < 0 ||
+              minutes > 59
+            ) {
+              return null;
+            }
+            return hours * 60 + minutes;
+          }
+          return null;
+        }
+
+        function clampMinutes(totalMinutes) {
+          if (totalMinutes === null || Number.isNaN(totalMinutes)) return null;
+          return ((totalMinutes % minutesInDay) + minutesInDay) % minutesInDay;
+        }
+
+        function roundToStep(totalMinutes, step) {
+          if (totalMinutes === null) return null;
+          const rounded = Math.round(totalMinutes / step) * step;
+          return clampMinutes(rounded === minutesInDay ? 0 : rounded);
+        }
+
+        function buildMenu(menu, step) {
+          const quick = document.createElement("div");
+          quick.className = "time-picker-quick";
+
+          const quickButtons = [
+            { label: "Сейчас", action: "now" },
+            { label: "+30 мин", action: "add", minutes: 30 },
+            { label: "+1 час", action: "add", minutes: 60 },
+            { label: "09:00", action: "set", time: "09:00" },
+            { label: "12:00", action: "set", time: "12:00" },
+            { label: "15:00", action: "set", time: "15:00" },
+            { label: "18:00", action: "set", time: "18:00" },
+            { label: "21:00", action: "set", time: "21:00" },
+          ];
+
+          quickButtons.forEach((item) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "time-chip";
+            btn.textContent = item.label;
+            if (item.action === "now") {
+              btn.dataset.timeAction = "now";
+            } else if (item.action === "add") {
+              btn.dataset.timeAction = "add";
+              btn.dataset.timeAdd = String(item.minutes || 0);
+            } else if (item.action === "set") {
+              btn.dataset.timeAction = "set";
+              btn.dataset.timeValue = item.time;
+            }
+            quick.appendChild(btn);
+          });
+
+          const grid = document.createElement("div");
+          grid.className = "time-picker-grid";
+          for (let minutes = 0; minutes < minutesInDay; minutes += step) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "time-chip";
+            btn.dataset.timeValue = formatTime(minutes);
+            btn.textContent = btn.dataset.timeValue;
+            grid.appendChild(btn);
+          }
+
+          menu.appendChild(quick);
+          menu.appendChild(grid);
+        }
+
+        function highlightSelection(menu, value) {
+          if (!menu) return;
+          const buttons = menu.querySelectorAll("[data-time-value]");
+          buttons.forEach((btn) => {
+            btn.classList.toggle("is-active", btn.dataset.timeValue === value);
+          });
+        }
+
+        function initPicker(picker) {
+          const input = picker.querySelector("input");
+          const toggle = picker.querySelector(".time-picker-toggle");
+          const menu = picker.querySelector(".time-picker-menu");
+          if (!input || !toggle || !menu) return;
+          function nowMinutes() {
+            const now = new Date();
+            return now.getHours() * 60 + now.getMinutes();
+          }
+
+          const step = Number.parseInt(picker.dataset.timeStep || "15", 10) || 15;
+          buildMenu(menu, step);
+
+          function setValue(value) {
+            if (!value) return;
+            input.value = value;
+            highlightSelection(menu, value);
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+
+          function openMenu() {
+            menu.classList.add("show");
+            highlightSelection(menu, input.value);
+          }
+
+          function closeMenu() {
+            menu.classList.remove("show");
+          }
+
+          toggle.addEventListener("click", () => {
+            if (menu.classList.contains("show")) {
+              closeMenu();
+            } else {
+              openMenu();
+            }
+          });
+
+          input.addEventListener("focus", openMenu);
+          input.addEventListener("input", () => highlightSelection(menu, input.value));
+          input.addEventListener("blur", () => {
+            const parsed = clampMinutes(parseTime(input.value));
+            if (parsed === null) {
+              input.value = "";
+              highlightSelection(menu, "");
+              return;
+            }
+            const normalized = formatTime(parsed);
+            if (normalized !== input.value) {
+              setValue(normalized);
+            }
+          });
+
+          menu.addEventListener("click", (event) => {
+            const target = event.target instanceof HTMLElement ? event.target.closest("button") : null;
+            if (!target) return;
+            const action = target.dataset.timeAction;
+            if (action === "now") {
+              const minutes = nowMinutes();
+              const rounded = roundToStep(minutes, step);
+              setValue(formatTime(rounded ?? 0));
+              closeMenu();
+              return;
+            }
+            if (action === "add") {
+              const delta = Number.parseInt(target.dataset.timeAdd || "0", 10);
+              const base = clampMinutes(parseTime(input.value));
+              const minutes = base === null ? roundToStep(nowMinutes(), step) : base;
+              const next = clampMinutes((minutes ?? 0) + delta);
+              const rounded = roundToStep(next, step);
+              setValue(formatTime(rounded ?? 0));
+              closeMenu();
+              return;
+            }
+            const timeValue = target.dataset.timeValue;
+            if (timeValue) {
+              setValue(timeValue);
+              closeMenu();
+            }
+          });
+
+          return { closeMenu };
+        }
+
+        const instances = pickers.map(initPicker).filter(Boolean);
+
+        document.addEventListener("click", (event) => {
+          pickers.forEach((picker, index) => {
+            if (!picker.contains(event.target)) {
+              instances[index]?.closeMenu();
+            }
+          });
         });
       })();
     </script>

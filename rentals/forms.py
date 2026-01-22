@@ -280,8 +280,12 @@ class RentalForm(StyledModelForm):
         for name in ("start_time", "end_time"):
             if name in self.fields:
                 widget = self.fields[name].widget
-                widget.input_type = "time"
+                widget.input_type = "text"
                 widget.attrs.setdefault("placeholder", "ЧЧ:ММ")
+                widget.attrs.setdefault("inputmode", "numeric")
+                widget.attrs.setdefault("pattern", "[0-9]{2}:[0-9]{2}")
+                widget.attrs.setdefault("autocomplete", "off")
+                widget.attrs.setdefault("data-time-picker-input", "true")
 
         for name in (
             "child_seat_included",

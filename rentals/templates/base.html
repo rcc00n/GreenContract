@@ -69,7 +69,6 @@
       (() => {
         const toggle = document.getElementById("themeToggle");
         const label = document.getElementById("themeToggleLabel");
-        const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
         const storedTheme = localStorage.getItem("theme");
         let userSelected = Boolean(storedTheme);
 
@@ -88,24 +87,13 @@
           document.dispatchEvent(new CustomEvent("theme:changed", { detail: { theme: nextTheme } }));
         };
 
-        applyTheme(storedTheme || (mediaQuery.matches ? "dark" : "light"), Boolean(storedTheme));
+        applyTheme(storedTheme || "light", Boolean(storedTheme));
 
         toggle?.addEventListener("click", () => {
           const next = document.body.dataset.theme === "dark" ? "light" : "dark";
           applyTheme(next, true);
         });
 
-        const handleSchemeChange = (event) => {
-          if (!userSelected) {
-            applyTheme(event.matches ? "dark" : "light");
-          }
-        };
-
-        if (mediaQuery.addEventListener) {
-          mediaQuery.addEventListener("change", handleSchemeChange);
-        } else if (mediaQuery.addListener) {
-          mediaQuery.addListener(handleSchemeChange);
-        }
       })();
     </script>
   </body>

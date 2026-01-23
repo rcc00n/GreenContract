@@ -203,6 +203,73 @@ body {
   padding-right: 0;
 }
 
+.login-partner-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed color-mix(in srgb, var(--border-subtle) 65%, transparent);
+}
+
+.login-partner-logo {
+  display: block;
+  height: auto;
+  object-fit: contain;
+}
+
+.login-partner-logo--greenrent {
+  max-width: 220px;
+  width: 100%;
+}
+
+.login-partner-x {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 60%, transparent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-strong);
+  background: color-mix(in srgb, var(--surface-1) 90%, transparent);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+}
+
+.login-partner-raccoon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.login-partner-logo--raccoon {
+  width: 88px;
+  height: 88px;
+  filter: drop-shadow(0 8px 14px rgba(74, 120, 255, 0.25));
+}
+
+.login-partner-name {
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 575.98px) {
+  .login-partner-banner {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .login-partner-logo--greenrent {
+    max-width: 180px;
+  }
+}
+
 @media (max-width: 991.98px) {
   .navbar.theme-navbar .nav-main {
     width: 100%;

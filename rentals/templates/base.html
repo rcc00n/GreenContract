@@ -42,7 +42,10 @@
             {% if user.is_authenticated %}
               <div class="nav-action-links">
                 <a class="nav-link" href="{% url 'rentals:password_change' %}">Сменить пароль</a>
-                <a class="nav-link" href="{% url 'logout' %}">Выйти</a>
+                <form method="post" action="{% url 'logout' %}">
+                  {% csrf_token %}
+                  <button class="nav-link btn btn-link p-0" type="submit">Выйти</button>
+                </form>
               </div>
             {% else %}
               <a class="nav-link" href="{% url 'login' %}">Войти</a>

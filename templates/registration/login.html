@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% load form_extras %}
 
 {% block content %}
@@ -28,6 +29,23 @@
               <button class="btn btn-primary" type="submit">Войти</button>
             </div>
           </form>
+
+          <div class="login-partner-banner mt-4" aria-label="GreenRent x Raccoon Code">
+            <img
+              class="login-partner-logo login-partner-logo--greenrent"
+              src="{% static 'rentals/img/greenrent-logo.svg' %}"
+              alt="GreenRent"
+            >
+            <div class="login-partner-x" aria-hidden="true">X</div>
+            <div class="login-partner-raccoon">
+              <img
+                class="login-partner-logo login-partner-logo--raccoon"
+                src="{% static 'rentals/img/raccoon-logo.png' %}"
+                alt="Raccoon Code"
+              >
+              <div class="login-partner-name">Raccoon Code</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

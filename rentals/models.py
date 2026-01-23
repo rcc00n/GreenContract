@@ -380,21 +380,13 @@ class Rental(models.Model):
         blank=True,
         help_text="Сумма к оплате после предоплаты.",
     )
-    airport_fee_start = models.DecimalField(
-        "Сбор аэропорт (выдача)",
+    car_wash_fee = models.DecimalField(
+        "Мойка",
         max_digits=8,
         decimal_places=2,
-        default=Decimal("0.00"),
+        default=Decimal("1000.00"),
         blank=True,
-        help_text="Сбор при выдаче в аэропорту.",
-    )
-    airport_fee_end = models.DecimalField(
-        "Сбор аэропорт (возврат)",
-        max_digits=8,
-        decimal_places=2,
-        default=Decimal("0.00"),
-        blank=True,
-        help_text="Сбор при возврате в аэропорту.",
+        help_text="Стоимость мойки автомобиля.",
     )
     night_fee_start = models.DecimalField(
         "Ночной выход (выдача)",

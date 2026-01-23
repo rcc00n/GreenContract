@@ -266,6 +266,12 @@ class RentalForm(StyledModelForm):
         super().__init__(*args, **kwargs)
         self._limit_customer_queryset("customer", "_customer_label")
         self._limit_customer_queryset("second_driver", "_second_driver_label")
+        self.initial_car_label = ""
+        if getattr(self.instance, "car_id", None):
+            try:
+                self.initial_car_label = str(self.instance.car)
+            except Exception:
+                self.initial_car_label = ""
         if "contract_number" in self.fields:
             field = self.fields["contract_number"]
             field.disabled = True
@@ -286,6 +292,10 @@ class RentalForm(StyledModelForm):
 
         for name in ("start_date", "end_date"):
             _configure_date_field(self.fields[name])
+            widget = self.fields[name].widget
+            widget.input_type = "date"
+            widget.format = "%Y-%m-%d"
+            widget.attrs.setdefault("data-date-input", "true")
 
         if "operation_regions" in self.fields and not self.is_bound:
             raw_regions = (getattr(self.instance, "operation_regions", "") or "").strip()
@@ -321,8 +331,7 @@ class RentalForm(StyledModelForm):
 
         numeric_optional = (
             "unique_daily_rate",
-            "airport_fee_start",
-            "airport_fee_end",
+            "car_wash_fee",
             "night_fee_start",
             "night_fee_end",
             "delivery_issue_fee",
@@ -354,9 +363,14 @@ class RentalForm(StyledModelForm):
         if "discount_percent" in self.fields:
             self.fields["discount_percent"].widget.attrs.setdefault("max", "100")
 
-        priority_cities = ["Симферополь", "Минеральные Воды"]
+        priority_cities = [
+            "Симферополь-0",
+            "Симферополь-1000",
+            "Минеральные Воды-0",
+            "Минеральные Воды-1000",
+        ]
         ordered_cities = [city for city in priority_cities if city in DELIVERY_FEES]
-        ordered_cities += sorted(city for city in DELIVERY_FEES.keys() if city not in priority_cities)
+        ordered_cities += sorted(city for city in DELIVERY_FEES.keys() if city not in ordered_cities)
         delivery_choices = [("", "Без доставки")] + [(city, city) for city in ordered_cities]
         for name in ("delivery_issue_city", "delivery_return_city"):
             if name in self.fields:
@@ -380,8 +394,7 @@ class RentalForm(StyledModelForm):
             "mileage_limit_km",
             "unique_daily_rate",
             "daily_rate",
-            "airport_fee_start",
-            "airport_fee_end",
+            "car_wash_fee",
             "night_fee_start",
             "night_fee_end",
             "delivery_issue_city",
@@ -420,8 +433,7 @@ class RentalForm(StyledModelForm):
             "unique_daily_rate": "Уникальный тариф (за сутки)",
             "daily_rate": "Суточный тариф",
             "total_price": "Итоговая сумма",
-            "airport_fee_start": "Аэропорт (выдача)",
-            "airport_fee_end": "Аэропорт (возврат)",
+            "car_wash_fee": "Мойка",
             "night_fee_start": "Ночной выход (выдача)",
             "night_fee_end": "Ночной выход (возврат)",
             "delivery_issue_city": "Доставка: выдача в городе",
@@ -448,6 +460,7 @@ class RentalForm(StyledModelForm):
         help_texts = {
             "operation_regions": "Укажите регионы, в которых разрешена эксплуатация.",
             "mileage_limit_km": "0 — без ограничения пробега.",
+            "car_wash_fee": "Стоимость мойки, ₽.",
         }
 
     def clean(self):
@@ -486,8 +499,7 @@ class RentalForm(StyledModelForm):
                 start_time=cleaned_data.get("start_time"),
                 end_time=cleaned_data.get("end_time"),
                 unique_daily_rate=cleaned_data.get("unique_daily_rate"),
-                airport_fee_start=cleaned_data.get("airport_fee_start"),
-                airport_fee_end=cleaned_data.get("airport_fee_end"),
+                car_wash_fee=cleaned_data.get("car_wash_fee"),
                 night_fee_start=cleaned_data.get("night_fee_start"),
                 night_fee_end=cleaned_data.get("night_fee_end"),
                 delivery_issue_city=cleaned_data.get("delivery_issue_city") or "",

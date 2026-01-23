@@ -1079,6 +1079,7 @@ class RentalCreateView(CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["car_pricing"] = [_serialize_car_pricing(car) for car in Car.objects.all()]
+        context["car_initial_label"] = getattr(context.get("form"), "initial_car_label", "")
         context["customer_initial_label"] = getattr(context.get("form"), "initial_customer_label", "")
         context["second_driver_initial_label"] = getattr(
             context.get("form"), "initial_second_driver_label", ""
@@ -1105,6 +1106,7 @@ class RentalUpdateView(UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["car_pricing"] = [_serialize_car_pricing(car) for car in Car.objects.all()]
+        context["car_initial_label"] = getattr(context.get("form"), "initial_car_label", "")
         context["customer_initial_label"] = getattr(context.get("form"), "initial_customer_label", "")
         context["second_driver_initial_label"] = getattr(
             context.get("form"), "initial_second_driver_label", ""

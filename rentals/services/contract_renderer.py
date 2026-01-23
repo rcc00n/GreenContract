@@ -87,8 +87,7 @@ PLACEHOLDER_GUIDE = [
             "rental.advance_payment_text": "Предоплата прописью",
             "rental.discount_amount": "Скидка суммой",
             "rental.discount_percent": "Скидка, %",
-            "rental.airport_fee_start": "Сбор при выдаче в аэропорту",
-            "rental.airport_fee_end": "Сбор при возврате в аэропорту",
+            "rental.car_wash_fee": "Мойка",
             "rental.night_fee_start": "Ночной выход (выдача)",
             "rental.night_fee_end": "Ночной выход (возврат)",
             "rental.delivery_issue_city": "Город выдачи (доставка)",
@@ -179,6 +178,7 @@ PLACEHOLDER_ALIASES_RU = {
     "rental.discount_percent": "аренда.скидка_процент",
     "rental.airport_fee_start": "аренда.аэропорт_выдача",
     "rental.airport_fee_end": "аренда.аэропорт_возврат",
+    "rental.car_wash_fee": "аренда.мойка",
     "rental.night_fee_start": "аренда.ночной_выход_выдача",
     "rental.night_fee_end": "аренда.ночной_выход_возврат",
     "rental.delivery_issue_city": "аренда.доставка_город_выдачи",
@@ -286,6 +286,8 @@ class _RentalTemplateProxy:
             return _fmt_date(getattr(self._rental, name))
         if name in {"start_time", "end_time"}:
             return _fmt_time(getattr(self._rental, name))
+        if name in {"delivery_issue_city", "delivery_return_city"}:
+            return _normalize_delivery_city(getattr(self._rental, name, ""))
         if name == "date_range":
             return _format_date_range(self._rental.start_date, self._rental.end_date)
         if name == "deal_name":
@@ -370,6 +372,13 @@ def _format_date_range(start_date, end_date) -> str:
     if start and end:
         return f"{start} — {end}"
     return start or end
+
+
+def _normalize_delivery_city(value: str | None) -> str:
+    if not value:
+        return ""
+    text = str(value).strip()
+    return re.sub(r"\s*[-–—]\s*\d+\s*$", "", text)
 
 
 def _format_deal_name(rental: Rental) -> str:
@@ -475,13 +484,14 @@ def build_placeholder_values(rental: Rental) -> dict[str, str]:
         "rental.advance_payment_text": rental.advance_payment_text,
         "rental.discount_amount": _fmt_decimal(rental.discount_amount),
         "rental.discount_percent": _fmt_decimal(rental.discount_percent),
-        "rental.airport_fee_start": _fmt_decimal(rental.airport_fee_start),
-        "rental.airport_fee_end": _fmt_decimal(rental.airport_fee_end),
+        "rental.airport_fee_start": _fmt_decimal(getattr(rental, "airport_fee_start", "")),
+        "rental.airport_fee_end": _fmt_decimal(getattr(rental, "airport_fee_end", "")),
+        "rental.car_wash_fee": _fmt_decimal(getattr(rental, "car_wash_fee", "")),
         "rental.night_fee_start": _fmt_decimal(rental.night_fee_start),
         "rental.night_fee_end": _fmt_decimal(rental.night_fee_end),
-        "rental.delivery_issue_city": rental.delivery_issue_city,
+        "rental.delivery_issue_city": _normalize_delivery_city(rental.delivery_issue_city),
         "rental.delivery_issue_fee": _fmt_decimal(rental.delivery_issue_fee),
-        "rental.delivery_return_city": rental.delivery_return_city,
+        "rental.delivery_return_city": _normalize_delivery_city(rental.delivery_return_city),
         "rental.delivery_return_fee": _fmt_decimal(rental.delivery_return_fee),
         "rental.operation_regions": rental.operation_regions,
         "rental.mileage_limit_km": _fmt_decimal(rental.mileage_limit_km),

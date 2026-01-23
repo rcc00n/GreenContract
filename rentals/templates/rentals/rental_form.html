@@ -27,8 +27,24 @@
 
               <div class="col-md-6">
                 <label class="form-label" for="{{ form.car.id_for_label }}">Автомобиль</label>
+                <div class="position-relative mb-2">
+                  <input
+                    type="search"
+                    class="form-control{% if form.car.errors %} is-invalid{% endif %}"
+                    id="car-search"
+                    placeholder="Введите госномер для поиска"
+                    autocomplete="off"
+                    data-initial-label="{{ car_initial_label|default_if_none:'' }}"
+                  >
+                  <div
+                    class="dropdown-menu w-100 shadow-sm"
+                    id="car-search-results"
+                    aria-label="Результаты поиска автомобиля"
+                    style="max-height: 240px; overflow-y: auto;"
+                  ></div>
+                </div>
                 {{ form.car }}
-                <div class="form-text">Авто из списка автоматически подтягивает цену по длительности.</div>
+                <div class="form-text">Поиск по госномеру, затем выберите авто из списка.</div>
                 {% for error in form.car.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
               <div class="col-md-6">
@@ -174,7 +190,20 @@
 
               <div class="col-lg-3 col-md-6">
                 <label class="form-label" for="{{ form.start_date.id_for_label }}">Дата начала</label>
-                {{ form.start_date }}
+                <div class="input-group">
+                  {{ form.start_date }}
+                  <button
+                    class="btn btn-outline-secondary date-picker-toggle"
+                    type="button"
+                    aria-label="Выбрать дату начала"
+                    data-date-target="{{ form.start_date.id_for_label }}"
+                  >
+                    <svg class="time-picker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <rect x="3" y="4" width="18" height="18" rx="2" />
+                      <path d="M16 2v4M8 2v4M3 10h18" />
+                    </svg>
+                  </button>
+                </div>
                 <div class="form-text">Выберите дату начала аренды.</div>
                 {% for error in form.start_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
@@ -197,7 +226,20 @@
               </div>
               <div class="col-lg-3 col-md-6">
                 <label class="form-label" for="{{ form.end_date.id_for_label }}">Дата окончания</label>
-                {{ form.end_date }}
+                <div class="input-group">
+                  {{ form.end_date }}
+                  <button
+                    class="btn btn-outline-secondary date-picker-toggle"
+                    type="button"
+                    aria-label="Выбрать дату окончания"
+                    data-date-target="{{ form.end_date.id_for_label }}"
+                  >
+                    <svg class="time-picker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <rect x="3" y="4" width="18" height="18" rx="2" />
+                      <path d="M16 2v4M8 2v4M3 10h18" />
+                    </svg>
+                  </button>
+                </div>
                 <div class="form-text">Система подставит цену в зависимости от количества дней.</div>
                 {% for error in form.end_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
@@ -217,16 +259,6 @@
                 </div>
                 <div class="form-text">Для ночных/аэропортовых сборов при возврате.</div>
                 {% for error in form.end_time.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-              </div>
-
-              <div class="col-12">
-                <div class="d-flex flex-wrap gap-2 align-items-center">
-                  <span class="small text-muted">Быстрый выбор длительности:</span>
-                  <button class="btn btn-sm btn-outline-secondary" type="button" data-days="3">3 дня</button>
-                  <button class="btn btn-sm btn-outline-secondary" type="button" data-days="7">7 дней</button>
-                  <button class="btn btn-sm btn-outline-secondary" type="button" data-days="14">14 дней</button>
-                  <button class="btn btn-sm btn-outline-secondary" type="button" data-days="30">30 дней</button>
-                </div>
               </div>
 
               <div class="col-12">
@@ -285,7 +317,15 @@
 
               <div class="col-12">
                 <div class="border rounded p-3 bg-light">
-                  <div class="fw-semibold mb-2">Аэропорт, ночной выход, доставка</div>
+                  <div class="fw-semibold mb-2">Мойка, ночной выход, доставка</div>
+                  <div class="row g-3 mb-2">
+                    <div class="col-lg-4 col-md-6">
+                      <label class="form-label" for="{{ form.car_wash_fee.id_for_label }}">Мойка</label>
+                      {{ form.car_wash_fee }}
+                      <div class="form-text">По умолчанию 1000 ₽, можно изменить.</div>
+                      {% for error in form.car_wash_fee.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                  </div>
                   <div class="row g-3">
                     <div class="col-lg-6">
                       <div class="border rounded p-3 h-100">
@@ -296,12 +336,6 @@
                           </button>
                         </div>
                         <div class="row g-2">
-                          <div class="col-sm-6">
-                            <label class="form-label" for="{{ form.airport_fee_start.id_for_label }}">Аэропорт</label>
-                            {{ form.airport_fee_start }}
-                            <div class="form-text">Рассчитывается по времени, можно поправить.</div>
-                            {% for error in form.airport_fee_start.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-                          </div>
                           <div class="col-sm-6">
                             <label class="form-label" for="{{ form.night_fee_start.id_for_label }}">Ночной выход</label>
                             {{ form.night_fee_start }}
@@ -355,12 +389,6 @@
                           </button>
                         </div>
                         <div class="row g-2">
-                          <div class="col-sm-6">
-                            <label class="form-label" for="{{ form.airport_fee_end.id_for_label }}">Аэропорт</label>
-                            {{ form.airport_fee_end }}
-                            <div class="form-text">По времени возврата.</div>
-                            {% for error in form.airport_fee_end.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-                          </div>
                           <div class="col-sm-6">
                             <label class="form-label" for="{{ form.night_fee_end.id_for_label }}">Ночной выход</label>
                             {{ form.night_fee_end }}
@@ -1196,21 +1224,19 @@
         const summaryDiscounts = document.getElementById("price-summary-discounts");
         const summaryTotal = document.getElementById("price-summary-total");
         const summaryDue = document.getElementById("price-summary-due");
-        const quickButtons = document.querySelectorAll("button[data-days]");
         const contractInput = document.getElementById("id_contract_number");
         const dealPreview = document.getElementById("deal-name-preview");
         const carDetails = document.getElementById("car-details");
         const carDetailsEmpty = document.getElementById("car-details-empty");
         const carEditLink = document.getElementById("car-edit-link");
         const customerSearchInput = document.getElementById("customer-search");
-        const airportStartInput = document.getElementById("id_airport_fee_start");
-        const airportEndInput = document.getElementById("id_airport_fee_end");
         const nightStartInput = document.getElementById("id_night_fee_start");
         const nightEndInput = document.getElementById("id_night_fee_end");
         const deliveryIssueCity = document.getElementById("id_delivery_issue_city");
         const deliveryReturnCity = document.getElementById("id_delivery_return_city");
         const deliveryIssueFee = document.getElementById("id_delivery_issue_fee");
         const deliveryReturnFee = document.getElementById("id_delivery_return_fee");
+        const carWashInput = document.getElementById("id_car_wash_fee");
         const childSeatToggle = document.getElementById("id_child_seat_included");
         const boosterToggle = document.getElementById("id_booster_included");
         const skiRackToggle = document.getElementById("id_ski_rack_included");
@@ -1223,16 +1249,130 @@
         const timeFillButtons = document.querySelectorAll("[data-time-fill]");
         const carPricingData = window.JSON.parse((document.getElementById("car-pricing-data") || { textContent: "[]" }).textContent);
         const pricingConfig = window.JSON.parse((document.getElementById("pricing-config-data") || { textContent: "{}" }).textContent);
+        const carSearchInput = document.getElementById("car-search");
+        const carSearchResults = document.getElementById("car-search-results");
         let selectedCustomerName = (customerSearchInput?.value || "").trim();
         let currentCar = null;
 
         const msPerDay = 24 * 60 * 60 * 1000;
         const manualTimeFlags = {
-          airportStart: false,
-          airportEnd: false,
           nightStart: false,
           nightEnd: false,
         };
+
+        document.querySelectorAll(".date-picker-toggle").forEach((btn) => {
+          const targetId = btn.getAttribute("data-date-target");
+          const input = targetId ? document.getElementById(targetId) : null;
+          btn.addEventListener("click", () => {
+            if (!input) return;
+            if (typeof input.showPicker === "function") {
+              input.showPicker();
+            } else {
+              input.focus();
+            }
+          });
+        });
+
+        const carIndex = new Map();
+        carPricingData.forEach((car) => {
+          carIndex.set(String(car.id), car);
+        });
+
+        function clearCarResults() {
+          if (!carSearchResults) return;
+          carSearchResults.innerHTML = "";
+          carSearchResults.classList.remove("show");
+        }
+
+        function renderCarResults(items, term) {
+          if (!carSearchResults) return;
+          clearCarResults();
+          if (!items.length) {
+            const empty = document.createElement("div");
+            empty.className = "dropdown-item text-muted small";
+            empty.textContent = term ? "Ничего не найдено" : "Начните вводить госномер";
+            carSearchResults.appendChild(empty);
+            carSearchResults.classList.add("show");
+            return;
+          }
+          items.forEach((item) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "dropdown-item text-wrap";
+            btn.dataset.id = item.id;
+            btn.addEventListener("click", () => selectCar(item));
+
+            const title = document.createElement("div");
+            title.className = "fw-semibold";
+            title.textContent = item.plate_number || item.label || "";
+
+            const meta = document.createElement("div");
+            meta.className = "small text-muted";
+            meta.textContent = [item.make, item.model, item.year].filter(Boolean).join(" ");
+
+            btn.appendChild(title);
+            btn.appendChild(meta);
+            carSearchResults.appendChild(btn);
+          });
+          carSearchResults.classList.add("show");
+        }
+
+        function selectCar(item) {
+          if (!item || !carSelect) return;
+          carSelect.value = String(item.id);
+          carSelect.dispatchEvent(new Event("change", { bubbles: true }));
+          if (carSearchInput) {
+            carSearchInput.value = item.plate_number || item.label || "";
+          }
+          clearCarResults();
+        }
+
+        function updateCarSearchFromSelect() {
+          if (!carSelect || !carSearchInput) return;
+          const selectedId = carSelect.value;
+          const car = carIndex.get(String(selectedId));
+          if (car) {
+            carSearchInput.value = car.plate_number || car.label || "";
+          } else {
+            carSearchInput.value = "";
+          }
+        }
+
+        if (carSearchInput && carSearchResults && carSelect) {
+          const initialLabel = carSearchInput.dataset.initialLabel || "";
+          if (initialLabel) {
+            carSearchInput.value = initialLabel;
+          } else {
+            updateCarSearchFromSelect();
+          }
+
+          carSearchInput.addEventListener("input", () => {
+            const term = carSearchInput.value.trim().toLowerCase();
+            if (term.length < 1) {
+              clearCarResults();
+              return;
+            }
+            const matches = carPricingData
+              .filter((car) => (car.plate_number || "").toLowerCase().includes(term))
+              .slice(0, 8);
+            renderCarResults(matches, term);
+          });
+
+          carSearchInput.addEventListener("focus", () => {
+            if (carSearchResults.innerHTML.trim()) {
+              carSearchResults.classList.add("show");
+            }
+          });
+
+          document.addEventListener("click", (event) => {
+            if (event.target === carSearchInput || carSearchResults.contains(event.target)) {
+              return;
+            }
+            clearCarResults();
+          });
+
+          carSelect.addEventListener("change", updateCarSearchFromSelect);
+        }
 
         function roundMoney(value) {
           const numeric = Number(value);
@@ -1409,16 +1549,10 @@
         function autoFillTimeFees(target, { force = false } = {}) {
           const isStart = target === "start";
           const minutes = parseTimeMinutes(isStart ? startTimeInput?.value : endTimeInput?.value);
-          const airportInput = isStart ? airportStartInput : airportEndInput;
           const nightInput = isStart ? nightStartInput : nightEndInput;
-          const airportKey = isStart ? "airportStart" : "airportEnd";
           const nightKey = isStart ? "nightStart" : "nightEnd";
-          const airportFee = feeByTime(minutes, pricingConfig.airport_slots || [], pricingConfig.airport_default || 0);
           const nightFee = feeByTime(minutes, pricingConfig.night_slots || [], pricingConfig.night_default || 0);
 
-          if (airportInput && (!manualTimeFlags[airportKey] || force || !airportInput.value)) {
-            setNumber(airportInput, airportFee);
-          }
           if (nightInput && (!manualTimeFlags[nightKey] || force || !nightInput.value)) {
             setNumber(nightInput, nightFee);
           }
@@ -1461,12 +1595,6 @@
           const baseRate = roundMoney(uniqueRate > 0 ? uniqueRate : pickRate(currentCar, days));
           const baseTotal = roundMoney(baseRate * days);
 
-          if (airportStartInput && !airportStartInput.value && !manualTimeFlags.airportStart) {
-            setNumber(airportStartInput, pricingConfig.airport_default || 0);
-          }
-          if (airportEndInput && !airportEndInput.value && !manualTimeFlags.airportEnd) {
-            setNumber(airportEndInput, pricingConfig.airport_default || 0);
-          }
           if (nightStartInput && !nightStartInput.value && !manualTimeFlags.nightStart) {
             setNumber(nightStartInput, pricingConfig.night_default || 0);
           }
@@ -1474,7 +1602,7 @@
             setNumber(nightEndInput, pricingConfig.night_default || 0);
           }
 
-          const airportTotal = roundMoney(parseNumber(airportStartInput) + parseNumber(airportEndInput));
+          const carWashTotal = Math.max(parseNumber(carWashInput), 0);
           const nightTotal = roundMoney(parseNumber(nightStartInput) + parseNumber(nightEndInput));
           const deliveryTotal = roundMoney(parseNumber(deliveryIssueFee) + parseNumber(deliveryReturnFee));
 
@@ -1498,7 +1626,7 @@
           const manualEquipment = Math.max(parseNumber(equipmentManualInput), 0);
           const equipmentTotal = manualEquipment > 0 ? roundMoney(manualEquipment) : roundMoney(seatsTotal + boostersTotal + gearTotal);
 
-          const extras = roundMoney(airportTotal + nightTotal + deliveryTotal + equipmentTotal);
+          const extras = roundMoney(carWashTotal + nightTotal + deliveryTotal + equipmentTotal);
           const subtotal = roundMoney(baseTotal + extras);
 
           const discountAmount = Math.min(Math.max(parseNumber(discountAmountInput), 0), subtotal);
@@ -1537,36 +1665,12 @@
           if (summaryDue) summaryDue.textContent = formatMoney(due);
         }
 
-        quickButtons.forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const days = Number(btn.getAttribute("data-days") || "0");
-            const startDate = parseDate(startInput?.value) || new Date();
-            const endDate = new Date(startDate.getTime() + days * msPerDay);
-            const format = (date) => {
-              const y = date.getUTCFullYear();
-              const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-              const d = String(date.getUTCDate()).padStart(2, "0");
-              return `${d}-${m}-${y}`;
-            };
-            if (startInput && !startInput.value) {
-              startInput.value = format(startDate);
-            }
-            if (endInput) {
-              endInput.value = format(endDate);
-            }
-            autoFillTimeFees("start");
-            autoFillTimeFees("end");
-            calculatePricing(true);
-          });
-        });
-
         [
           carSelect,
           startInput,
           endInput,
           uniqueRateInput,
-          airportStartInput,
-          airportEndInput,
+          carWashInput,
           nightStartInput,
           nightEndInput,
           deliveryIssueFee,
@@ -1600,8 +1704,6 @@
         });
 
         [
-          [airportStartInput, "airportStart"],
-          [airportEndInput, "airportEnd"],
           [nightStartInput, "nightStart"],
           [nightEndInput, "nightEnd"],
         ].forEach(([input, key]) => {
@@ -1624,10 +1726,8 @@
           btn.addEventListener("click", () => {
             const target = btn.getAttribute("data-time-fill");
             if (target === "start") {
-              manualTimeFlags.airportStart = false;
               manualTimeFlags.nightStart = false;
             } else if (target === "end") {
-              manualTimeFlags.airportEnd = false;
               manualTimeFlags.nightEnd = false;
             }
             autoFillTimeFees(target, { force: true });
@@ -1649,8 +1749,7 @@
 
         [
           uniqueRateInput,
-          airportStartInput,
-          airportEndInput,
+          carWashInput,
           nightStartInput,
           nightEndInput,
           deliveryIssueFee,
@@ -1664,10 +1763,10 @@
           }
         });
 
-        if (!((airportStartInput?.value || "").trim() || (nightStartInput?.value || "").trim())) {
+        if (!((nightStartInput?.value || "").trim())) {
           autoFillTimeFees("start");
         }
-        if (!((airportEndInput?.value || "").trim() || (nightEndInput?.value || "").trim())) {
+        if (!((nightEndInput?.value || "").trim())) {
           autoFillTimeFees("end");
         }
         calculatePricing(true);

@@ -5,18 +5,15 @@ from typing import Dict
 
 from ..models import Car
 
-AIRPORT_FEE_DEFAULT = Decimal("1100")
-AIRPORT_FEE_SLOTS = [
+# Таблица для ночного выхода — можно скорректировать при необходимости.
+NIGHT_EXIT_FEE_DEFAULT = Decimal("0")
+NIGHT_EXIT_FEE_SLOTS = [
     ("20:00", "20:59", Decimal("1000")),
     ("21:00", "23:59", Decimal("1700")),
     ("00:00", "05:59", Decimal("2200")),
     ("06:00", "07:59", Decimal("1700")),
     ("08:00", "08:59", Decimal("1000")),
 ]
-
-# Таблица для ночного выхода — можно скорректировать при необходимости.
-NIGHT_EXIT_FEE_DEFAULT = Decimal("0")
-NIGHT_EXIT_FEE_SLOTS = AIRPORT_FEE_SLOTS
 
 DELIVERY_FEES: Dict[str, Decimal] = {
     "Алупка": Decimal("4500"),
@@ -50,7 +47,8 @@ DELIVERY_FEES: Dict[str, Decimal] = {
     "Малореченское": Decimal("3500"),
     "Массандра": Decimal("3000"),
     "Межводное": Decimal("4900"),
-    "Минеральные Воды": Decimal("10000"),
+    "Минеральные Воды-0": Decimal("0"),
+    "Минеральные Воды-1000": Decimal("1000"),
     "Мирное": Decimal("3700"),
     "Морское": Decimal("4000"),
     "МРИЯ отель": Decimal("4200"),
@@ -71,7 +69,8 @@ DELIVERY_FEES: Dict[str, Decimal] = {
     "Севастополь": Decimal("3500"),
     "Семидворье": Decimal("3500"),
     "Симеиз": Decimal("4200"),
-    "Симферополь": Decimal("1000"),
+    "Симферополь-0": Decimal("0"),
+    "Симферополь-1000": Decimal("1000"),
     "Симферопольский р-ны Строгоновка, Денисовка, Мазанка": Decimal("1500"),
     "Солнечногорское (Рыбачье)": Decimal("3500"),
     "Сочи": Decimal("10000"),
@@ -110,7 +109,7 @@ class PricingBreakdown:
     days: int
     daily_rate: Decimal
     base_total: Decimal
-    airport_total: Decimal
+    car_wash_total: Decimal
     night_total: Decimal
     delivery_total: Decimal
     seats_total: Decimal
@@ -183,8 +182,6 @@ def pricing_config() -> dict:
         return [{"start": start, "end": end, "amount": float(amount)} for start, end, amount in slots]
 
     return {
-        "airport_default": float(AIRPORT_FEE_DEFAULT),
-        "airport_slots": _slot_list(AIRPORT_FEE_SLOTS),
         "night_default": float(NIGHT_EXIT_FEE_DEFAULT),
         "night_slots": _slot_list(NIGHT_EXIT_FEE_SLOTS),
         "delivery_fees": {name: float(amount) for name, amount in DELIVERY_FEES.items()},
@@ -206,8 +203,7 @@ def calculate_rental_pricing(
     start_time: time | None = None,
     end_time: time | None = None,
     unique_daily_rate: Decimal | None = None,
-    airport_fee_start: Decimal | None = None,
-    airport_fee_end: Decimal | None = None,
+    car_wash_fee: Decimal | None = None,
     night_fee_start: Decimal | None = None,
     night_fee_end: Decimal | None = None,
     delivery_issue_city: str = "",
@@ -239,7 +235,7 @@ def calculate_rental_pricing(
             days=days,
             daily_rate=zero,
             base_total=zero,
-            airport_total=zero,
+            car_wash_total=zero,
             night_total=zero,
             delivery_total=zero,
             seats_total=zero,
@@ -260,17 +256,9 @@ def calculate_rental_pricing(
     )
     base_total = _round_money(base_daily_rate * Decimal(days))
 
-    airport_start = (
-        _round_money(airport_fee_start)
-        if airport_fee_start not in (None, "")
-        else _round_money(_fee_for_time(start_time, AIRPORT_FEE_SLOTS, AIRPORT_FEE_DEFAULT))
-    )
-    airport_end = (
-        _round_money(airport_fee_end)
-        if airport_fee_end not in (None, "")
-        else _round_money(_fee_for_time(end_time, AIRPORT_FEE_SLOTS, AIRPORT_FEE_DEFAULT))
-    )
-    airport_total = _round_money(airport_start + airport_end)
+    car_wash_total = _round_money(car_wash_fee)
+    if car_wash_total < 0:
+        car_wash_total = Decimal("0")
 
     night_start = (
         _round_money(night_fee_start)
@@ -315,7 +303,15 @@ def calculate_rental_pricing(
     else:
         equipment_manual = Decimal("0")
 
-    extras_total = _round_money(airport_total + night_total + delivery_total + seats_total + boosters_total + gear_total + equipment_manual)
+    extras_total = _round_money(
+        car_wash_total
+        + night_total
+        + delivery_total
+        + seats_total
+        + boosters_total
+        + gear_total
+        + equipment_manual
+    )
     subtotal = _round_money(base_total + extras_total)
 
     discount_value = _round_money(discount_amount)
@@ -342,7 +338,7 @@ def calculate_rental_pricing(
         days=days,
         daily_rate=base_daily_rate,
         base_total=base_total,
-        airport_total=airport_total,
+        car_wash_total=car_wash_total,
         night_total=night_total,
         delivery_total=delivery_total,
         seats_total=seats_total,

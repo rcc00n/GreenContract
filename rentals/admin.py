@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Car, ContractTemplate, Customer, Rental
+from .models import BusinessSettings, Car, ContractTemplate, Customer, Rental
 
 
 @admin.register(Car)
@@ -53,3 +53,8 @@ class RentalAdmin(admin.ModelAdmin):
 @admin.register(ContractTemplate)
 class ContractTemplateAdmin(admin.ModelAdmin):
     list_display = ("name", "format")
+
+
+@admin.register(BusinessSettings)
+class BusinessSettingsAdmin(admin.ModelAdmin):
+    list_display = ("id", "car_wash_default", "night_fee_default")

@@ -6,8 +6,21 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import PasswordChangeForm, SetPasswordForm, UserCreationForm
 
 from .car_constants import CAR_LOSS_FEE_FIELDS
-from .models import Car, Customer, Rental, ContractTemplate, CustomerTag, OPERATION_REGIONS
-from .services.pricing import DELIVERY_FEES, calculate_rental_pricing
+from .models import (
+    BusinessSettings,
+    Car,
+    ContractTemplate,
+    Customer,
+    CustomerTag,
+    OPERATION_REGIONS,
+    Rental,
+)
+from .services.pricing import (
+    calculate_rental_pricing,
+    get_delivery_fees,
+    parse_delivery_overrides,
+    parse_night_slots,
+)
 
 DATE_INPUT_FORMATS = ("%d-%m-%Y", "%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y")
 DATE_PLACEHOLDER = "ДД-ММ-ГГГГ"
@@ -289,6 +302,9 @@ class RentalForm(StyledModelForm):
             today = date.today()
             self.initial.setdefault("start_date", today)
             self.initial.setdefault("end_date", today + timedelta(days=1))
+            if "car_wash_fee" in self.fields and not self.instance.pk:
+                settings = BusinessSettings.get_solo()
+                self.initial.setdefault("car_wash_fee", settings.car_wash_default)
 
         for name in ("start_date", "end_date"):
             _configure_date_field(self.fields[name])
@@ -363,14 +379,15 @@ class RentalForm(StyledModelForm):
         if "discount_percent" in self.fields:
             self.fields["discount_percent"].widget.attrs.setdefault("max", "100")
 
+        delivery_fees = get_delivery_fees()
         priority_cities = [
             "Симферополь-0",
             "Симферополь-1000",
             "Минеральные Воды-0",
             "Минеральные Воды-1000",
         ]
-        ordered_cities = [city for city in priority_cities if city in DELIVERY_FEES]
-        ordered_cities += sorted(city for city in DELIVERY_FEES.keys() if city not in ordered_cities)
+        ordered_cities = [city for city in priority_cities if city in delivery_fees]
+        ordered_cities += sorted(city for city in delivery_fees.keys() if city not in ordered_cities)
         delivery_choices = [("", "Без доставки")] + [(city, city) for city in ordered_cities]
         for name in ("delivery_issue_city", "delivery_return_city"):
             if name in self.fields:
@@ -599,6 +616,93 @@ class ContractTemplateForm(StyledModelForm):
                 _add_error("body_html", "Заполните разметку веб-шаблона или приложите готовый ПДФ.")
             if uploaded_file and not uploaded_file.name.lower().endswith(".pdf"):
                 _add_error("file", "Для формата ПДФ нужен файл ПДФ.")
+
+        return cleaned
+
+
+class BusinessSettingsForm(StyledModelForm):
+    class Meta:
+        model = BusinessSettings
+        fields = [
+            "high_season_start",
+            "high_season_end",
+            "car_wash_default",
+            "night_fee_default",
+            "night_fee_slots_text",
+            "child_seat_daily",
+            "child_seat_cap",
+            "booster_daily",
+            "booster_cap",
+            "ski_rack_daily",
+            "autobox_daily",
+            "crossbars_daily",
+            "delivery_fees_text",
+        ]
+        labels = {
+            "high_season_start": "Начало высокого сезона",
+            "high_season_end": "Конец высокого сезона",
+            "car_wash_default": "Мойка по умолчанию, ₽",
+            "night_fee_default": "Ночной выход по умолчанию, ₽",
+            "night_fee_slots_text": "Ночные интервалы (HH:MM-HH:MM=сумма)",
+            "delivery_fees_text": "Тарифы доставки (Город=сумма)",
+        }
+        help_texts = {
+            "high_season_start": "Используются только день и месяц. Если не задано, сезон = высокий.",
+            "high_season_end": "Используются только день и месяц. Если не задано, сезон = высокий.",
+            "night_fee_slots_text": "Например: 20:00-23:59=1700",
+            "delivery_fees_text": "Одна строка — один город. Можно указывать только изменения.",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name in ("high_season_start", "high_season_end"):
+            if name in self.fields:
+                _configure_date_field(self.fields[name])
+                widget = self.fields[name].widget
+                widget.input_type = "date"
+                widget.format = "%Y-%m-%d"
+
+        for name in (
+            "car_wash_default",
+            "night_fee_default",
+            "child_seat_daily",
+            "child_seat_cap",
+            "booster_daily",
+            "booster_cap",
+            "ski_rack_daily",
+            "autobox_daily",
+            "crossbars_daily",
+        ):
+            if name in self.fields:
+                self.fields[name].widget.attrs.setdefault("min", "0")
+                self.fields[name].widget.attrs.setdefault("step", "1")
+
+        for name in ("night_fee_slots_text", "delivery_fees_text"):
+            if name in self.fields:
+                self.fields[name].widget.attrs.setdefault("rows", 5)
+
+    def clean(self):
+        cleaned = super().clean()
+        start = cleaned.get("high_season_start")
+        end = cleaned.get("high_season_end")
+        if bool(start) ^ bool(end):
+            self.add_error("high_season_start", "Нужно заполнить обе даты сезона.")
+            self.add_error("high_season_end", "Нужно заполнить обе даты сезона.")
+
+        night_text = cleaned.get("night_fee_slots_text") or ""
+        delivery_text = cleaned.get("delivery_fees_text") or ""
+
+        if night_text.strip():
+            try:
+                parse_night_slots(night_text)
+            except ValueError as exc:
+                self.add_error("night_fee_slots_text", str(exc))
+
+        if delivery_text.strip():
+            try:
+                parse_delivery_overrides(delivery_text)
+            except ValueError as exc:
+                self.add_error("delivery_fees_text", str(exc))
 
         return cleaned
 

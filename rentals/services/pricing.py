@@ -15,7 +15,7 @@ NIGHT_EXIT_FEE_SLOTS = [
     ("08:00", "08:59", Decimal("1000")),
 ]
 
-DELIVERY_FEES: Dict[str, Decimal] = {
+BASE_DELIVERY_FEES: Dict[str, Decimal] = {
     "Алупка": Decimal("4500"),
     "Алушта": Decimal("2500"),
     "за Алушту": Decimal("3000"),
@@ -152,6 +152,91 @@ def _parse_time_string(value: str) -> time:
     return datetime.strptime(value, "%H:%M").time()
 
 
+def _parse_decimal_str(value: str) -> Decimal:
+    text = str(value).strip().replace(",", ".")
+    if not text:
+        raise ValueError("Пустое значение суммы.")
+    try:
+        return Decimal(text)
+    except (InvalidOperation, ValueError):
+        raise ValueError("Некорректное значение суммы.")
+
+
+def parse_delivery_overrides(text: str) -> dict[str, Decimal]:
+    overrides: dict[str, Decimal] = {}
+    for idx, raw_line in enumerate((text or "").splitlines(), start=1):
+        line = raw_line.strip()
+        if not line:
+            continue
+        if "=" not in line:
+            raise ValueError(f"Строка {idx}: ожидалось 'Город=сумма'.")
+        city_raw, amount_raw = line.split("=", 1)
+        city = city_raw.strip()
+        if not city:
+            raise ValueError(f"Строка {idx}: пустое название города.")
+        amount = _parse_decimal_str(amount_raw)
+        overrides[city] = amount
+    return overrides
+
+
+def parse_night_slots(text: str) -> list[tuple[str, str, Decimal]]:
+    slots: list[tuple[str, str, Decimal]] = []
+    for idx, raw_line in enumerate((text or "").splitlines(), start=1):
+        line = raw_line.strip()
+        if not line:
+            continue
+        if "=" not in line or "-" not in line:
+            raise ValueError(f"Строка {idx}: ожидалось 'HH:MM-HH:MM=сумма'.")
+        range_part, amount_part = line.split("=", 1)
+        start_raw, end_raw = [part.strip() for part in range_part.split("-", 1)]
+        try:
+            _parse_time_string(start_raw)
+            _parse_time_string(end_raw)
+        except ValueError:
+            raise ValueError(f"Строка {idx}: неверный формат времени.")
+        amount = _parse_decimal_str(amount_part)
+        slots.append((start_raw, end_raw, amount))
+    return slots
+
+
+def _get_business_settings():
+    from ..models import BusinessSettings
+
+    return BusinessSettings.get_solo()
+
+
+def get_delivery_fees(settings=None) -> Dict[str, Decimal]:
+    if settings is None:
+        settings = _get_business_settings()
+    fees = dict(BASE_DELIVERY_FEES)
+    if settings and settings.delivery_fees_text:
+        fees.update(parse_delivery_overrides(settings.delivery_fees_text))
+    return fees
+
+
+def get_night_slots(settings=None) -> list[tuple[str, str, Decimal]]:
+    if settings is None:
+        settings = _get_business_settings()
+    if settings and settings.night_fee_slots_text:
+        return parse_night_slots(settings.night_fee_slots_text)
+    return NIGHT_EXIT_FEE_SLOTS
+
+
+def season_for_date(date_value: date | None, settings=None) -> str:
+    if not date_value or not settings:
+        return "high"
+    start = settings.high_season_start
+    end = settings.high_season_end
+    if not start or not end:
+        return "high"
+    start_md = (start.month, start.day)
+    end_md = (end.month, end.day)
+    target_md = (date_value.month, date_value.day)
+    if start_md <= end_md:
+        return "high" if start_md <= target_md <= end_md else "low"
+    # High season overlaps year end (e.g. Nov->Mar)
+    return "high" if (target_md >= start_md or target_md <= end_md) else "low"
+
 def _time_in_range(start: time, end: time, current: time) -> bool:
     if start <= end:
         return start <= current <= end
@@ -169,10 +254,11 @@ def _fee_for_time(value: time | None, slots: list[tuple[str, str, Decimal]], def
     return default
 
 
-def delivery_fee_for_city(city: str | None) -> Decimal:
+def delivery_fee_for_city(city: str | None, fees: Dict[str, Decimal] | None = None) -> Decimal:
     if not city:
         return Decimal("0.00")
-    return DELIVERY_FEES.get(city, Decimal("0.00"))
+    fee_map = fees or get_delivery_fees(_get_business_settings())
+    return fee_map.get(city, Decimal("0.00"))
 
 
 def pricing_config() -> dict:
@@ -181,17 +267,50 @@ def pricing_config() -> dict:
     def _slot_list(slots):
         return [{"start": start, "end": end, "amount": float(amount)} for start, end, amount in slots]
 
+    settings = _get_business_settings()
+    night_slots = get_night_slots(settings)
+    delivery_fees = get_delivery_fees(settings)
+    season_start = settings.high_season_start
+    season_end = settings.high_season_end
+
+    night_default = (
+        settings.night_fee_default if settings.night_fee_default is not None else NIGHT_EXIT_FEE_DEFAULT
+    )
+    child_seat_daily = settings.child_seat_daily if settings.child_seat_daily is not None else CHILD_SEAT_DAILY
+    child_seat_cap = settings.child_seat_cap if settings.child_seat_cap is not None else CHILD_SEAT_CAP
+    booster_daily = settings.booster_daily if settings.booster_daily is not None else BOOSTER_DAILY
+    booster_cap = settings.booster_cap if settings.booster_cap is not None else BOOSTER_CAP
+    ski_rack_daily = settings.ski_rack_daily if settings.ski_rack_daily is not None else SKI_RACK_DAILY
+    autobox_daily = settings.autobox_daily if settings.autobox_daily is not None else AUTOBOX_DAILY
+    crossbars_daily = settings.crossbars_daily if settings.crossbars_daily is not None else CROSSBARS_DAILY
+    car_wash_default = (
+        settings.car_wash_default if settings.car_wash_default is not None else Decimal("1000.00")
+    )
+
     return {
-        "night_default": float(NIGHT_EXIT_FEE_DEFAULT),
-        "night_slots": _slot_list(NIGHT_EXIT_FEE_SLOTS),
-        "delivery_fees": {name: float(amount) for name, amount in DELIVERY_FEES.items()},
-        "child_seat_daily": float(CHILD_SEAT_DAILY),
-        "child_seat_cap": float(CHILD_SEAT_CAP),
-        "booster_daily": float(BOOSTER_DAILY),
-        "booster_cap": float(BOOSTER_CAP),
-        "ski_rack_daily": float(SKI_RACK_DAILY),
-        "autobox_daily": float(AUTOBOX_DAILY),
-        "crossbars_daily": float(CROSSBARS_DAILY),
+        "night_default": float(night_default),
+        "night_slots": _slot_list(night_slots),
+        "delivery_fees": {name: float(amount) for name, amount in delivery_fees.items()},
+        "child_seat_daily": float(child_seat_daily),
+        "child_seat_cap": float(child_seat_cap),
+        "booster_daily": float(booster_daily),
+        "booster_cap": float(booster_cap),
+        "ski_rack_daily": float(ski_rack_daily),
+        "autobox_daily": float(autobox_daily),
+        "crossbars_daily": float(crossbars_daily),
+        "car_wash_default": float(car_wash_default),
+        "season_start": {
+            "month": season_start.month,
+            "day": season_start.day,
+        }
+        if season_start
+        else None,
+        "season_end": {
+            "month": season_end.month,
+            "day": season_end.day,
+        }
+        if season_end
+        else None,
     }
 
 
@@ -251,49 +370,66 @@ def calculate_rental_pricing(
             balance_due=zero,
         )
 
+    settings = _get_business_settings()
+    season = season_for_date(start_date, settings)
+    night_slots = get_night_slots(settings)
+    night_default = settings.night_fee_default if settings.night_fee_default is not None else NIGHT_EXIT_FEE_DEFAULT
+    delivery_fees = get_delivery_fees(settings)
+
     base_daily_rate = (
-        _round_money(unique_daily_rate) if unique_daily_rate not in (None, "") else _round_money(car.get_rate_for_days(days))
+        _round_money(unique_daily_rate)
+        if unique_daily_rate not in (None, "")
+        else _round_money(car.get_rate_for_days(days, season=season))
     )
     base_total = _round_money(base_daily_rate * Decimal(days))
 
-    car_wash_total = _round_money(car_wash_fee)
+    car_wash_value = car_wash_fee if car_wash_fee not in (None, "") else settings.car_wash_default
+    car_wash_total = _round_money(car_wash_value)
     if car_wash_total < 0:
         car_wash_total = Decimal("0")
 
     night_start = (
         _round_money(night_fee_start)
         if night_fee_start not in (None, "")
-        else _round_money(_fee_for_time(start_time, NIGHT_EXIT_FEE_SLOTS, NIGHT_EXIT_FEE_DEFAULT))
+        else _round_money(_fee_for_time(start_time, night_slots, night_default))
     )
     night_end = (
         _round_money(night_fee_end)
         if night_fee_end not in (None, "")
-        else _round_money(_fee_for_time(end_time, NIGHT_EXIT_FEE_SLOTS, NIGHT_EXIT_FEE_DEFAULT))
+        else _round_money(_fee_for_time(end_time, night_slots, night_default))
     )
     night_total = _round_money(night_start + night_end)
 
     issue_delivery_fee = (
         _round_money(delivery_issue_fee)
         if delivery_issue_fee not in (None, "")
-        else _round_money(delivery_fee_for_city(delivery_issue_city))
+        else _round_money(delivery_fee_for_city(delivery_issue_city, delivery_fees))
     )
     return_delivery_fee = (
         _round_money(delivery_return_fee)
         if delivery_return_fee not in (None, "")
-        else _round_money(delivery_fee_for_city(delivery_return_city))
+        else _round_money(delivery_fee_for_city(delivery_return_city, delivery_fees))
     )
     delivery_total = _round_money(issue_delivery_fee + return_delivery_fee)
 
+    child_daily = settings.child_seat_daily if settings.child_seat_daily is not None else CHILD_SEAT_DAILY
+    child_cap = settings.child_seat_cap if settings.child_seat_cap is not None else CHILD_SEAT_CAP
+    booster_daily = settings.booster_daily if settings.booster_daily is not None else BOOSTER_DAILY
+    booster_cap = settings.booster_cap if settings.booster_cap is not None else BOOSTER_CAP
+    ski_daily = settings.ski_rack_daily if settings.ski_rack_daily is not None else SKI_RACK_DAILY
+    autobox_daily = settings.autobox_daily if settings.autobox_daily is not None else AUTOBOX_DAILY
+    crossbars_daily = settings.crossbars_daily if settings.crossbars_daily is not None else CROSSBARS_DAILY
+
     seat_units = max(int(child_seat_count or 0), 1 if child_seat_included else 0)
     booster_units = max(int(booster_count or 0), 1 if booster_included else 0)
-    seats_total = _round_money(min(CHILD_SEAT_DAILY * days, CHILD_SEAT_CAP) * seat_units)
-    boosters_total = _round_money(min(BOOSTER_DAILY * days, BOOSTER_CAP) * booster_units)
+    seats_total = _round_money(min(child_daily * days, child_cap) * seat_units)
+    boosters_total = _round_money(min(booster_daily * days, booster_cap) * booster_units)
 
     ski_units = max(int(ski_rack_count or 0), 1 if ski_rack_included else 0)
     box_units = max(int(roof_box_count or 0), 1 if roof_box_included else 0)
     cross_units = max(int(crossbars_count or 0), 1 if crossbars_included else 0)
     gear_total = _round_money(
-        SKI_RACK_DAILY * ski_units * days + AUTOBOX_DAILY * box_units * days + CROSSBARS_DAILY * cross_units * days
+        ski_daily * ski_units * days + autobox_daily * box_units * days + crossbars_daily * cross_units * days
     )
 
     equipment_override = _round_money(equipment_manual_total)

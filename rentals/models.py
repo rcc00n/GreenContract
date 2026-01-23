@@ -567,3 +567,102 @@ class ContractTemplate(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class BusinessSettings(models.Model):
+    """
+    Singleton-style business settings editable via the UI.
+    """
+
+    high_season_start = models.DateField(
+        "Начало высокого сезона",
+        blank=True,
+        null=True,
+        help_text="Используются только день и месяц (год игнорируется).",
+    )
+    high_season_end = models.DateField(
+        "Конец высокого сезона",
+        blank=True,
+        null=True,
+        help_text="Используются только день и месяц (год игнорируется).",
+    )
+    car_wash_default = models.DecimalField(
+        "Мойка по умолчанию, ₽",
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("1000.00"),
+    )
+    night_fee_default = models.DecimalField(
+        "Ночной выход по умолчанию, ₽",
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("0.00"),
+    )
+    night_fee_slots_text = models.TextField(
+        "Ночные интервалы (HH:MM-HH:MM=сумма)",
+        blank=True,
+        default="",
+        help_text="Одна строка = один интервал. Пример: 20:00-23:59=1700",
+    )
+    child_seat_daily = models.DecimalField(
+        "Детское кресло, ₽/сутки",
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("200.00"),
+    )
+    child_seat_cap = models.DecimalField(
+        "Детское кресло, максимум ₽",
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("2800.00"),
+    )
+    booster_daily = models.DecimalField(
+        "Бустер, ₽/сутки",
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("100.00"),
+    )
+    booster_cap = models.DecimalField(
+        "Бустер, максимум ₽",
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("1000.00"),
+    )
+    ski_rack_daily = models.DecimalField(
+        "Крепления для лыж, ₽/сутки",
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("400.00"),
+    )
+    autobox_daily = models.DecimalField(
+        "Автобокс, ₽/сутки",
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("900.00"),
+    )
+    crossbars_daily = models.DecimalField(
+        "Поперечины, ₽/сутки",
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("300.00"),
+    )
+    delivery_fees_text = models.TextField(
+        "Тарифы доставки (Город=сумма)",
+        blank=True,
+        default="",
+        help_text="Одна строка = один город. Можно указывать только изменения к базовому прайсу.",
+    )
+
+    class Meta:
+        verbose_name = "Настройки бизнеса"
+        verbose_name_plural = "Настройки бизнеса"
+
+    def __str__(self):
+        return "Настройки бизнеса"
+
+    @classmethod
+    def get_solo(cls):
+        instance = cls.objects.first()
+        if instance:
+            return instance
+        return cls.objects.create()

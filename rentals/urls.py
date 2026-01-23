@@ -50,4 +50,5 @@ urlpatterns = [
         views.ContractTemplateUpdateView.as_view(),
         name="contract_template_update",
     ),
+    path("settings/", views.BusinessSettingsUpdateView.as_view(), name="settings"),
 ]

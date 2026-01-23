@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="row">
+    <div class="col-lg-9 mx-auto">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h1 class="h4 mb-0">Настройки бизнеса</h1>
+          <p class="text-muted small mb-0">Управляйте сезонностью, мойкой, ночными ставками и доп. услугами.</p>
+        </div>
+        <a href="{% url 'rentals:dashboard' %}" class="btn btn-outline-secondary">Назад</a>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <form method="post" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <div class="border rounded p-3 bg-light mb-3">
+              <div class="fw-semibold mb-2">Сезонность</div>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label" for="{{ form.high_season_start.id_for_label }}">Начало высокого сезона</label>
+                  {{ form.high_season_start }}
+                  {% for error in form.high_season_start.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="{{ form.high_season_end.id_for_label }}">Конец высокого сезона</label>
+                  {{ form.high_season_end }}
+                  {% for error in form.high_season_end.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+              </div>
+              <div class="form-text">Если даты не заданы, система считает сезон всегда высоким.</div>
+            </div>
+
+            <div class="border rounded p-3 bg-light mb-3">
+              <div class="fw-semibold mb-2">Мойка и ночной выход</div>
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label" for="{{ form.car_wash_default.id_for_label }}">Мойка по умолчанию, ₽</label>
+                  {{ form.car_wash_default }}
+                  {% for error in form.car_wash_default.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="{{ form.night_fee_default.id_for_label }}">Ночной выход по умолчанию, ₽</label>
+                  {{ form.night_fee_default }}
+                  {% for error in form.night_fee_default.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+              </div>
+              <div class="mt-3">
+                <label class="form-label" for="{{ form.night_fee_slots_text.id_for_label }}">Ночные интервалы</label>
+                {{ form.night_fee_slots_text }}
+                <div class="form-text">Пример: <code>20:00-23:59=1700</code></div>
+                {% for error in form.night_fee_slots_text.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+            </div>
+
+            <div class="border rounded p-3 bg-light mb-3">
+              <div class="fw-semibold mb-2">Оборудование (₽/сутки)</div>
+              <div class="row g-3">
+                <div class="col-md-3">
+                  <label class="form-label" for="{{ form.child_seat_daily.id_for_label }}">Детское кресло</label>
+                  {{ form.child_seat_daily }}
+                  {% for error in form.child_seat_daily.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label" for="{{ form.child_seat_cap.id_for_label }}">Кресло максимум, ₽</label>
+                  {{ form.child_seat_cap }}
+                  {% for error in form.child_seat_cap.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label" for="{{ form.booster_daily.id_for_label }}">Бустер</label>
+                  {{ form.booster_daily }}
+                  {% for error in form.booster_daily.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label" for="{{ form.booster_cap.id_for_label }}">Бустер максимум, ₽</label>
+                  {{ form.booster_cap }}
+                  {% for error in form.booster_cap.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="{{ form.ski_rack_daily.id_for_label }}">Крепления для лыж</label>
+                  {{ form.ski_rack_daily }}
+                  {% for error in form.ski_rack_daily.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="{{ form.autobox_daily.id_for_label }}">Автобокс</label>
+                  {{ form.autobox_daily }}
+                  {% for error in form.autobox_daily.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="{{ form.crossbars_daily.id_for_label }}">Поперечины</label>
+                  {{ form.crossbars_daily }}
+                  {% for error in form.crossbars_daily.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+              </div>
+            </div>
+
+            <div class="border rounded p-3 bg-light mb-3">
+              <div class="fw-semibold mb-2">Тарифы доставки</div>
+              <label class="form-label" for="{{ form.delivery_fees_text.id_for_label }}">Город=сумма</label>
+              {{ form.delivery_fees_text }}
+              <div class="form-text">Можно указать только изменения: <code>Симферополь-0=0</code></div>
+              {% for error in form.delivery_fees_text.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 pt-2">
+              <button class="btn btn-primary" type="submit">Сохранить настройки</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

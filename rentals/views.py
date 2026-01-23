@@ -35,6 +35,7 @@ from django.views.decorators.http import require_POST
 from .car_constants import CAR_LOSS_FEE_FIELDS
 from .forms import (
     AdminUserCreationForm,
+    BusinessSettingsForm,
     CarForm,
     ContractTemplateForm,
     CustomerForm,
@@ -42,7 +43,7 @@ from .forms import (
     StyledPasswordChangeForm,
     StyledSetPasswordForm,
 )
-from .models import Car, ContractTemplate, Customer, CustomerTag, Rental
+from .models import BusinessSettings, Car, ContractTemplate, Customer, CustomerTag, Rental
 from .services.contract_renderer import placeholder_guide, render_docx, render_html_template, render_pdf
 from .services.pricing import calculate_rental_pricing, pricing_config
 from .services.stats import (
@@ -1146,6 +1147,17 @@ class ContractTemplateUpdateView(UpdateView):
         context = super().get_context_data(**kwargs)
         context["placeholder_guide"] = placeholder_guide()
         return context
+
+
+@method_decorator(login_required, name="dispatch")
+class BusinessSettingsUpdateView(UpdateView):
+    model = BusinessSettings
+    form_class = BusinessSettingsForm
+    template_name = "rentals/settings_form.html"
+    success_url = reverse_lazy("rentals:settings")
+
+    def get_object(self, queryset=None):
+        return BusinessSettings.get_solo()
 
 
 @login_required

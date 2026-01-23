@@ -1462,7 +1462,25 @@
           }).format(roundMoney(value));
         }
 
-        function pickRate(car, days) {
+        function seasonForDate(dateValue) {
+          const start = pricingConfig.season_start;
+          const end = pricingConfig.season_end;
+          if (!dateValue || !start || !end) {
+            return "high";
+          }
+          const target = (dateValue.getUTCMonth() + 1) * 100 + dateValue.getUTCDate();
+          const startKey = (start.month || 0) * 100 + (start.day || 0);
+          const endKey = (end.month || 0) * 100 + (end.day || 0);
+          if (!startKey || !endKey) {
+            return "high";
+          }
+          if (startKey <= endKey) {
+            return target >= startKey && target <= endKey ? "high" : "low";
+          }
+          return target >= startKey || target <= endKey ? "high" : "low";
+        }
+
+        function pickRate(car, days, season) {
           if (!car) return 0;
           const tiers = [
             { threshold: 15, high: "rate_15_plus_high", low: "rate_15_plus_low" },
@@ -1470,10 +1488,13 @@
             { threshold: 1, high: "rate_1_4_high", low: "rate_1_4_low" },
           ];
 
+          const order = season === "low" ? ["low", "high"] : ["high", "low"];
           for (const tier of tiers) {
             if (days >= tier.threshold) {
-              if (car[tier.high]) return car[tier.high];
-              if (car[tier.low]) return car[tier.low];
+              for (const seasonKey of order) {
+                const key = seasonKey === "high" ? tier.high : tier.low;
+                if (car[key]) return car[key];
+              }
             }
           }
           return car.daily_rate || 0;
@@ -1592,7 +1613,8 @@
           }
 
           const uniqueRate = parseNumber(uniqueRateInput);
-          const baseRate = roundMoney(uniqueRate > 0 ? uniqueRate : pickRate(currentCar, days));
+          const season = seasonForDate(startDate);
+          const baseRate = roundMoney(uniqueRate > 0 ? uniqueRate : pickRate(currentCar, days, season));
           const baseTotal = roundMoney(baseRate * days);
 
           if (nightStartInput && !nightStartInput.value && !manualTimeFlags.nightStart) {

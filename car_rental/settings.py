@@ -110,6 +110,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_REDIRECT_URL = "rentals:dashboard"
 LOGOUT_REDIRECT_URL = "login"
 
+# Idle session timeout: 30 minutes of inactivity.
+SESSION_COOKIE_AGE = 30 * 60
+SESSION_SAVE_EVERY_REQUEST = True
+
 # Upload limits: allow larger CSV/XLS/XLSX imports by default.
 FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("FILE_UPLOAD_MAX_MEMORY_SIZE", 50 * 1024 * 1024))
 DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("DATA_UPLOAD_MAX_MEMORY_SIZE", 50 * 1024 * 1024))

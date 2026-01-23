@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import PasswordChangeForm, SetPasswordForm, UserCreationForm
 
 from .car_constants import CAR_LOSS_FEE_FIELDS
-from .models import Car, Customer, Rental, ContractTemplate, CustomerTag
+from .models import Car, Customer, Rental, ContractTemplate, CustomerTag, OPERATION_REGIONS
 from .services.pricing import DELIVERY_FEES, calculate_rental_pricing
 
 DATE_INPUT_FORMATS = ("%d-%m-%Y", "%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y")
@@ -26,6 +26,8 @@ def _apply_bootstrap_classes(fields):
         widget = field.widget
         css = widget.attrs.get("class", "")
         if isinstance(widget, forms.CheckboxInput):
+            widget.attrs["class"] = f"form-check-input {css}".strip()
+        elif isinstance(widget, forms.CheckboxSelectMultiple):
             widget.attrs["class"] = f"form-check-input {css}".strip()
         else:
             widget.attrs["class"] = f"form-control {css}".strip()
@@ -252,6 +254,14 @@ class CustomerForm(StyledModelForm):
 
 
 class RentalForm(StyledModelForm):
+    operation_regions = forms.MultipleChoiceField(
+        required=False,
+        label="Территория эксплуатации",
+        choices=[(region, region) for region in OPERATION_REGIONS],
+        widget=forms.CheckboxSelectMultiple,
+        help_text="Отметьте возможные регионы эксплуатации.",
+    )
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._limit_customer_queryset("customer", "_customer_label")
@@ -276,6 +286,12 @@ class RentalForm(StyledModelForm):
 
         for name in ("start_date", "end_date"):
             _configure_date_field(self.fields[name])
+
+        if "operation_regions" in self.fields and not self.is_bound:
+            raw_regions = (getattr(self.instance, "operation_regions", "") or "").strip()
+            if raw_regions:
+                parsed = [item.strip() for item in raw_regions.split(",") if item.strip()]
+                self.initial.setdefault("operation_regions", parsed)
 
         for name in ("start_time", "end_time"):
             if name in self.fields:
@@ -360,6 +376,8 @@ class RentalForm(StyledModelForm):
             "start_time",
             "end_date",
             "end_time",
+            "operation_regions",
+            "mileage_limit_km",
             "unique_daily_rate",
             "daily_rate",
             "airport_fee_start",
@@ -397,6 +415,8 @@ class RentalForm(StyledModelForm):
             "end_date": "Дата окончания",
             "start_time": "Время выдачи",
             "end_time": "Время возврата",
+            "operation_regions": "Территория эксплуатации",
+            "mileage_limit_km": "Ограничение пробега (км)",
             "unique_daily_rate": "Уникальный тариф (за сутки)",
             "daily_rate": "Суточный тариф",
             "total_price": "Итоговая сумма",
@@ -424,6 +444,10 @@ class RentalForm(StyledModelForm):
             "prepayment": "Предоплата",
             "balance_due": "К оплате после предоплаты",
             "status": "Статус",
+        }
+        help_texts = {
+            "operation_regions": "Укажите регионы, в которых разрешена эксплуатация.",
+            "mileage_limit_km": "0 — без ограничения пробега.",
         }
 
     def clean(self):
@@ -489,6 +513,16 @@ class RentalForm(StyledModelForm):
             cleaned_data["total_price"] = pricing.total_price
             cleaned_data["balance_due"] = pricing.balance_due
         return cleaned_data
+
+    def clean_operation_regions(self):
+        selected = self.cleaned_data.get("operation_regions") or []
+        if isinstance(selected, str):
+            selected = [value.strip() for value in selected.split(",") if value.strip()]
+        if not selected:
+            return ""
+        selected_set = set(selected)
+        ordered = [region for region in OPERATION_REGIONS if region in selected_set]
+        return ", ".join(ordered)
 
     def _limit_customer_queryset(self, field_name: str, label_attr: str):
         """

@@ -229,6 +229,35 @@
                 </div>
               </div>
 
+              <div class="col-12">
+                <div class="border rounded p-3 bg-light">
+                  <div class="fw-semibold mb-2">Территория и пробег</div>
+                  <div class="row g-3">
+                    <div class="col-lg-8">
+                      <div class="form-label">Территория эксплуатации</div>
+                      <div class="row g-2">
+                        {% for checkbox in form.operation_regions %}
+                          <div class="col-md-6">
+                            <div class="form-check">
+                              {{ checkbox.tag }}
+                              <label class="form-check-label" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
+                            </div>
+                          </div>
+                        {% endfor %}
+                      </div>
+                      <div class="form-text">Отметьте возможные регионы эксплуатации.</div>
+                      {% for error in form.operation_regions.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-lg-4">
+                      <label class="form-label" for="{{ form.mileage_limit_km.id_for_label }}">Ограничение пробега (км)</label>
+                      {{ form.mileage_limit_km }}
+                      <div class="form-text">0 — без ограничения пробега.</div>
+                      {% for error in form.mileage_limit_km.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div class="col-lg-3 col-md-6">
                 <label class="form-label" for="{{ form.unique_daily_rate.id_for_label }}">Уникальный тариф</label>
                 {{ form.unique_daily_rate }}
@@ -1647,6 +1676,22 @@
 
     <div class="d-flex justify-content-end gap-2 pt-3">
       <a href="{% url 'rentals:rental_list' %}" class="btn btn-outline-secondary">Отмена</a>
+      {% if object and contract_templates %}
+        <div class="btn-group">
+          <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+            Договор
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            {% for ct in contract_templates %}
+              <li>
+                <button class="dropdown-item" type="submit" name="generate_contract_template_id" value="{{ ct.pk }}">
+                  {{ ct.name }}
+                </button>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
       <button class="btn btn-primary" type="submit">Сохранить аренду</button>
     </div>
   </form>

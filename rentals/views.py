@@ -1084,6 +1084,7 @@ class RentalCreateView(CreateView):
             context.get("form"), "initial_second_driver_label", ""
         )
         context["pricing_config"] = pricing_config()
+        context["contract_templates"] = ContractTemplate.objects.all()
         return context
 
 
@@ -1094,6 +1095,13 @@ class RentalUpdateView(UpdateView):
     template_name = "rentals/rental_form.html"
     success_url = reverse_lazy("rentals:rental_list")
 
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        template_id = self.request.POST.get("generate_contract_template_id")
+        if template_id:
+            return redirect("rentals:generate_contract", rental_id=self.object.pk, template_id=template_id)
+        return response
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["car_pricing"] = [_serialize_car_pricing(car) for car in Car.objects.all()]
@@ -1102,6 +1110,7 @@ class RentalUpdateView(UpdateView):
             context.get("form"), "initial_second_driver_label", ""
         )
         context["pricing_config"] = pricing_config()
+        context["contract_templates"] = ContractTemplate.objects.all()
         return context
 
 

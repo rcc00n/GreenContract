@@ -11,6 +11,25 @@ except ImportError:  # pragma: no cover - dependency installed via requirements
 
 User = get_user_model()
 
+OPERATION_REGIONS = [
+    "Республика Крым и Севастополь",
+    "Ставропольский край",
+    "Краснодарский край",
+    "Карачаево-Черкесская Республика",
+    "Кабардино-Балкарская Республика",
+    "Адыгея",
+    "Чечня",
+    "Северная Осетия",
+    "Калмыкия",
+]
+
+MILEAGE_LIMIT_CHOICES = [
+    (0, "0"),
+    (200, "200"),
+    (250, "250"),
+    (300, "300"),
+]
+
 
 def _format_money_words(value: Decimal | None) -> str:
     if value is None:
@@ -209,6 +228,10 @@ class Car(models.Model):
     def __str__(self):
         return f"{self.plate_number} - {self.make} {self.model} ({self.year})"
 
+    @property
+    def security_deposit_text(self) -> str:
+        return _format_money_words(self.security_deposit)
+
     def get_rate_for_days(self, days: int, season: str = "high") -> Decimal:
         """
         Return the per-day rate based on rental duration.
@@ -405,6 +428,17 @@ class Rental(models.Model):
         default=Decimal("0.00"),
         blank=True,
     )
+    operation_regions = models.TextField(
+        "Территория эксплуатации",
+        blank=True,
+        default="",
+        help_text="Регионы эксплуатации, разделённые запятыми.",
+    )
+    mileage_limit_km = models.PositiveIntegerField(
+        "Ограничение пробега, км",
+        choices=MILEAGE_LIMIT_CHOICES,
+        default=0,
+    )
     child_seat_included = models.BooleanField("Детское кресло", default=False)
     child_seat_count = models.PositiveIntegerField("Кол-во детских кресел", default=0, blank=True)
     booster_included = models.BooleanField("Бустер", default=False)
@@ -497,6 +531,10 @@ class Rental(models.Model):
     @property
     def advance_payment_text(self) -> str:
         return _format_money_words(self.prepayment)
+
+    @property
+    def balance_due_text(self) -> str:
+        return _format_money_words(self.balance_due)
 
     def save(self, *args, **kwargs):
         attempts = 0

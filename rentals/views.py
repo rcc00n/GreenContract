@@ -677,20 +677,7 @@ def _normalize_customer_row(row, row_index: int):
 def admin_user_list(request):
     if not request.user.is_superuser:
         raise PermissionDenied
-    admins = User.objects.filter(is_staff=True).order_by("username")
-    form = AdminUserCreationForm(request.POST or None)
-
-    if request.method == "POST" and form.is_valid():
-        new_admin = form.save()
-        messages.success(request, f"Администратор {new_admin.get_username()} создан.")
-        return redirect("rentals:admin_user_list")
-
-    context = {
-        "admins": admins,
-        "form": form,
-        "superuser_count": User.objects.filter(is_superuser=True).count(),
-    }
-    return render(request, "rentals/admin_list.html", context)
+    return redirect(f"{reverse('rentals:settings')}?tab=admins")
 
 
 @login_required
@@ -702,7 +689,7 @@ def admin_user_password_reset(request, user_id):
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, f"Пароль обновлен для {target_user.get_username()}.")
-        return redirect("rentals:admin_user_list")
+        return redirect(f"{reverse('rentals:settings')}?tab=admins")
     return render(
         request,
         "rentals/admin_password_reset.html",
@@ -721,13 +708,13 @@ def admin_user_delete(request, user_id):
     target_user = get_object_or_404(User, pk=user_id)
     if target_user == request.user:
         messages.error(request, "Нельзя удалить собственный аккаунт.")
-        return redirect("rentals:admin_user_list")
+        return redirect(f"{reverse('rentals:settings')}?tab=admins")
     if target_user.is_superuser and User.objects.filter(is_superuser=True).exclude(pk=target_user.pk).count() == 0:
         messages.error(request, "Нельзя удалить последнего суперпользователя.")
-        return redirect("rentals:admin_user_list")
+        return redirect(f"{reverse('rentals:settings')}?tab=admins")
     target_user.delete()
     messages.success(request, f"Пользователь {target_user.get_username()} удален.")
-    return redirect("rentals:admin_user_list")
+    return redirect(f"{reverse('rentals:settings')}?tab=admins")
 
 
 @login_required
@@ -1158,6 +1145,40 @@ class BusinessSettingsUpdateView(UpdateView):
 
     def get_object(self, queryset=None):
         return BusinessSettings.get_solo()
+
+    def _resolve_tab(self):
+        tab = (self.request.GET.get("tab") or "general").lower()
+        if tab == "admins" and not self.request.user.is_superuser:
+            return "general"
+        return tab if tab in {"general", "admins"} else "general"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        active_tab = kwargs.get("active_tab") or self._resolve_tab()
+        if active_tab == "admins" and not self.request.user.is_superuser:
+            active_tab = "general"
+        context["active_tab"] = active_tab
+        if self.request.user.is_superuser:
+            context.setdefault("admins", User.objects.filter(is_staff=True).order_by("username"))
+            context.setdefault("superuser_count", User.objects.filter(is_superuser=True).count())
+            context.setdefault("admin_form", kwargs.get("admin_form") or AdminUserCreationForm())
+        return context
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        action = request.POST.get("action")
+        if action == "create_admin":
+            if not request.user.is_superuser:
+                raise PermissionDenied
+            admin_form = AdminUserCreationForm(request.POST)
+            if admin_form.is_valid():
+                new_admin = admin_form.save()
+                messages.success(request, f"Администратор {new_admin.get_username()} создан.")
+                return redirect(f"{reverse('rentals:settings')}?tab=admins")
+            settings_form = BusinessSettingsForm(instance=self.object)
+            context = self.get_context_data(form=settings_form, admin_form=admin_form, active_tab="admins")
+            return self.render_to_response(context)
+        return super().post(request, *args, **kwargs)
 
 
 @login_required

@@ -25,9 +25,6 @@
             <li class="nav-item"><a class="nav-link" href="{% url 'rentals:rental_list' %}">Аренды</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'rentals:contract_template_list' %}">Шаблоны договоров</a></li>
             <li class="nav-item"><a class="nav-link" href="{% url 'rentals:settings' %}">Настройки</a></li>
-            {% if user.is_superuser %}
-              <li class="nav-item"><a class="nav-link" href="{% url 'rentals:admin_user_list' %}">Администраторы</a></li>
-            {% endif %}
           </ul>
           <div class="nav-actions ms-lg-auto">
             <button class="btn btn-sm theme-toggle" type="button" id="themeToggle" aria-label="Переключить тему">

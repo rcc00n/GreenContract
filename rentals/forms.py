@@ -723,6 +723,7 @@ class AdminUserCreationForm(UserCreationForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        _apply_bootstrap_classes(self.fields)
         self.fields["username"].label = "Логин"
         self.fields["username"].help_text = "Только латиница, цифры и @/./+/-/_."
         if "email" in self.fields:

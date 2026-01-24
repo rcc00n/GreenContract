@@ -1,6 +1,8 @@
 from contextlib import contextmanager
+from functools import lru_cache
 from io import BytesIO
 import logging
+import os
 from pathlib import Path
 import re
 from decimal import Decimal
@@ -11,7 +13,10 @@ from django.template import engines
 from django.utils import timezone
 from docx import Document
 from pypdf import PdfReader, PdfWriter
-from pypdf.generic import BooleanObject, NameObject
+from pypdf.generic import ArrayObject, BooleanObject, NameObject
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
 from xhtml2pdf import pisa
 
 from ..models import ContractTemplate, Rental
@@ -392,6 +397,46 @@ def _normalize_html_charset(html: str, target: str = "utf-8") -> str:
     return updated
 
 
+def _inject_pdf_font_css(html: str) -> str:
+    font_path = _find_pdf_font_path()
+    if not font_path:
+        return html
+
+    font_url = font_path.as_posix()
+    style_block = (
+        "<style>"
+        "@font-face {"
+        "font-family: 'ContractFont';"
+        f"src: url('file://{font_url}');"
+        "}"
+        "body, * { font-family: 'ContractFont', sans-serif; }"
+        "</style>"
+    )
+
+    head_match = re.search(r"<head[^>]*>", html, flags=re.IGNORECASE)
+    if head_match:
+        insert_at = head_match.end()
+        return html[:insert_at] + style_block + html[insert_at:]
+    return style_block + html
+
+
+def _pisa_link_callback(uri: str, rel: str | None = None):
+    if uri.startswith("file://"):
+        return uri.replace("file://", "", 1)
+    if uri.startswith(settings.MEDIA_URL):
+        path = Path(settings.MEDIA_ROOT) / uri[len(settings.MEDIA_URL) :].lstrip("/")
+        if path.exists():
+            return str(path)
+    if uri.startswith(settings.STATIC_URL):
+        path = Path(settings.STATIC_ROOT) / uri[len(settings.STATIC_URL) :].lstrip("/")
+        if path.exists():
+            return str(path)
+    path = Path(uri)
+    if path.exists():
+        return str(path)
+    return uri
+
+
 def _fmt_date(value) -> str:
     return value.strftime("%d.%m.%Y") if value else ""
 
@@ -614,7 +659,8 @@ def render_html_template(contract_template: ContractTemplate, rental: Rental) ->
 def render_html_to_pdf(html: str) -> bytes:
     """Convert HTML to PDF bytes using xhtml2pdf."""
     output = BytesIO()
-    result = pisa.CreatePDF(html, dest=output, encoding="utf-8")
+    html = _inject_pdf_font_css(html)
+    result = pisa.CreatePDF(html, dest=output, encoding="utf-8", link_callback=_pisa_link_callback)
     output.seek(0)
     if result.err:
         raise ValueError("Не удалось сформировать ПДФ из веб-шаблона.")
@@ -652,6 +698,252 @@ def _read_contract_template_bytes(contract_template: ContractTemplate) -> bytes:
     with _open_contract_template_file(contract_template) as template_file:
         return template_file.read()
 
+
+@lru_cache(maxsize=1)
+def _find_pdf_font_path() -> Path | None:
+    candidates: list[Path] = []
+
+    env_path = os.environ.get("DJANGO_PDF_FONT_PATH") or os.environ.get("PDF_FONT_PATH")
+    if env_path:
+        candidates.append(Path(env_path))
+
+    settings_path = getattr(settings, "PDF_FONT_PATH", None)
+    if settings_path:
+        candidates.append(Path(settings_path))
+
+    candidates.extend(
+        [
+            Path(settings.BASE_DIR) / "static" / "fonts" / "DejaVuSans.ttf",
+            Path(settings.BASE_DIR) / "assets" / "fonts" / "DejaVuSans.ttf",
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+            Path("/usr/share/fonts/dejavu/DejaVuSans.ttf"),
+            Path("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
+            Path("/usr/share/fonts/truetype/freefont/FreeSans.ttf"),
+            Path("C:/Windows/Fonts/arial.ttf"),
+            Path("C:/Windows/Fonts/calibri.ttf"),
+        ]
+    )
+
+    for path in candidates:
+        if path and path.exists():
+            return path
+    return None
+
+
+@lru_cache(maxsize=1)
+def _get_pdf_font_name() -> str:
+    font_name = "ContractFont"
+    font_path = _find_pdf_font_path()
+    if font_path:
+        try:
+            pdfmetrics.registerFont(TTFont(font_name, str(font_path)))
+            logger.info("Используем шрифт для ПДФ: %s", font_path)
+            return font_name
+        except Exception:
+            logger.exception("Не удалось зарегистрировать шрифт ПДФ: %s", font_path)
+
+    logger.warning(
+        "Шрифт с поддержкой кириллицы не найден. ПДФ может содержать квадраты. "
+        "Укажите DJANGO_PDF_FONT_PATH.",
+    )
+    return "Helvetica"
+
+
+def _extract_font_size(da_value, default: float = 10.0) -> float:
+    if not da_value:
+        return default
+    text = str(da_value)
+    match = re.search(r"([0-9]+(?:\\.[0-9]+)?)\\s+Tf", text)
+    if match:
+        try:
+            return float(match.group(1))
+        except ValueError:
+            return default
+    return default
+
+
+def _wrap_text_to_width(text: str, max_width: float, font_name: str, font_size: float) -> list[str]:
+    if text is None:
+        return []
+    lines: list[str] = []
+    for raw_line in str(text).splitlines() or [""]:
+        words = raw_line.split(" ")
+        current = ""
+        for word in words:
+            candidate = word if not current else f"{current} {word}"
+            if pdfmetrics.stringWidth(candidate, font_name, font_size) <= max_width:
+                current = candidate
+                continue
+            if current:
+                lines.append(current)
+            if pdfmetrics.stringWidth(word, font_name, font_size) <= max_width:
+                current = word
+                continue
+            chunk = ""
+            for char in word:
+                test = f"{chunk}{char}"
+                if pdfmetrics.stringWidth(test, font_name, font_size) <= max_width:
+                    chunk = test
+                else:
+                    if chunk:
+                        lines.append(chunk)
+                    chunk = char
+            current = chunk
+        if current or raw_line == "":
+            lines.append(current)
+    return lines
+
+
+def _get_inherited_attr(annot, key: str):
+    current = annot
+    visited = set()
+    while current is not None:
+        current_id = id(current)
+        if current_id in visited:
+            break
+        visited.add(current_id)
+        if key in current:
+            return current.get(key)
+        parent = current.get("/Parent")
+        if parent is None:
+            break
+        current = parent.get_object() if hasattr(parent, "get_object") else parent
+    return None
+
+
+def _iter_field_annotations(reader: PdfReader):
+    for page_index, page in enumerate(reader.pages):
+        annots = page.get("/Annots") or []
+        for annot_ref in annots:
+            annot = annot_ref.get_object()
+            if annot.get("/Subtype") != "/Widget":
+                continue
+            field_name = _get_inherited_attr(annot, "/T")
+            field_type = _get_inherited_attr(annot, "/FT")
+            field_flags = _get_inherited_attr(annot, "/Ff")
+            field_da = _get_inherited_attr(annot, "/DA")
+            rect = annot.get("/Rect")
+            yield {
+                "page_index": page_index,
+                "annot_ref": annot_ref,
+                "annot": annot,
+                "name": str(field_name) if field_name else "",
+                "type": str(field_type) if field_type else "",
+                "flags": int(field_flags) if field_flags is not None else 0,
+                "da": field_da,
+                "rect": rect,
+            }
+
+
+def _strip_text_field_annots(page, field_type: str = "/Tx"):
+    annots = page.get("/Annots")
+    if not annots:
+        return
+    kept = []
+    for annot_ref in annots:
+        annot = annot_ref.get_object()
+        if annot.get("/Subtype") != "/Widget":
+            kept.append(annot_ref)
+            continue
+        annot_type = _get_inherited_attr(annot, "/FT")
+        if str(annot_type) == field_type:
+            continue
+        kept.append(annot_ref)
+    if kept:
+        page[NameObject("/Annots")] = ArrayObject(kept)
+    else:
+        page.pop("/Annots", None)
+
+
+def _draw_text_in_rect(
+    pdf_canvas: canvas.Canvas,
+    text: str,
+    rect,
+    font_name: str,
+    font_size: float,
+    multiline: bool,
+):
+    if not rect:
+        return
+    llx, lly, urx, ury = [float(value) for value in rect]
+    width = max(urx - llx, 0)
+    height = max(ury - lly, 0)
+    if width <= 0 or height <= 0:
+        return
+
+    padding = 2.0
+    max_width = max(width - 2 * padding, 1)
+    max_height = max(height - 2 * padding, 1)
+
+    text_value = "" if text is None else str(text)
+    if not text_value:
+        return
+
+    font_size = min(font_size, max_height)
+    if not multiline:
+        while pdfmetrics.stringWidth(text_value, font_name, font_size) > max_width and font_size > 6:
+            font_size -= 0.5
+
+    pdf_canvas.setFont(font_name, font_size)
+    pdf_canvas.setFillColorRGB(0, 0, 0)
+
+    if multiline or "\n" in text_value:
+        line_height = font_size * 1.2
+        max_lines = max(int(max_height / line_height), 1)
+        lines = _wrap_text_to_width(text_value, max_width, font_name, font_size)[:max_lines]
+        y = ury - padding - font_size
+        for line in lines:
+            pdf_canvas.drawString(llx + padding, y, line)
+            y -= line_height
+            if y < lly:
+                break
+    else:
+        y = lly + (height - font_size) / 2.0
+        pdf_canvas.drawString(llx + padding, y, text_value)
+
+
+def _build_pdf_overlay(reader: PdfReader, field_values: dict[str, str]) -> bytes:
+    font_name = _get_pdf_font_name()
+    output = BytesIO()
+    pdf_canvas = None
+    items_by_page: dict[int, list[dict]] = {}
+    for item in _iter_field_annotations(reader):
+        items_by_page.setdefault(item["page_index"], []).append(item)
+
+    for page_index, page in enumerate(reader.pages):
+        width = float(page.mediabox.width)
+        height = float(page.mediabox.height)
+        if pdf_canvas is None:
+            pdf_canvas = canvas.Canvas(output, pagesize=(width, height))
+        else:
+            pdf_canvas.setPageSize((width, height))
+
+        for item in items_by_page.get(page_index, []):
+            if item["type"] != "/Tx":
+                continue
+            field_name = item["name"]
+            if not field_name:
+                continue
+            value = field_values.get(field_name)
+            if value is None or value == "":
+                continue
+            multiline = bool(item["flags"] & 4096)
+            font_size = _extract_font_size(item["da"], default=10.0)
+            _draw_text_in_rect(
+                pdf_canvas,
+                value,
+                item["rect"],
+                font_name,
+                font_size,
+                multiline,
+            )
+
+        pdf_canvas.showPage()
+
+    if pdf_canvas is None:
+        return b""
+    pdf_canvas.save()
+    return output.getvalue()
 
 def _replace_in_paragraphs(paragraphs: Iterable, mapping: dict[str, str]):
     """Replace placeholders in a list of DOCX paragraphs."""
@@ -722,18 +1014,35 @@ def render_pdf(contract_template: ContractTemplate, rental: Rental) -> BytesIO:
 
 def _fill_pdf_form(template_bytes: bytes, rental: Rental) -> BytesIO:
     """
-    Fill a PDF with form fields that match placeholder names (underscored),
-    например customer_full_name или rental_contract_number.
+    Fill a PDF with form fields that match placeholder names.
+    Для PDF-форм с кириллицей поверх формы рисуется текст с шрифтом,
+    иначе просмотрщики часто показывают квадраты вместо букв.
     """
-    field_values = {key.replace(".", "_"): value for key, value in build_placeholder_values(rental).items()}
+    raw_values = build_placeholder_values(rental)
+    field_values = {**raw_values, **{key.replace(".", "_"): value for key, value in raw_values.items()}}
+
     reader = PdfReader(BytesIO(template_bytes))
     writer = PdfWriter()
+
     for page in reader.pages:
         writer.add_page(page)
 
     if reader.get_fields():
         for page in writer.pages:
             writer.update_page_form_field_values(page, field_values)
+
+    overlay_bytes = b""
+    try:
+        overlay_bytes = _build_pdf_overlay(reader, field_values)
+    except Exception:
+        logger.exception("Не удалось подготовить текстовую подложку для ПДФ.")
+
+    overlay_reader = PdfReader(BytesIO(overlay_bytes)) if overlay_bytes else None
+
+    for index, page in enumerate(writer.pages):
+        if overlay_reader and index < len(overlay_reader.pages):
+            page.merge_page(overlay_reader.pages[index])
+            _strip_text_field_annots(page)
 
     try:
         acroform = writer._root_object.get("/AcroForm")  # type: ignore[attr-defined]

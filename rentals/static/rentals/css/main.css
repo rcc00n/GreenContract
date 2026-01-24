@@ -789,3 +789,166 @@ body[data-theme="dark"] .theme-toggle .icon-moon {
 #contractSnippet {
   white-space: pre-wrap;
 }
+
+.wizard-header {
+  background: linear-gradient(
+      120deg,
+      color-mix(in srgb, var(--surface-2) 80%, transparent) 0%,
+      color-mix(in srgb, var(--surface-3) 60%, transparent) 100%
+    ),
+    var(--surface-1);
+}
+
+.wizard-counter {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--brand) 12%, var(--surface-1));
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 70%, transparent);
+  border-radius: 999px;
+  padding: 6px 14px;
+}
+
+.wizard-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wizard-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.wizard-step-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 70%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  color: var(--text-primary);
+  text-align: left;
+  font-weight: 600;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.wizard-step-button:hover {
+  border-color: color-mix(in srgb, var(--brand) 45%, transparent);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+.wizard-step-button.is-active {
+  border-color: color-mix(in srgb, var(--brand) 65%, transparent);
+  background: color-mix(in srgb, var(--brand) 12%, var(--surface-1));
+  box-shadow: var(--glow);
+}
+
+.wizard-step-button.is-complete {
+  border-color: color-mix(in srgb, var(--brand) 55%, transparent);
+}
+
+.wizard-step-index {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  background: color-mix(in srgb, var(--brand) 15%, var(--surface-1));
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.wizard-step-button.is-active .wizard-step-index {
+  background: color-mix(in srgb, var(--brand) 65%, var(--surface-1));
+  color: var(--text-inverse);
+}
+
+.wizard-step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wizard-step-title {
+  font-size: 0.95rem;
+}
+
+.wizard-step-meta {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.wizard-progress-track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border-subtle) 70%, transparent);
+  overflow: hidden;
+}
+
+.wizard-progress-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--brand), var(--brand-soft));
+  transition: width 0.25s ease;
+}
+
+.wizard-step-panel {
+  display: none;
+}
+
+.wizard-step-panel.is-active {
+  display: block;
+  animation: wizardFade 0.2s ease-out;
+}
+
+.wizard-step-pill {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 70%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  color: var(--text-secondary);
+}
+
+.wizard-nav {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed color-mix(in srgb, var(--border-subtle) 65%, transparent);
+}
+
+@keyframes wizardFade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 575.98px) {
+  .wizard-step-button {
+    padding: 10px;
+  }
+  .wizard-step-text {
+    gap: 0;
+  }
+  .wizard-step-title {
+    font-size: 0.9rem;
+  }
+}

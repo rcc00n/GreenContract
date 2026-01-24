@@ -27,6 +27,7 @@ urlpatterns = [
     path("customers/import/", views.import_customers_csv, name="import_customers_csv"),
     path("rentals/", views.RentalListView.as_view(), name="rental_list"),
     path("rentals/new/", views.RentalCreateView.as_view(), name="rental_create"),
+    path("rentals/wizard/", views.RentalWizardView.as_view(), name="rental_wizard"),
     path("rentals/<int:pk>/edit/", views.RentalUpdateView.as_view(), name="rental_update"),
     path("rentals/export/", views.export_rentals_csv, name="export_rentals_csv"),
     path("rentals/import/", views.import_rentals_csv, name="import_rentals_csv"),

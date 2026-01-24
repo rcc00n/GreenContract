@@ -553,6 +553,19 @@ class RentalForm(StyledModelForm):
         ordered = [region for region in OPERATION_REGIONS if region in selected_set]
         return ", ".join(ordered)
 
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        regions = self.cleaned_data.get("operation_regions", "")
+        if isinstance(regions, (list, tuple)):
+            selected_set = {str(value).strip() for value in regions if value and str(value).strip()}
+            ordered = [region for region in OPERATION_REGIONS if region in selected_set]
+            regions = ", ".join(ordered)
+        instance.operation_regions = regions or ""
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
     def _limit_customer_queryset(self, field_name: str, label_attr: str):
         """
         Keep the customer queryset tiny so rendering the form does not pull hundreds

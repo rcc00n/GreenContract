@@ -1,0 +1,2107 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-0">Мастер договора</h1>
+      <p class="text-muted small mb-0">Пошагово заполните сделку, а система подготовит договор.</p>
+    </div>
+    <a href="{% url 'rentals:rental_list' %}" class="btn btn-outline-secondary">Назад к списку</a>
+  </div>
+
+  <form method="post" novalidate id="rentalWizardForm">
+    {% csrf_token %}
+
+    <div class="card shadow-sm mb-3 wizard-header">
+      <div class="card-body">
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+        <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between">
+          <div>
+            <div class="text-uppercase small text-muted">Пошаговое оформление</div>
+            <div class="fw-semibold">Заполните ключевые данные — договор сформируется автоматически.</div>
+          </div>
+          <div class="wizard-counter" id="wizardStepCounter">Шаг 1 из 4</div>
+        </div>
+        <div class="wizard-progress mt-3">
+          <ol class="wizard-steps" id="contractWizardSteps">
+            <li>
+              <button type="button" class="wizard-step-button" data-wizard-step="0">
+                <span class="wizard-step-index">1</span>
+                <span class="wizard-step-text">
+                  <span class="wizard-step-title">Авто и клиенты</span>
+                  <span class="wizard-step-meta">Клиент, водитель</span>
+                </span>
+              </button>
+            </li>
+            <li>
+              <button type="button" class="wizard-step-button" data-wizard-step="1">
+                <span class="wizard-step-index">2</span>
+                <span class="wizard-step-text">
+                  <span class="wizard-step-title">Срок и условия</span>
+                  <span class="wizard-step-meta">Даты, территория</span>
+                </span>
+              </button>
+            </li>
+            <li>
+              <button type="button" class="wizard-step-button" data-wizard-step="2">
+                <span class="wizard-step-index">3</span>
+                <span class="wizard-step-text">
+                  <span class="wizard-step-title">Тариф и услуги</span>
+                  <span class="wizard-step-meta">Доплаты, доставка</span>
+                </span>
+              </button>
+            </li>
+            <li>
+              <button type="button" class="wizard-step-button" data-wizard-step="3">
+                <span class="wizard-step-index">4</span>
+                <span class="wizard-step-text">
+                  <span class="wizard-step-title">Финиш</span>
+                  <span class="wizard-step-meta">Скидки, договор</span>
+                </span>
+              </button>
+            </li>
+          </ol>
+          <div class="wizard-progress-track">
+            <span class="wizard-progress-fill" id="wizardProgressFill"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="contractWizard">
+      <section class="wizard-step-panel" data-step="0" data-required-fields="id_car,id_customer">
+        <div class="card shadow-sm mb-3">
+          <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+              <div>
+                <div class="fw-semibold">Авто и клиенты</div>
+                <div class="text-muted small">Выберите автомобиль и основного клиента для договора.</div>
+              </div>
+              <span class="wizard-step-pill">Шаг 1</span>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-4 col-lg-3">
+                <label class="form-label" for="{{ form.contract_number.id_for_label }}">Номер договора</label>
+                {{ form.contract_number }}
+                {% for error in form.contract_number.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.car.id_for_label }}">Автомобиль</label>
+                <div class="position-relative mb-2">
+                  <input
+                    type="search"
+                    class="form-control{% if form.car.errors %} is-invalid{% endif %}"
+                    id="car-search"
+                    placeholder="Введите госномер для поиска"
+                    autocomplete="off"
+                    data-initial-label="{{ car_initial_label|default_if_none:'' }}"
+                  >
+                  <div
+                    class="dropdown-menu w-100 shadow-sm"
+                    id="car-search-results"
+                    aria-label="Результаты поиска автомобиля"
+                    style="max-height: 240px; overflow-y: auto;"
+                  ></div>
+                </div>
+                {{ form.car }}
+                <div class="form-text">Поиск по госномеру, затем выберите авто из списка.</div>
+                {% for error in form.car.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="customer-search">Клиент</label>
+                {{ form.customer }}
+                <div class="d-flex align-items-start gap-2">
+                  <div class="flex-grow-1 position-relative">
+                    <input
+                      type="search"
+                      class="form-control{% if form.customer.errors %} is-invalid{% endif %}"
+                      id="customer-search"
+                      placeholder="Начните вводить имя, телефон или эл. почту"
+                      autocomplete="off"
+                      data-search-url="{% url 'rentals:customer_search' %}"
+                      data-initial-label="{{ customer_initial_label|default_if_none:'' }}"
+                    >
+                    <div
+                      class="dropdown-menu w-100 shadow-sm"
+                      id="customer-search-results"
+                      aria-label="Результаты поиска клиентов"
+                      style="max-height: 280px; overflow-y: auto;"
+                    ></div>
+                  </div>
+                  <a
+                    href="#"
+                    class="btn btn-sm btn-outline-secondary align-self-start disabled"
+                    id="customer-edit-link"
+                    data-edit-url-template="{% url 'rentals:customer_update' 0 %}"
+                    target="_blank"
+                    rel="noopener"
+                    aria-disabled="true"
+                    tabindex="-1"
+                  >
+                    Редактировать клиента
+                  </a>
+                </div>
+                <div class="form-text">
+                  Поиск по имени, телефону, эл. почте или номеру удостоверения. Минимум 2 символа.
+                </div>
+                <div class="small text-muted mt-1" id="customer-selected-summary">
+                  {% if customer_initial_label %}{{ customer_initial_label }}{% else %}Клиент не выбран{% endif %}
+                </div>
+                {% for error in form.customer.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+
+                <div class="mt-3 pt-2 border-top">
+                  <div class="d-flex justify-content-between align-items-center gap-2">
+                    <div>
+                      <div class="fw-semibold small">Второй водитель</div>
+                      <div class="text-muted small">Опционально для договора.</div>
+                    </div>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
+                      id="second-driver-toggle"
+                      aria-expanded="false"
+                      aria-controls="second-driver-panel"
+                    >
+                      <span class="fw-semibold" aria-hidden="true" data-toggle-icon>+</span>
+                      <span data-toggle-label>Добавить</span>
+                    </button>
+                  </div>
+                  <div
+                    class="mt-2{% if second_driver_initial_label or form.second_driver.errors %} {% else %} d-none{% endif %}"
+                    id="second-driver-panel"
+                    data-initial-open="{% if second_driver_initial_label or form.second_driver.errors %}true{% else %}false{% endif %}"
+                  >
+                    {{ form.second_driver }}
+                    <div class="d-flex align-items-start gap-2">
+                      <div class="flex-grow-1 position-relative">
+                        <input
+                          type="search"
+                          class="form-control{% if form.second_driver.errors %} is-invalid{% endif %}"
+                          id="second-driver-search"
+                          placeholder="Начните вводить имя, телефон или эл. почту"
+                          autocomplete="off"
+                          data-search-url="{% url 'rentals:customer_search' %}"
+                          data-initial-label="{{ second_driver_initial_label|default_if_none:'' }}"
+                        >
+                        <div
+                          class="dropdown-menu w-100 shadow-sm"
+                          id="second-driver-search-results"
+                          aria-label="Результаты поиска второго водителя"
+                          style="max-height: 280px; overflow-y: auto;"
+                        ></div>
+                      </div>
+                      <a
+                        href="#"
+                        class="btn btn-sm btn-outline-secondary align-self-start disabled"
+                        id="second-driver-edit-link"
+                        data-edit-url-template="{% url 'rentals:customer_update' 0 %}"
+                        target="_blank"
+                        rel="noopener"
+                        aria-disabled="true"
+                        tabindex="-1"
+                      >
+                        Редактировать
+                      </a>
+                    </div>
+                    <div class="form-text">Поиск по имени, телефону, эл. почте или номеру удостоверения.</div>
+                    <div class="small text-muted mt-1" id="second-driver-selected-summary">
+                      {% if second_driver_initial_label %}
+                        {{ second_driver_initial_label }}
+                      {% else %}
+                        Второй водитель не выбран
+                      {% endif %}
+                    </div>
+                    {% for error in form.second_driver.errors %}
+                      <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-3">
+              <div class="border rounded p-3 bg-light">
+                <div class="text-muted small">Предпросмотр сделки</div>
+                <div class="fw-semibold" id="deal-name-preview">—</div>
+              </div>
+            </div>
+
+            <div class="mt-3">
+              <div class="border rounded p-3 bg-light">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div>
+                    <div class="fw-semibold">Данные выбранного авто</div>
+                    <div class="text-muted small">ВИН, СТС и год подтягиваются автоматически.</div>
+                  </div>
+                  <a href="#" class="btn btn-sm btn-outline-secondary d-none" id="car-edit-link" target="_blank" rel="noopener">
+                    Редактировать авто
+                  </a>
+                </div>
+                <div id="car-details" class="row small gy-1">
+                  <div class="col-md-4">
+                    <div class="fw-semibold" data-field="plate">—</div>
+                    <div class="text-muted" data-field="makeModel">—</div>
+                    <div>Год: <span data-field="year">—</span></div>
+                  </div>
+                  <div class="col-md-4">
+                    <div>ВИН: <span data-field="vin">—</span></div>
+                    <div>СТС: <span data-field="sts_number">—</span></div>
+                  </div>
+                  <div class="col-md-4">
+                    <div>СТС выдана: <span data-field="sts_issue_date">—</span></div>
+                    <div>Кем: <span data-field="sts_issued_by">—</span></div>
+                  </div>
+                </div>
+                <div class="text-muted small" id="car-details-empty">Выберите авто, чтобы увидеть ВИН и СТС.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="wizard-step-panel" data-step="1" data-required-fields="id_start_date,id_end_date">
+        <div class="card shadow-sm mb-3">
+          <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+              <div>
+                <div class="fw-semibold">Срок и условия</div>
+                <div class="text-muted small">Укажите даты аренды и условия эксплуатации.</div>
+              </div>
+              <span class="wizard-step-pill">Шаг 2</span>
+            </div>
+
+            <div class="row g-3">
+              <div class="col-lg-3 col-md-6">
+                <label class="form-label" for="{{ form.start_date.id_for_label }}">Дата начала</label>
+                <div class="input-group">
+                  {{ form.start_date }}
+                  <button
+                    class="btn btn-outline-secondary date-picker-toggle"
+                    type="button"
+                    aria-label="Выбрать дату начала"
+                    data-date-target="{{ form.start_date.id_for_label }}"
+                  >
+                    <svg class="time-picker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <rect x="3" y="4" width="18" height="18" rx="2" />
+                      <path d="M16 2v4M8 2v4M3 10h18" />
+                    </svg>
+                  </button>
+                </div>
+                <div class="form-text">Выберите дату начала аренды.</div>
+                {% for error in form.start_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-lg-3 col-md-6">
+                <label class="form-label" for="{{ form.start_time.id_for_label }}">Время выдачи</label>
+                <div class="time-picker" data-time-picker data-time-step="15">
+                  <div class="input-group">
+                    {{ form.start_time }}
+                    <button class="btn btn-outline-secondary time-picker-toggle" type="button" aria-label="Выбрать время">
+                      <svg class="time-picker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 7v6l4 2" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="time-picker-menu" role="listbox" aria-label="Выбор времени"></div>
+                </div>
+                <div class="form-text">Нужен для расчёта аэропортового/ночного сбора.</div>
+                {% for error in form.start_time.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-lg-3 col-md-6">
+                <label class="form-label" for="{{ form.end_date.id_for_label }}">Дата окончания</label>
+                <div class="input-group">
+                  {{ form.end_date }}
+                  <button
+                    class="btn btn-outline-secondary date-picker-toggle"
+                    type="button"
+                    aria-label="Выбрать дату окончания"
+                    data-date-target="{{ form.end_date.id_for_label }}"
+                  >
+                    <svg class="time-picker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <rect x="3" y="4" width="18" height="18" rx="2" />
+                      <path d="M16 2v4M8 2v4M3 10h18" />
+                    </svg>
+                  </button>
+                </div>
+                <div class="form-text">Система подставит цену в зависимости от количества дней.</div>
+                {% for error in form.end_date.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-lg-3 col-md-6">
+                <label class="form-label" for="{{ form.end_time.id_for_label }}">Время возврата</label>
+                <div class="time-picker" data-time-picker data-time-step="15">
+                  <div class="input-group">
+                    {{ form.end_time }}
+                    <button class="btn btn-outline-secondary time-picker-toggle" type="button" aria-label="Выбрать время">
+                      <svg class="time-picker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 7v6l4 2" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="time-picker-menu" role="listbox" aria-label="Выбор времени"></div>
+                </div>
+                <div class="form-text">Для ночных/аэропортовых сборов при возврате.</div>
+                {% for error in form.end_time.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+
+              <div class="col-12">
+                <div class="border rounded p-3 bg-light">
+                  <div class="fw-semibold mb-2">Территория и пробег</div>
+                  <div class="row g-3">
+                    <div class="col-lg-8">
+                      <div class="form-label">Территория эксплуатации</div>
+                      <div class="row g-2">
+                        {% for checkbox in form.operation_regions %}
+                          <div class="col-md-6">
+                            <div class="form-check">
+                              {{ checkbox.tag }}
+                              <label class="form-check-label" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
+                            </div>
+                          </div>
+                        {% endfor %}
+                      </div>
+                      <div class="form-text">Отметьте возможные регионы эксплуатации.</div>
+                      {% for error in form.operation_regions.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-lg-4">
+                      <label class="form-label" for="{{ form.mileage_limit_km.id_for_label }}">Ограничение пробега (км)</label>
+                      {{ form.mileage_limit_km }}
+                      <div class="form-text">0 — без ограничения пробега.</div>
+                      {% for error in form.mileage_limit_km.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="wizard-step-panel" data-step="2">
+        <div class="card shadow-sm mb-3">
+          <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+              <div>
+                <div class="fw-semibold">Тариф и услуги</div>
+                <div class="text-muted small">Настройте тарифы, дополнительные услуги и доставку.</div>
+              </div>
+              <span class="wizard-step-pill">Шаг 3</span>
+            </div>
+
+            <div class="row g-3">
+              <div class="col-lg-3 col-md-6">
+                <label class="form-label" for="{{ form.unique_daily_rate.id_for_label }}">Уникальный тариф</label>
+                {{ form.unique_daily_rate }}
+                <div class="form-text">Перебивает тариф машины на все дни.</div>
+                {% for error in form.unique_daily_rate.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-lg-3 col-md-6">
+                <label class="form-label" for="{{ form.daily_rate.id_for_label }}">Суточный тариф</label>
+                {{ form.daily_rate }}
+                <div class="form-text">Автозаполнение по тарифу автомобиля.</div>
+                {% for error in form.daily_rate.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-lg-3 col-md-6">
+                <label class="form-label" for="{{ form.total_price.id_for_label }}">Итоговая сумма</label>
+                {{ form.total_price }}
+                <div class="form-text">Сумма договора после доп. услуг и скидок.</div>
+                {% for error in form.total_price.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+              <div class="col-lg-3 col-md-6">
+                <label class="form-label" for="{{ form.balance_due.id_for_label }}">К оплате после предоплаты</label>
+                {{ form.balance_due }}
+                <div class="form-text">Учитывает предоплату.</div>
+                {% for error in form.balance_due.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+
+              <div class="col-12">
+                <div class="border rounded p-3 bg-light">
+                  <div class="fw-semibold mb-2">Мойка, ночной выход, доставка</div>
+                  <div class="row g-3 mb-2">
+                    <div class="col-lg-4 col-md-6">
+                      <label class="form-label" for="{{ form.car_wash_fee.id_for_label }}">Мойка</label>
+                      {{ form.car_wash_fee }}
+                      <div class="form-text">По умолчанию 1000 ₽, можно изменить.</div>
+                      {% for error in form.car_wash_fee.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-lg-6">
+                      <div class="border rounded p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                          <div class="fw-semibold small mb-0">Выдача</div>
+                          <button class="btn btn-sm btn-outline-secondary" type="button" data-time-fill="start">
+                            По времени выдачи
+                          </button>
+                        </div>
+                        <div class="row g-2">
+                          <div class="col-sm-6">
+                            <label class="form-label" for="{{ form.night_fee_start.id_for_label }}">Ночной выход</label>
+                            {{ form.night_fee_start }}
+                            <div class="form-text">По таблице ночных выходов.</div>
+                            {% for error in form.night_fee_start.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                          </div>
+                          <div class="col-sm-6">
+                            <label class="form-label" for="{{ form.delivery_issue_city.id_for_label }}">Город выдачи</label>
+                            <div class="city-picker" data-city-picker>
+                              {{ form.delivery_issue_city }}
+                              <button
+                                class="form-control city-picker-trigger{% if form.delivery_issue_city.errors %} is-invalid{% endif %}"
+                                type="button"
+                                aria-haspopup="listbox"
+                                aria-expanded="false"
+                              >
+                                <span data-city-label>Выберите город</span>
+                                <span class="city-picker-caret">▾</span>
+                              </button>
+                              <div class="city-picker-menu" role="listbox" aria-label="Выбор города выдачи">
+                                <div class="city-picker-search">
+                                  <input
+                                    type="search"
+                                    class="form-control form-control-sm"
+                                    placeholder="Поиск города"
+                                    autocomplete="off"
+                                  >
+                                </div>
+                                <div class="city-picker-options"></div>
+                                <div class="city-picker-empty text-muted small d-none">Нет совпадений</div>
+                              </div>
+                            </div>
+                            <div class="form-text">Стоимость возьмём из таблицы доставки.</div>
+                            {% for error in form.delivery_issue_city.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                          </div>
+                          <div class="col-sm-6">
+                            <label class="form-label" for="{{ form.delivery_issue_fee.id_for_label }}">Стоимость выдачи</label>
+                            {{ form.delivery_issue_fee }}
+                            <div class="form-text">Автозаполнение, можно изменить.</div>
+                            {% for error in form.delivery_issue_fee.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-lg-6">
+                      <div class="border rounded p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                          <div class="fw-semibold small mb-0">Возврат</div>
+                          <button class="btn btn-sm btn-outline-secondary" type="button" data-time-fill="end">
+                            По времени возврата
+                          </button>
+                        </div>
+                        <div class="row g-2">
+                          <div class="col-sm-6">
+                            <label class="form-label" for="{{ form.night_fee_end.id_for_label }}">Ночной выход</label>
+                            {{ form.night_fee_end }}
+                            <div class="form-text">Можно скорректировать вручную.</div>
+                            {% for error in form.night_fee_end.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                          </div>
+                          <div class="col-sm-6">
+                            <label class="form-label" for="{{ form.delivery_return_city.id_for_label }}">Город возврата</label>
+                            <div class="city-picker" data-city-picker>
+                              {{ form.delivery_return_city }}
+                              <button
+                                class="form-control city-picker-trigger{% if form.delivery_return_city.errors %} is-invalid{% endif %}"
+                                type="button"
+                                aria-haspopup="listbox"
+                                aria-expanded="false"
+                              >
+                                <span data-city-label>Выберите город</span>
+                                <span class="city-picker-caret">▾</span>
+                              </button>
+                              <div class="city-picker-menu" role="listbox" aria-label="Выбор города возврата">
+                                <div class="city-picker-search">
+                                  <input
+                                    type="search"
+                                    class="form-control form-control-sm"
+                                    placeholder="Поиск города"
+                                    autocomplete="off"
+                                  >
+                                </div>
+                                <div class="city-picker-options"></div>
+                                <div class="city-picker-empty text-muted small d-none">Нет совпадений</div>
+                              </div>
+                            </div>
+                            <div class="form-text">Считается отдельно от выдачи.</div>
+                            {% for error in form.delivery_return_city.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                          </div>
+                          <div class="col-sm-6">
+                            <label class="form-label" for="{{ form.delivery_return_fee.id_for_label }}">Стоимость возврата</label>
+                            {{ form.delivery_return_fee }}
+                            <div class="form-text">Авторасчёт по городу, редактируется.</div>
+                            {% for error in form.delivery_return_fee.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="border rounded p-3 bg-light">
+                  <div class="fw-semibold mb-2">Дополнительное оборудование</div>
+                  <div class="row g-3 align-items-center">
+                    <div class="col-md-4">
+                      <div class="form-check">
+                        {{ form.child_seat_included }}
+                        <label class="form-check-label" for="{{ form.child_seat_included.id_for_label }}">Детское кресло</label>
+                      </div>
+                      <div class="form-text">200 ₽/сут, максимум 2800 за кресло.</div>
+                      {% for error in form.child_seat_included.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                      <div class="form-check">
+                        {{ form.booster_included }}
+                        <label class="form-check-label" for="{{ form.booster_included.id_for_label }}">Бустер</label>
+                      </div>
+                      <div class="form-text">100 ₽/сут, максимум 1000 за бустер.</div>
+                      {% for error in form.booster_included.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                      <div class="form-check">
+                        {{ form.ski_rack_included }}
+                        <label class="form-check-label" for="{{ form.ski_rack_included.id_for_label }}">Крепления д/лыж</label>
+                      </div>
+                      <div class="form-text">400 ₽ в сутки.</div>
+                      {% for error in form.ski_rack_included.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                      <div class="form-check">
+                        {{ form.roof_box_included }}
+                        <label class="form-check-label" for="{{ form.roof_box_included.id_for_label }}">Автобокс</label>
+                      </div>
+                      <div class="form-text">900 ₽ в сутки.</div>
+                      {% for error in form.roof_box_included.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                      <div class="form-check">
+                        {{ form.crossbars_included }}
+                        <label class="form-check-label" for="{{ form.crossbars_included.id_for_label }}">Поперечины</label>
+                      </div>
+                      <div class="form-text">300 ₽ в сутки.</div>
+                      {% for error in form.crossbars_included.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label" for="{{ form.equipment_manual_total.id_for_label }}">Фикс. сумма оборудования</label>
+                      {{ form.equipment_manual_total }}
+                      <div class="form-text">Заполните, если не считать по суткам.</div>
+                      {% for error in form.equipment_manual_total.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="wizard-step-panel" data-step="3" data-required-fields="{% if contract_templates %}wizard-contract-template{% endif %}">
+        <div class="card shadow-sm mb-3">
+          <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+              <div>
+                <div class="fw-semibold">Финиш и договор</div>
+                <div class="text-muted small">Проверьте расчёт, скидки и выберите шаблон договора.</div>
+              </div>
+              <span class="wizard-step-pill">Шаг 4</span>
+            </div>
+
+            <div class="row g-3">
+              <div class="col-12">
+                <div class="border rounded p-3 bg-light">
+                  <div class="fw-semibold mb-2">Скидки, предоплата и статус</div>
+                  <div class="row g-3">
+                    <div class="col-md-4">
+                      <label class="form-label" for="{{ form.discount_amount.id_for_label }}">Скидка суммой</label>
+                      {{ form.discount_amount }}
+                      <div class="form-text">Фиксированная скидка в рублях.</div>
+                      {% for error in form.discount_amount.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label" for="{{ form.discount_percent.id_for_label }}">Скидка %</label>
+                      {{ form.discount_percent }}
+                      <div class="form-text">Применяется к суточному тарифу после фиксированной скидки. Доп. услуги без скидки.</div>
+                      {% for error in form.discount_percent.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label" for="{{ form.prepayment.id_for_label }}">Предоплата</label>
+                      {{ form.prepayment }}
+                      <div class="form-text">Вычитается из суммы к оплате.</div>
+                      {% for error in form.prepayment.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label" for="{{ form.status.id_for_label }}">Статус</label>
+                      {{ form.status }}
+                      {% for error in form.status.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="border rounded p-3 bg-light">
+                  <div class="fw-semibold mb-2">Шаблон договора</div>
+                  {% if contract_templates %}
+                    <label class="form-label" for="wizard-contract-template">Выберите шаблон</label>
+                    <select
+                      class="form-select"
+                      id="wizard-contract-template"
+                      name="generate_contract_template_id"
+                    >
+                      {% for ct in contract_templates %}
+                        <option value="{{ ct.pk }}" {% if forloop.first %}selected{% endif %}>{{ ct.name }}</option>
+                      {% endfor %}
+                    </select>
+                    <div class="form-text">Договор сформируется сразу после сохранения сделки.</div>
+                  {% else %}
+                    <div class="alert alert-warning mb-0">
+                      Нет шаблонов договоров. Добавьте шаблон в разделе «Шаблоны договоров» и
+                      сформируйте договор из списка аренд.
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-3">
+              <div class="card shadow-sm" id="price-summary" role="alert">
+                <div class="card-body">
+                  <div class="d-flex align-items-center gap-2 mb-3">
+                    <div class="spinner-border spinner-border-sm text-primary d-none" id="price-spinner" role="status">
+                      <span class="visually-hidden">Загрузка...</span>
+                    </div>
+                    <div>
+                      <div class="fw-semibold text-uppercase small text-muted mb-1">Текущий расчёт</div>
+                      <div class="small text-muted" id="price-summary-text">Выберите авто и даты аренды.</div>
+                    </div>
+                  </div>
+                  <div class="bg-light rounded p-3 mb-3">
+                    <div class="text-muted small">К оплате</div>
+                    <div class="h4 mb-0" id="price-summary-due">—</div>
+                  </div>
+                  <div class="small" id="price-summary-breakdown">
+                    <div class="d-flex justify-content-between">
+                      <span>Дней</span>
+                      <span id="price-summary-days">—</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                      <span>Тариф</span>
+                      <span id="price-summary-rate">—</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                      <span>Базово</span>
+                      <span id="price-summary-base">—</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                      <span>Доп. услуги</span>
+                      <span id="price-summary-extras">—</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                      <span>Скидки</span>
+                      <span id="price-summary-discounts">—</span>
+                    </div>
+                    <div class="d-flex justify-content-between fw-semibold">
+                      <span>Итого</span>
+                      <span id="price-summary-total">—</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="alert alert-warning d-none" id="wizardValidation" role="alert">
+      Заполните обязательные поля, чтобы продолжить.
+    </div>
+
+    {% if car_pricing %}
+      {{ car_pricing|json_script:"car-pricing-data" }}
+    {% endif %}
+    {% if pricing_config %}
+      {{ pricing_config|json_script:"pricing-config-data" }}
+    {% endif %}
+
+    <script>
+      (function() {
+        function initCustomerSearch(config) {
+          const searchInput = document.getElementById(config.inputId);
+          const resultsMenu = document.getElementById(config.resultsId);
+          const hiddenField = document.getElementById(config.hiddenId);
+          const summary = document.getElementById(config.summaryId);
+          const editLink = document.getElementById(config.editLinkId);
+          const editUrlTemplate = editLink?.dataset.editUrlTemplate;
+          const searchUrl = searchInput?.dataset.searchUrl;
+          const initialLabel = searchInput?.dataset.initialLabel;
+          let debounceTimer = null;
+          let activeRequest = null;
+          let lastSelectedLabel = initialLabel && hiddenField?.value ? initialLabel : "";
+
+          if (!searchInput || !resultsMenu || !hiddenField || !searchUrl) {
+            return {
+              clearSelection() {},
+              setSummary() {},
+              searchInput: null,
+              hiddenField: null,
+            };
+          }
+
+          const messages = {
+            minChars: config.minCharsMessage || "Введите минимум 2 символа для поиска.",
+            selection: config.selectionMessage || "Выберите клиента из результатов поиска.",
+            empty: config.emptyMessage || "Клиент не выбран",
+            noResults: config.noResultsMessage || "Ничего не найдено",
+            searching: config.searchingMessage || "Ищем...",
+            selected: config.selectedMessage || "Клиент выбран",
+            error: config.errorMessage || "Не удалось загрузить клиентов. Попробуйте ещё раз.",
+          };
+
+          function setSummary(text, highlight = false) {
+            if (!summary) return;
+            summary.textContent = text;
+            summary.classList.toggle("text-danger", highlight);
+          }
+
+          function clearResults() {
+            resultsMenu.innerHTML = "";
+            resultsMenu.classList.remove("show");
+          }
+
+          function setEditLink(customerId) {
+            if (!editLink) return;
+            if (!customerId || !editUrlTemplate) {
+              editLink.classList.add("disabled");
+              editLink.setAttribute("aria-disabled", "true");
+              editLink.setAttribute("tabindex", "-1");
+              editLink.removeAttribute("href");
+              return;
+            }
+            const url = editUrlTemplate.replace("/0/", `/${customerId}/`);
+            editLink.href = url;
+            editLink.classList.remove("disabled");
+            editLink.removeAttribute("aria-disabled");
+            editLink.removeAttribute("tabindex");
+          }
+
+          function clearSelection() {
+            hiddenField.value = "";
+            searchInput.value = "";
+            lastSelectedLabel = "";
+            setEditLink("");
+            setSummary(messages.empty);
+            clearResults();
+          }
+
+          function selectCustomer(item) {
+            if (!item) return;
+            hiddenField.value = item.id;
+            const parts = [item.name, item.phone].filter(Boolean);
+            const label = parts.join(" · ") || item.name;
+            searchInput.value = item.name;
+            lastSelectedLabel = label;
+            setSummary(label);
+            setEditLink(item.id);
+            if (config.onSelect) {
+              config.onSelect(item);
+            }
+            clearResults();
+          }
+
+          function renderResults(items) {
+            clearResults();
+            if (!items.length) {
+              const empty = document.createElement("div");
+              empty.className = "dropdown-item text-muted small";
+              empty.textContent = messages.noResults;
+              resultsMenu.appendChild(empty);
+              resultsMenu.classList.add("show");
+              return;
+            }
+
+            items.forEach((item) => {
+              const btn = document.createElement("button");
+              btn.type = "button";
+              btn.className = "dropdown-item text-wrap";
+              btn.dataset.id = item.id;
+
+              btn.addEventListener("click", () => selectCustomer(item));
+
+              const title = document.createElement("div");
+              title.className = "fw-semibold";
+              title.textContent = item.name;
+
+              const meta = document.createElement("div");
+              meta.className = "small text-muted";
+              const metaParts = [item.phone, item.email, item.license_number].filter(Boolean);
+              meta.textContent = metaParts.join(" • ");
+
+              btn.appendChild(title);
+              btn.appendChild(meta);
+              resultsMenu.appendChild(btn);
+            });
+
+            resultsMenu.classList.add("show");
+          }
+
+          function fetchResults(term) {
+            if (!term) return;
+
+            if (activeRequest) {
+              activeRequest.abort();
+            }
+
+            const controller = new AbortController();
+            activeRequest = controller;
+
+            resultsMenu.innerHTML = `<span class="dropdown-item text-muted small">${messages.searching}</span>`;
+            resultsMenu.classList.add("show");
+
+            fetch(`${searchUrl}?q=${encodeURIComponent(term)}`, { signal: controller.signal })
+              .then((response) => (response.ok ? response.json() : Promise.reject()))
+              .then((data) => {
+                if (controller.signal.aborted) return;
+                renderResults((data && data.results) || []);
+              })
+              .catch(() => {
+                if (controller.signal.aborted) return;
+                clearResults();
+                setSummary(messages.error, true);
+              })
+              .finally(() => {
+                if (activeRequest === controller) {
+                  activeRequest = null;
+                }
+              });
+          }
+
+          function handleInput() {
+            const term = searchInput.value.trim();
+            if (term !== lastSelectedLabel && hiddenField.value) {
+              hiddenField.value = "";
+              setEditLink("");
+            }
+
+            if (term.length < 2) {
+              clearResults();
+              if (!hiddenField.value) {
+                setSummary(messages.minChars, true);
+              }
+              return;
+            }
+
+            setSummary(messages.selection);
+
+            if (debounceTimer) {
+              window.clearTimeout(debounceTimer);
+            }
+            debounceTimer = window.setTimeout(() => fetchResults(term), 180);
+          }
+
+          searchInput.addEventListener("input", handleInput);
+          searchInput.addEventListener("focus", () => {
+            if (resultsMenu.innerHTML.trim()) {
+              resultsMenu.classList.add("show");
+            }
+          });
+
+          document.addEventListener("click", (event) => {
+            if (event.target === searchInput || resultsMenu.contains(event.target)) {
+              return;
+            }
+            clearResults();
+          });
+
+          if (initialLabel && hiddenField.value) {
+            searchInput.value = initialLabel;
+            setSummary(initialLabel);
+            setEditLink(hiddenField.value);
+            if (config.onSelect) {
+              config.onSelect({ id: hiddenField.value, name: searchInput.value || initialLabel });
+            }
+          } else if (hiddenField.value) {
+            setSummary(messages.selected);
+            setEditLink(hiddenField.value);
+          } else {
+            setSummary(messages.minChars, true);
+            setEditLink("");
+          }
+
+          return {
+            clearSelection,
+            setSummary,
+            searchInput,
+            hiddenField,
+          };
+        }
+
+        const customerSearch = initCustomerSearch({
+          inputId: "customer-search",
+          resultsId: "customer-search-results",
+          hiddenId: "id_customer",
+          summaryId: "customer-selected-summary",
+          editLinkId: "customer-edit-link",
+          onSelect: (item) => {
+            document.dispatchEvent(new CustomEvent("rental:customer-change", { detail: { name: item.name } }));
+          },
+          emptyMessage: "Клиент не выбран",
+          selectedMessage: "Клиент выбран",
+        });
+
+        const secondDriverSearch = initCustomerSearch({
+          inputId: "second-driver-search",
+          resultsId: "second-driver-search-results",
+          hiddenId: "id_second_driver",
+          summaryId: "second-driver-selected-summary",
+          editLinkId: "second-driver-edit-link",
+          emptyMessage: "Второй водитель не выбран",
+          selectedMessage: "Второй водитель выбран",
+          selectionMessage: "Выберите водителя из результатов поиска.",
+          errorMessage: "Не удалось загрузить водителей. Попробуйте ещё раз.",
+        });
+
+        const toggleBtn = document.getElementById("second-driver-toggle");
+        const toggleLabel = toggleBtn?.querySelector("[data-toggle-label]");
+        const toggleIcon = toggleBtn?.querySelector("[data-toggle-icon]");
+        const panel = document.getElementById("second-driver-panel");
+        let isSecondDriverActive = false;
+
+        function setSecondDriverActive(active, { preserveSelection = false } = {}) {
+          isSecondDriverActive = active;
+          if (panel) {
+            panel.classList.toggle("d-none", !active);
+          }
+          if (toggleBtn) {
+            toggleBtn.setAttribute("aria-expanded", String(active));
+          }
+          if (toggleLabel) {
+            toggleLabel.textContent = active ? "Убрать" : "Добавить";
+          }
+          if (toggleIcon) {
+            toggleIcon.textContent = active ? "×" : "+";
+          }
+          if (!active && !preserveSelection) {
+            secondDriverSearch.clearSelection();
+          }
+          if (active && secondDriverSearch.searchInput) {
+            secondDriverSearch.searchInput.focus();
+          }
+        }
+
+        const initialSecondOpen =
+          panel?.dataset.initialOpen === "true" || Boolean(secondDriverSearch.hiddenField?.value);
+        setSecondDriverActive(initialSecondOpen, { preserveSelection: true });
+
+        toggleBtn?.addEventListener("click", () => {
+          setSecondDriverActive(!isSecondDriverActive);
+        });
+      })();
+    </script>
+
+    <script>
+      (function() {
+        const pickers = Array.from(document.querySelectorAll("[data-time-picker]"));
+        if (!pickers.length) return;
+
+        const minutesInDay = 24 * 60;
+
+        function pad(value) {
+          return String(value).padStart(2, "0");
+        }
+
+        function formatTime(totalMinutes) {
+          const safe = ((totalMinutes % minutesInDay) + minutesInDay) % minutesInDay;
+          const hours = Math.floor(safe / 60);
+          const minutes = safe % 60;
+          return `${pad(hours)}:${pad(minutes)}`;
+        }
+
+        function parseTime(value) {
+          if (!value) return null;
+          const normalized = String(value).trim();
+          if (!normalized) return null;
+          const match = normalized.match(/^(\d{1,2})\s*[:.]\s*(\d{1,2})$/);
+          if (match) {
+            const hours = Number.parseInt(match[1], 10);
+            const minutes = Number.parseInt(match[2], 10);
+            if (
+              Number.isFinite(hours) &&
+              Number.isFinite(minutes) &&
+              hours >= 0 &&
+              hours <= 23 &&
+              minutes >= 0 &&
+              minutes <= 59
+            ) {
+              return hours * 60 + minutes;
+            }
+            return null;
+          }
+          const digits = normalized.replace(/\D/g, "");
+          if (digits.length === 1 || digits.length === 2) {
+            const hours = Number.parseInt(digits, 10);
+            if (!Number.isFinite(hours) || hours < 0 || hours > 23) return null;
+            return hours * 60;
+          }
+          if (digits.length === 3) {
+            const hours = Number.parseInt(digits.slice(0, 1), 10);
+            const minutes = Number.parseInt(digits.slice(1), 10);
+            if (
+              !Number.isFinite(hours) ||
+              !Number.isFinite(minutes) ||
+              hours < 0 ||
+              hours > 9 ||
+              minutes < 0 ||
+              minutes > 59
+            ) {
+              return null;
+            }
+            return hours * 60 + minutes;
+          }
+          if (digits.length >= 4) {
+            const hours = Number.parseInt(digits.slice(0, 2), 10);
+            const minutes = Number.parseInt(digits.slice(2, 4), 10);
+            if (
+              !Number.isFinite(hours) ||
+              !Number.isFinite(minutes) ||
+              hours < 0 ||
+              hours > 23 ||
+              minutes < 0 ||
+              minutes > 59
+            ) {
+              return null;
+            }
+            return hours * 60 + minutes;
+          }
+          return null;
+        }
+
+        function clampMinutes(totalMinutes) {
+          if (totalMinutes === null || Number.isNaN(totalMinutes)) return null;
+          return ((totalMinutes % minutesInDay) + minutesInDay) % minutesInDay;
+        }
+
+        function roundToStep(totalMinutes, step) {
+          if (totalMinutes === null) return null;
+          const rounded = Math.round(totalMinutes / step) * step;
+          return clampMinutes(rounded === minutesInDay ? 0 : rounded);
+        }
+
+        function buildMenu(menu, step) {
+          const quick = document.createElement("div");
+          quick.className = "time-picker-quick";
+
+          const quickButtons = [
+            { label: "Сейчас", action: "now" },
+            { label: "+30 мин", action: "add", minutes: 30 },
+            { label: "+1 час", action: "add", minutes: 60 },
+            { label: "09:00", action: "set", time: "09:00" },
+            { label: "12:00", action: "set", time: "12:00" },
+            { label: "15:00", action: "set", time: "15:00" },
+            { label: "18:00", action: "set", time: "18:00" },
+            { label: "21:00", action: "set", time: "21:00" },
+          ];
+
+          quickButtons.forEach((item) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "time-chip";
+            btn.textContent = item.label;
+            if (item.action === "now") {
+              btn.dataset.timeAction = "now";
+            } else if (item.action === "add") {
+              btn.dataset.timeAction = "add";
+              btn.dataset.timeAdd = String(item.minutes || 0);
+            } else if (item.action === "set") {
+              btn.dataset.timeAction = "set";
+              btn.dataset.timeValue = item.time;
+            }
+            quick.appendChild(btn);
+          });
+
+          const grid = document.createElement("div");
+          grid.className = "time-picker-grid";
+          for (let minutes = 0; minutes < minutesInDay; minutes += step) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "time-chip";
+            btn.dataset.timeValue = formatTime(minutes);
+            btn.textContent = btn.dataset.timeValue;
+            grid.appendChild(btn);
+          }
+
+          menu.appendChild(quick);
+          menu.appendChild(grid);
+        }
+
+        function highlightSelection(menu, value) {
+          if (!menu) return;
+          const buttons = menu.querySelectorAll("[data-time-value]");
+          buttons.forEach((btn) => {
+            btn.classList.toggle("is-active", btn.dataset.timeValue === value);
+          });
+        }
+
+        function initPicker(picker) {
+          const input = picker.querySelector("input");
+          const toggle = picker.querySelector(".time-picker-toggle");
+          const menu = picker.querySelector(".time-picker-menu");
+          if (!input || !toggle || !menu) return;
+          function nowMinutes() {
+            const now = new Date();
+            return now.getHours() * 60 + now.getMinutes();
+          }
+
+          const step = Number.parseInt(picker.dataset.timeStep || "15", 10) || 15;
+          buildMenu(menu, step);
+
+          function setValue(value) {
+            if (!value) return;
+            input.value = value;
+            highlightSelection(menu, value);
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+
+          function openMenu() {
+            menu.classList.add("show");
+            highlightSelection(menu, input.value);
+          }
+
+          function closeMenu() {
+            menu.classList.remove("show");
+          }
+
+          toggle.addEventListener("click", () => {
+            if (menu.classList.contains("show")) {
+              closeMenu();
+            } else {
+              openMenu();
+            }
+          });
+
+          input.addEventListener("focus", openMenu);
+          input.addEventListener("input", () => highlightSelection(menu, input.value));
+          input.addEventListener("blur", () => {
+            const parsed = clampMinutes(parseTime(input.value));
+            if (parsed === null) {
+              input.value = "";
+              highlightSelection(menu, "");
+              return;
+            }
+            const normalized = formatTime(parsed);
+            if (normalized !== input.value) {
+              setValue(normalized);
+            }
+          });
+
+          menu.addEventListener("click", (event) => {
+            const target = event.target instanceof HTMLElement ? event.target.closest("button") : null;
+            if (!target) return;
+            const action = target.dataset.timeAction;
+            if (action === "now") {
+              const minutes = nowMinutes();
+              const rounded = roundToStep(minutes, step);
+              setValue(formatTime(rounded ?? 0));
+              closeMenu();
+              return;
+            }
+            if (action === "add") {
+              const delta = Number.parseInt(target.dataset.timeAdd || "0", 10);
+              const base = clampMinutes(parseTime(input.value));
+              const minutes = base === null ? roundToStep(nowMinutes(), step) : base;
+              const next = clampMinutes((minutes ?? 0) + delta);
+              const rounded = roundToStep(next, step);
+              setValue(formatTime(rounded ?? 0));
+              closeMenu();
+              return;
+            }
+            const timeValue = target.dataset.timeValue;
+            if (timeValue) {
+              setValue(timeValue);
+              closeMenu();
+            }
+          });
+
+          return { closeMenu };
+        }
+
+        const instances = pickers.map(initPicker).filter(Boolean);
+
+        document.addEventListener("click", (event) => {
+          pickers.forEach((picker, index) => {
+            if (!picker.contains(event.target)) {
+              instances[index]?.closeMenu();
+            }
+          });
+        });
+      })();
+    </script>
+
+    <script>
+      (function() {
+        const pickers = Array.from(document.querySelectorAll("[data-city-picker]"));
+        if (!pickers.length) return;
+
+        function updateTrigger(picker, value) {
+          const select = picker.querySelector("select");
+          const label = picker.querySelector("[data-city-label]");
+          if (!select || !label) return;
+          const selected = Array.from(select.options).find((opt) => opt.value === value) || select.selectedOptions[0];
+          label.textContent = selected ? selected.text : "Выберите город";
+        }
+
+        function buildOptions(picker) {
+          const select = picker.querySelector("select");
+          const optionsWrap = picker.querySelector(".city-picker-options");
+          if (!select || !optionsWrap) return;
+          optionsWrap.innerHTML = "";
+          const fragment = document.createDocumentFragment();
+          Array.from(select.options).forEach((opt) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "city-option";
+            btn.dataset.value = opt.value;
+            btn.dataset.label = opt.text.toLowerCase();
+            btn.textContent = opt.text;
+            fragment.appendChild(btn);
+          });
+          optionsWrap.appendChild(fragment);
+        }
+
+        function highlightSelection(picker, value) {
+          const options = picker.querySelectorAll(".city-option");
+          options.forEach((btn) => {
+            btn.classList.toggle("is-active", btn.dataset.value === value);
+          });
+        }
+
+        function closeMenu(picker) {
+          const menu = picker.querySelector(".city-picker-menu");
+          const trigger = picker.querySelector(".city-picker-trigger");
+          if (menu) menu.classList.remove("show");
+          if (trigger) trigger.setAttribute("aria-expanded", "false");
+        }
+
+        pickers.forEach((picker) => {
+          const select = picker.querySelector("select");
+          const trigger = picker.querySelector(".city-picker-trigger");
+          const menu = picker.querySelector(".city-picker-menu");
+          const search = picker.querySelector(".city-picker-search input");
+          const empty = picker.querySelector(".city-picker-empty");
+
+          if (!select || !trigger || !menu) return;
+
+          buildOptions(picker);
+          updateTrigger(picker, select.value);
+          highlightSelection(picker, select.value);
+
+          trigger.addEventListener("click", () => {
+            const isOpen = menu.classList.contains("show");
+            pickers.forEach((item) => item !== picker && closeMenu(item));
+            menu.classList.toggle("show", !isOpen);
+            trigger.setAttribute("aria-expanded", String(!isOpen));
+            if (!isOpen && search) {
+              search.value = "";
+              search.focus();
+              const options = picker.querySelectorAll(".city-option");
+              options.forEach((btn) => btn.classList.remove("d-none"));
+              empty?.classList.add("d-none");
+            }
+          });
+
+          picker.addEventListener("click", (event) => {
+            const target = event.target instanceof HTMLElement ? event.target.closest(".city-option") : null;
+            if (!target) return;
+            const value = target.dataset.value ?? "";
+            select.value = value;
+            updateTrigger(picker, value);
+            highlightSelection(picker, value);
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+            closeMenu(picker);
+          });
+
+          search?.addEventListener("input", () => {
+            const term = search.value.trim().toLowerCase();
+            let visible = 0;
+            picker.querySelectorAll(".city-option").forEach((btn) => {
+              const match = !term || (btn.dataset.label || "").includes(term);
+              btn.classList.toggle("d-none", !match);
+              if (match) visible += 1;
+            });
+            empty?.classList.toggle("d-none", visible > 0);
+          });
+
+          select.addEventListener("change", () => {
+            updateTrigger(picker, select.value);
+            highlightSelection(picker, select.value);
+          });
+        });
+
+        document.addEventListener("click", (event) => {
+          pickers.forEach((picker) => {
+            if (!picker.contains(event.target)) {
+              closeMenu(picker);
+            }
+          });
+        });
+      })();
+    </script>
+
+    <script>
+      (function() {
+        const carSelect = document.getElementById("id_car");
+        const startInput = document.getElementById("id_start_date");
+        const endInput = document.getElementById("id_end_date");
+        const startTimeInput = document.getElementById("id_start_time");
+        const endTimeInput = document.getElementById("id_end_time");
+        const dailyRateInput = document.getElementById("id_daily_rate");
+        const uniqueRateInput = document.getElementById("id_unique_daily_rate");
+        const totalInput = document.getElementById("id_total_price");
+        const balanceInput = document.getElementById("id_balance_due");
+        const summaryText = document.getElementById("price-summary-text");
+        const summaryDays = document.getElementById("price-summary-days");
+        const summaryRate = document.getElementById("price-summary-rate");
+        const summaryBase = document.getElementById("price-summary-base");
+        const summaryExtras = document.getElementById("price-summary-extras");
+        const summaryDiscounts = document.getElementById("price-summary-discounts");
+        const summaryTotal = document.getElementById("price-summary-total");
+        const summaryDue = document.getElementById("price-summary-due");
+        const contractInput = document.getElementById("id_contract_number");
+        const dealPreview = document.getElementById("deal-name-preview");
+        const carDetails = document.getElementById("car-details");
+        const carDetailsEmpty = document.getElementById("car-details-empty");
+        const carEditLink = document.getElementById("car-edit-link");
+        const customerSearchInput = document.getElementById("customer-search");
+        const nightStartInput = document.getElementById("id_night_fee_start");
+        const nightEndInput = document.getElementById("id_night_fee_end");
+        const deliveryIssueCity = document.getElementById("id_delivery_issue_city");
+        const deliveryReturnCity = document.getElementById("id_delivery_return_city");
+        const deliveryIssueFee = document.getElementById("id_delivery_issue_fee");
+        const deliveryReturnFee = document.getElementById("id_delivery_return_fee");
+        const carWashInput = document.getElementById("id_car_wash_fee");
+        const childSeatToggle = document.getElementById("id_child_seat_included");
+        const boosterToggle = document.getElementById("id_booster_included");
+        const skiRackToggle = document.getElementById("id_ski_rack_included");
+        const roofBoxToggle = document.getElementById("id_roof_box_included");
+        const crossbarsToggle = document.getElementById("id_crossbars_included");
+        const equipmentManualInput = document.getElementById("id_equipment_manual_total");
+        const discountAmountInput = document.getElementById("id_discount_amount");
+        const discountPercentInput = document.getElementById("id_discount_percent");
+        const prepaymentInput = document.getElementById("id_prepayment");
+        const timeFillButtons = document.querySelectorAll("[data-time-fill]");
+        const carPricingData = window.JSON.parse((document.getElementById("car-pricing-data") || { textContent: "[]" }).textContent);
+        const pricingConfig = window.JSON.parse((document.getElementById("pricing-config-data") || { textContent: "{}" }).textContent);
+        const carSearchInput = document.getElementById("car-search");
+        const carSearchResults = document.getElementById("car-search-results");
+        let selectedCustomerName = (customerSearchInput?.value || "").trim();
+        let currentCar = null;
+
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const manualTimeFlags = {
+          nightStart: false,
+          nightEnd: false,
+        };
+
+        document.querySelectorAll(".date-picker-toggle").forEach((btn) => {
+          const targetId = btn.getAttribute("data-date-target");
+          const input = targetId ? document.getElementById(targetId) : null;
+          btn.addEventListener("click", () => {
+            if (!input) return;
+            if (typeof input.showPicker === "function") {
+              input.showPicker();
+            } else {
+              input.focus();
+            }
+          });
+        });
+
+        const carIndex = new Map();
+        carPricingData.forEach((car) => {
+          carIndex.set(String(car.id), car);
+        });
+
+        function clearCarResults() {
+          if (!carSearchResults) return;
+          carSearchResults.innerHTML = "";
+          carSearchResults.classList.remove("show");
+        }
+
+        function renderCarResults(items, term) {
+          if (!carSearchResults) return;
+          clearCarResults();
+          if (!items.length) {
+            const empty = document.createElement("div");
+            empty.className = "dropdown-item text-muted small";
+            empty.textContent = term ? "Ничего не найдено" : "Начните вводить госномер";
+            carSearchResults.appendChild(empty);
+            carSearchResults.classList.add("show");
+            return;
+          }
+          items.forEach((item) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "dropdown-item text-wrap";
+            btn.dataset.id = item.id;
+            btn.addEventListener("click", () => selectCar(item));
+
+            const title = document.createElement("div");
+            title.className = "fw-semibold";
+            title.textContent = item.plate_number || item.label || "";
+
+            const meta = document.createElement("div");
+            meta.className = "small text-muted";
+            meta.textContent = [item.make, item.model, item.year].filter(Boolean).join(" ");
+
+            btn.appendChild(title);
+            btn.appendChild(meta);
+            carSearchResults.appendChild(btn);
+          });
+          carSearchResults.classList.add("show");
+        }
+
+        function selectCar(item) {
+          if (!item || !carSelect) return;
+          carSelect.value = String(item.id);
+          carSelect.dispatchEvent(new Event("change", { bubbles: true }));
+          if (carSearchInput) {
+            carSearchInput.value = item.plate_number || item.label || "";
+          }
+          clearCarResults();
+        }
+
+        function updateCarSearchFromSelect() {
+          if (!carSelect || !carSearchInput) return;
+          const selectedId = carSelect.value;
+          const car = carIndex.get(String(selectedId));
+          if (car) {
+            carSearchInput.value = car.plate_number || car.label || "";
+          } else {
+            carSearchInput.value = "";
+          }
+        }
+
+        if (carSearchInput && carSearchResults && carSelect) {
+          const initialLabel = carSearchInput.dataset.initialLabel || "";
+          if (initialLabel) {
+            carSearchInput.value = initialLabel;
+          } else {
+            updateCarSearchFromSelect();
+          }
+
+          carSearchInput.addEventListener("input", () => {
+            const term = carSearchInput.value.trim().toLowerCase();
+            if (term.length < 1) {
+              clearCarResults();
+              return;
+            }
+            const matches = carPricingData
+              .filter((car) => (car.plate_number || "").toLowerCase().includes(term))
+              .slice(0, 8);
+            renderCarResults(matches, term);
+          });
+
+          carSearchInput.addEventListener("focus", () => {
+            if (carSearchResults.innerHTML.trim()) {
+              carSearchResults.classList.add("show");
+            }
+          });
+
+          document.addEventListener("click", (event) => {
+            if (event.target === carSearchInput || carSearchResults.contains(event.target)) {
+              return;
+            }
+            clearCarResults();
+          });
+
+          carSelect.addEventListener("change", updateCarSearchFromSelect);
+        }
+
+        function roundMoney(value) {
+          const numeric = Number(value);
+          if (!Number.isFinite(numeric)) return 0;
+          return Math.round(numeric);
+        }
+
+        function parseDate(value) {
+          if (!value) return null;
+          const normalized = value.replace(/[./]/g, "-");
+          const parts = normalized.split("-");
+          if (parts.length !== 3) return null;
+          let year;
+          let month;
+          let day;
+          if (parts[0].length === 4) {
+            year = parseInt(parts[0], 10);
+            month = parseInt(parts[1], 10);
+            day = parseInt(parts[2], 10);
+          } else if (parts[2].length === 4) {
+            day = parseInt(parts[0], 10);
+            month = parseInt(parts[1], 10);
+            year = parseInt(parts[2], 10);
+          } else {
+            return null;
+          }
+          if (!year || !month || !day) return null;
+          return new Date(Date.UTC(year, month - 1, day));
+        }
+
+        function diffDays(start, end) {
+          if (!start || !end) return 0;
+          const diff = Math.round((end - start) / msPerDay);
+          return diff > 0 ? diff : 0;
+        }
+
+        function parseTimeMinutes(value) {
+          if (!value) return null;
+          const parts = value.split(":");
+          if (parts.length !== 2) return null;
+          const hours = parseInt(parts[0], 10);
+          const minutes = parseInt(parts[1], 10);
+          if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+          return hours * 60 + minutes;
+        }
+
+        function slotMinutes(text) {
+          const parts = text.split(":");
+          if (parts.length !== 2) return 0;
+          return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        }
+
+        function feeByTime(valueMinutes, slots, fallback) {
+          if (valueMinutes === null || valueMinutes === undefined) return fallback;
+          for (const slot of slots || []) {
+            const start = slotMinutes(slot.start || "00:00");
+            const end = slotMinutes(slot.end || "00:00");
+            if (start <= end) {
+              if (valueMinutes >= start && valueMinutes <= end) {
+                return slot.amount ?? fallback;
+              }
+            } else if (valueMinutes >= start || valueMinutes <= end) {
+              return slot.amount ?? fallback;
+            }
+          }
+          return fallback;
+        }
+
+        function parseNumber(input) {
+          if (!input) return 0;
+          const raw = String(input.value || "").replace(",", ".").trim();
+          const parsed = Number.parseFloat(raw);
+          return Number.isFinite(parsed) ? roundMoney(parsed) : 0;
+        }
+
+        function setNumber(input, value) {
+          if (!input) return;
+          input.value = String(roundMoney(value));
+        }
+
+        function formatMoney(value) {
+          return new Intl.NumberFormat("ru-RU", {
+            style: "currency",
+            currency: "RUB",
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+          }).format(roundMoney(value));
+        }
+
+        function seasonForDate(dateValue) {
+          const start = pricingConfig.season_start;
+          const end = pricingConfig.season_end;
+          if (!dateValue || !start || !end) {
+            return "high";
+          }
+          const target = (dateValue.getUTCMonth() + 1) * 100 + dateValue.getUTCDate();
+          const startKey = (start.month || 0) * 100 + (start.day || 0);
+          const endKey = (end.month || 0) * 100 + (end.day || 0);
+          if (!startKey || !endKey) {
+            return "high";
+          }
+          if (startKey <= endKey) {
+            return target >= startKey && target <= endKey ? "high" : "low";
+          }
+          return target >= startKey || target <= endKey ? "high" : "low";
+        }
+
+        function pickRate(car, days, season) {
+          if (!car) return 0;
+          const tiers = [
+            { threshold: 15, high: "rate_15_plus_high", low: "rate_15_plus_low" },
+            { threshold: 5, high: "rate_5_14_high", low: "rate_5_14_low" },
+            { threshold: 1, high: "rate_1_4_high", low: "rate_1_4_low" },
+          ];
+
+          const order = season === "low" ? ["low", "high"] : ["high", "low"];
+          for (const tier of tiers) {
+            if (days >= tier.threshold) {
+              for (const seasonKey of order) {
+                const key = seasonKey === "high" ? tier.high : tier.low;
+                if (car[key]) return car[key];
+              }
+            }
+          }
+          return car.daily_rate || 0;
+        }
+
+        function setCarDetail(field, value) {
+          const el = carDetails?.querySelector(`[data-field="${field}"]`);
+          if (el) {
+            el.textContent = value || "—";
+          }
+        }
+
+        function updateCarDetails(car) {
+          if (!carDetails || !carDetailsEmpty) return;
+          if (!car) {
+            setCarDetail("plate", "—");
+            setCarDetail("makeModel", "—");
+            setCarDetail("year", "—");
+            setCarDetail("vin", "—");
+            setCarDetail("sts_number", "—");
+            setCarDetail("sts_issue_date", "—");
+            setCarDetail("sts_issued_by", "—");
+            carDetailsEmpty.classList.remove("d-none");
+            carDetails.classList.add("opacity-50");
+            carEditLink?.classList.add("d-none");
+            return;
+          }
+
+          setCarDetail("plate", car.plate_number || "—");
+          setCarDetail("makeModel", [car.make, car.model].filter(Boolean).join(" ").trim() || "—");
+          setCarDetail("year", car.year || "—");
+          setCarDetail("vin", car.vin || "—");
+          setCarDetail("sts_number", car.sts_number || "—");
+          setCarDetail("sts_issue_date", car.sts_issue_date || "—");
+          setCarDetail("sts_issued_by", car.sts_issued_by || "—");
+          carDetailsEmpty.classList.add("d-none");
+          carDetails.classList.remove("opacity-50");
+          if (carEditLink) {
+            if (car.edit_url) {
+              carEditLink.href = car.edit_url;
+              carEditLink.classList.remove("d-none");
+            } else {
+              carEditLink.classList.add("d-none");
+            }
+          }
+        }
+
+        function extractLastName(name) {
+          const parts = (name || "").trim().split(/\s+/);
+          return parts.length ? parts[0] : "";
+        }
+
+        function updateDealPreview(car) {
+          if (!dealPreview) return;
+          const contract = (contractInput?.value || "").trim() || "#####";
+          const lastName = extractLastName(selectedCustomerName) || "Фамилия";
+          const carPart = car ? `${car.plate_number} ${car.make}`.trim() : "Авто";
+          const datePart = startInput?.value || "дата";
+          dealPreview.textContent = `${contract}/${lastName}/${carPart}/${datePart}`;
+        }
+
+        function deliveryFeeFor(city) {
+          if (!city) return 0;
+          return pricingConfig.delivery_fees?.[city] || 0;
+        }
+
+        function autoFillDelivery(selectEl, feeEl) {
+          if (!selectEl || !feeEl) return;
+          const fee = deliveryFeeFor(selectEl.value || "");
+          setNumber(feeEl, fee);
+        }
+
+        function autoFillTimeFees(target, { force = false } = {}) {
+          const isStart = target === "start";
+          const minutes = parseTimeMinutes(isStart ? startTimeInput?.value : endTimeInput?.value);
+          const nightInput = isStart ? nightStartInput : nightEndInput;
+          const nightKey = isStart ? "nightStart" : "nightEnd";
+          const nightFee = feeByTime(minutes, pricingConfig.night_slots || [], pricingConfig.night_default || 0);
+
+          if (nightInput && (!manualTimeFlags[nightKey] || force || !nightInput.value)) {
+            setNumber(nightInput, nightFee);
+          }
+        }
+
+        function clearSummary() {
+          if (summaryDays) summaryDays.textContent = "—";
+          if (summaryRate) summaryRate.textContent = "—";
+          if (summaryBase) summaryBase.textContent = "—";
+          if (summaryExtras) summaryExtras.textContent = "—";
+          if (summaryDiscounts) summaryDiscounts.textContent = "—";
+          if (summaryTotal) summaryTotal.textContent = "—";
+          if (summaryDue) summaryDue.textContent = "—";
+        }
+
+        function calculatePricing(forceWrite = false) {
+          const carId = Number(carSelect?.value);
+          currentCar = carPricingData.find((item) => item.id === carId);
+          const startDate = parseDate(startInput?.value);
+          const endDate = parseDate(endInput?.value);
+          const days = diffDays(startDate, endDate);
+
+          updateCarDetails(currentCar);
+          updateDealPreview(currentCar);
+
+          if (!currentCar || !days) {
+            if (forceWrite) {
+              setNumber(dailyRateInput, 0);
+              setNumber(totalInput, 0);
+              setNumber(balanceInput, 0);
+            }
+            clearSummary();
+            if (summaryText) {
+              summaryText.textContent = "Выберите авто и корректные даты аренды.";
+            }
+            return;
+          }
+
+          const uniqueRate = parseNumber(uniqueRateInput);
+          const season = seasonForDate(startDate);
+          const baseRate = roundMoney(uniqueRate > 0 ? uniqueRate : pickRate(currentCar, days, season));
+          const baseTotal = roundMoney(baseRate * days);
+
+          if (nightStartInput && !nightStartInput.value && !manualTimeFlags.nightStart) {
+            setNumber(nightStartInput, pricingConfig.night_default || 0);
+          }
+          if (nightEndInput && !nightEndInput.value && !manualTimeFlags.nightEnd) {
+            setNumber(nightEndInput, pricingConfig.night_default || 0);
+          }
+
+          const carWashTotal = Math.max(parseNumber(carWashInput), 0);
+          const nightTotal = roundMoney(parseNumber(nightStartInput) + parseNumber(nightEndInput));
+          const deliveryTotal = roundMoney(parseNumber(deliveryIssueFee) + parseNumber(deliveryReturnFee));
+
+          const seatsPerUnit = Math.min(
+            days * (pricingConfig.child_seat_daily || 0),
+            pricingConfig.child_seat_cap || 0
+          );
+          const boosterPerUnit = Math.min(
+            days * (pricingConfig.booster_daily || 0),
+            pricingConfig.booster_cap || 0
+          );
+          const seatsTotal = roundMoney(seatsPerUnit * (childSeatToggle?.checked ? 1 : 0));
+          const boostersTotal = roundMoney(boosterPerUnit * (boosterToggle?.checked ? 1 : 0));
+
+          const gearPerDay =
+            (pricingConfig.ski_rack_daily || 0) * (skiRackToggle?.checked ? 1 : 0) +
+            (pricingConfig.autobox_daily || 0) * (roofBoxToggle?.checked ? 1 : 0) +
+            (pricingConfig.crossbars_daily || 0) * (crossbarsToggle?.checked ? 1 : 0);
+          const gearTotal = roundMoney(gearPerDay * days);
+
+          const manualEquipment = Math.max(parseNumber(equipmentManualInput), 0);
+          const equipmentTotal = manualEquipment > 0 ? roundMoney(manualEquipment) : roundMoney(seatsTotal + boostersTotal + gearTotal);
+
+          const extras = roundMoney(carWashTotal + nightTotal + deliveryTotal + equipmentTotal);
+          const subtotal = roundMoney(baseTotal + extras);
+
+          const discountAmount = Math.min(Math.max(parseNumber(discountAmountInput), 0), subtotal);
+          const discountPercent = Math.min(Math.max(parseNumber(discountPercentInput), 0), 100);
+          const percentBase = Math.max(baseTotal, 0);
+          let discountPercentAmount = roundMoney(percentBase * (discountPercent / 100));
+          const maxPercentDiscount = Math.max(subtotal - discountAmount, 0);
+          if (discountPercentAmount > maxPercentDiscount) {
+            discountPercentAmount = maxPercentDiscount;
+          }
+
+          const contractTotal = roundMoney(subtotal - discountAmount - discountPercentAmount);
+          const prepayment = Math.max(parseNumber(prepaymentInput), 0);
+          const due = roundMoney(Math.max(contractTotal - prepayment, 0));
+
+          setNumber(dailyRateInput, baseRate);
+          setNumber(totalInput, contractTotal);
+          setNumber(balanceInput, due);
+
+          const discountsTotal = roundMoney(discountAmount + discountPercentAmount);
+          if (summaryText) {
+            summaryText.textContent = [
+              `${days} дн × ${formatMoney(baseRate)} = ${formatMoney(baseTotal)}`,
+              `доп. услуги ${formatMoney(extras)}`,
+              `скидки ${formatMoney(discountsTotal)}`,
+              `предоплата ${formatMoney(prepayment)}`,
+            ].join(" · ");
+          }
+
+          if (summaryDays) summaryDays.textContent = `${days}`;
+          if (summaryRate) summaryRate.textContent = formatMoney(baseRate);
+          if (summaryBase) summaryBase.textContent = formatMoney(baseTotal);
+          if (summaryExtras) summaryExtras.textContent = formatMoney(extras);
+          if (summaryDiscounts) summaryDiscounts.textContent = `-${formatMoney(discountsTotal)}`;
+          if (summaryTotal) summaryTotal.textContent = formatMoney(contractTotal);
+          if (summaryDue) summaryDue.textContent = formatMoney(due);
+        }
+
+        [
+          carSelect,
+          startInput,
+          endInput,
+          uniqueRateInput,
+          carWashInput,
+          nightStartInput,
+          nightEndInput,
+          deliveryIssueFee,
+          deliveryReturnFee,
+          childSeatToggle,
+          boosterToggle,
+          skiRackToggle,
+          roofBoxToggle,
+          crossbarsToggle,
+          equipmentManualInput,
+          discountAmountInput,
+          discountPercentInput,
+          prepaymentInput,
+        ].forEach((el) => {
+          if (el) {
+            el.addEventListener("change", () => calculatePricing(true));
+            el.addEventListener("input", () => calculatePricing(true));
+          }
+        });
+
+        [startTimeInput, endTimeInput].forEach((el) => {
+          if (!el) return;
+          el.addEventListener("change", () => {
+            autoFillTimeFees(el === startTimeInput ? "start" : "end");
+            calculatePricing(true);
+          });
+          el.addEventListener("input", () => {
+            autoFillTimeFees(el === startTimeInput ? "start" : "end");
+            calculatePricing(true);
+          });
+        });
+
+        [
+          [nightStartInput, "nightStart"],
+          [nightEndInput, "nightEnd"],
+        ].forEach(([input, key]) => {
+          if (!input) return;
+          input.addEventListener("input", () => {
+            manualTimeFlags[key] = Boolean((input.value || "").trim());
+            calculatePricing(true);
+          });
+        });
+
+        [deliveryIssueCity, deliveryReturnCity].forEach((el) => {
+          if (!el) return;
+          el.addEventListener("change", () => {
+            autoFillDelivery(el, el === deliveryIssueCity ? deliveryIssueFee : deliveryReturnFee);
+            calculatePricing(true);
+          });
+        });
+
+        timeFillButtons.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const target = btn.getAttribute("data-time-fill");
+            if (target === "start") {
+              manualTimeFlags.nightStart = false;
+            } else if (target === "end") {
+              manualTimeFlags.nightEnd = false;
+            }
+            autoFillTimeFees(target, { force: true });
+            calculatePricing(true);
+          });
+        });
+
+        customerSearchInput?.addEventListener("input", () => {
+          selectedCustomerName = customerSearchInput.value.trim();
+          updateDealPreview(currentCar);
+        });
+
+        document.addEventListener("rental:customer-change", (event) => {
+          selectedCustomerName = (event.detail?.name || "").trim();
+          updateDealPreview(currentCar);
+        });
+
+        contractInput?.addEventListener("input", () => updateDealPreview(currentCar));
+
+        [
+          uniqueRateInput,
+          carWashInput,
+          nightStartInput,
+          nightEndInput,
+          deliveryIssueFee,
+          deliveryReturnFee,
+          equipmentManualInput,
+          discountAmountInput,
+          prepaymentInput,
+        ].forEach((el) => {
+          if (el && (el.value || "").trim()) {
+            setNumber(el, parseNumber(el));
+          }
+        });
+
+        if (!((nightStartInput?.value || "").trim())) {
+          autoFillTimeFees("start");
+        }
+        if (!((nightEndInput?.value || "").trim())) {
+          autoFillTimeFees("end");
+        }
+        calculatePricing(true);
+      })();
+    </script>
+
+    <script>
+      (() => {
+        const wizard = document.getElementById("contractWizard");
+        const stepButtons = Array.from(document.querySelectorAll("[data-wizard-step]"));
+        const stepPanels = wizard ? Array.from(wizard.querySelectorAll(".wizard-step-panel")) : [];
+        const counter = document.getElementById("wizardStepCounter");
+        const progressFill = document.getElementById("wizardProgressFill");
+        const prevBtn = document.querySelector("[data-wizard-prev]");
+        const nextBtn = document.querySelector("[data-wizard-next]");
+        const submitBtn = document.querySelector("[data-wizard-submit]");
+        const validation = document.getElementById("wizardValidation");
+        const form = document.getElementById("rentalWizardForm");
+
+        if (!wizard || !stepPanels.length) return;
+
+        const proxyMap = {
+          id_car: "car-search",
+          id_customer: "customer-search",
+        };
+
+        const totalSteps = stepPanels.length;
+        let currentIndex = 0;
+
+        function setValidation(message) {
+          if (!validation) return;
+          if (!message) {
+            validation.classList.add("d-none");
+            validation.textContent = "";
+            return;
+          }
+          validation.textContent = message;
+          validation.classList.remove("d-none");
+        }
+
+        function getFieldValue(field) {
+          if (!field) return "";
+          if (field.type === "checkbox") {
+            return field.checked ? "1" : "";
+          }
+          return (field.value || "").trim();
+        }
+
+        function setFieldInvalid(fieldId, invalid) {
+          const field = document.getElementById(fieldId);
+          const proxyId = proxyMap[fieldId];
+          const target = proxyId ? document.getElementById(proxyId) : field;
+          if (!target) return;
+          target.classList.toggle("is-invalid", invalid);
+          target.setAttribute("aria-invalid", invalid ? "true" : "false");
+        }
+
+        function validateStep(index) {
+          const panel = stepPanels[index];
+          if (!panel) return true;
+          const requiredRaw = panel.dataset.requiredFields || "";
+          const required = requiredRaw
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean);
+          if (!required.length) {
+            setValidation("");
+            return true;
+          }
+
+          let ok = true;
+          required.forEach((fieldId) => {
+            setFieldInvalid(fieldId, false);
+            const field = document.getElementById(fieldId);
+            if (!getFieldValue(field)) {
+              ok = false;
+              setFieldInvalid(fieldId, true);
+            }
+          });
+
+          if (!ok) {
+            setValidation("Заполните обязательные поля, чтобы продолжить.");
+          } else {
+            setValidation("");
+          }
+          return ok;
+        }
+
+        function updateProgress() {
+          stepButtons.forEach((btn, index) => {
+            btn.classList.toggle("is-active", index === currentIndex);
+            btn.classList.toggle("is-complete", index < currentIndex);
+            btn.setAttribute("aria-current", index === currentIndex ? "step" : "false");
+          });
+
+          stepPanels.forEach((panel, index) => {
+            panel.classList.toggle("is-active", index === currentIndex);
+            panel.setAttribute("aria-hidden", index === currentIndex ? "false" : "true");
+          });
+
+          if (counter) {
+            counter.textContent = `Шаг ${currentIndex + 1} из ${totalSteps}`;
+          }
+
+          if (progressFill) {
+            const percent = totalSteps > 1 ? (currentIndex / (totalSteps - 1)) * 100 : 100;
+            progressFill.style.width = `${percent}%`;
+          }
+
+          if (prevBtn) prevBtn.classList.toggle("d-none", currentIndex === 0);
+          if (nextBtn) nextBtn.classList.toggle("d-none", currentIndex === totalSteps - 1);
+          if (submitBtn) submitBtn.classList.toggle("d-none", currentIndex !== totalSteps - 1);
+
+          const activePanel = stepPanels[currentIndex];
+          if (activePanel) {
+            activePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        }
+
+        function goToStep(index, { skipValidation = false } = {}) {
+          if (index < 0 || index >= totalSteps) return;
+          if (!skipValidation && index > currentIndex && !validateStep(currentIndex)) {
+            return;
+          }
+          currentIndex = index;
+          updateProgress();
+        }
+
+        const firstErrorIndex = stepPanels.findIndex((panel) =>
+          panel.querySelector(".is-invalid, .invalid-feedback.d-block")
+        );
+        currentIndex = firstErrorIndex >= 0 ? firstErrorIndex : 0;
+        updateProgress();
+
+        prevBtn?.addEventListener("click", () => goToStep(currentIndex - 1, { skipValidation: true }));
+        nextBtn?.addEventListener("click", () => goToStep(currentIndex + 1));
+
+        stepButtons.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const targetIndex = Number.parseInt(btn.dataset.wizardStep || "0", 10);
+            if (Number.isNaN(targetIndex)) return;
+            if (targetIndex <= currentIndex) {
+              goToStep(targetIndex, { skipValidation: true });
+            } else {
+              goToStep(targetIndex);
+            }
+          });
+        });
+
+        form?.addEventListener("input", () => {
+          if (validation && !validation.classList.contains("d-none")) {
+            validation.classList.add("d-none");
+          }
+        });
+      })();
+    </script>
+
+    <div class="wizard-nav d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <button type="button" class="btn btn-outline-secondary" data-wizard-prev>Назад</button>
+      <div class="d-flex flex-wrap gap-2">
+        <a href="{% url 'rentals:rental_list' %}" class="btn btn-outline-secondary">Отмена</a>
+        <button type="button" class="btn btn-primary" data-wizard-next>Далее</button>
+        {% if contract_templates %}
+          <button class="btn btn-primary d-none" type="submit" data-wizard-submit>Сформировать договор</button>
+        {% else %}
+          <button class="btn btn-primary d-none" type="submit" data-wizard-submit>Сохранить аренду</button>
+        {% endif %}
+      </div>
+    </div>
+  </form>
+{% endblock %}

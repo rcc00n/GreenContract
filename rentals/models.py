@@ -229,6 +229,10 @@ class Car(models.Model):
         return f"{self.plate_number} - {self.make} {self.model} ({self.year})"
 
     @property
+    def label(self) -> str:
+        return str(self)
+
+    @property
     def security_deposit_text(self) -> str:
         return _format_money_words(self.security_deposit)
 
@@ -310,6 +314,7 @@ class Customer(models.Model):
         related_name="customers",
         help_text="Гибкие теги, например ВИП, проблемный, корпоративный.",
     )
+    created_at = models.DateTimeField("Дата добавления", auto_now_add=True)
 
     class Meta:
         verbose_name = "Клиент"
@@ -558,7 +563,7 @@ class ContractTemplate(models.Model):
 
     placeholder_help = models.TextField(
         "Подсказка плейсхолдеров",
-        default="Используйте {{ клиент.фио }}, {{ авто.госномер }}, {{ аренда.дата_начала }} и т.д.",
+        default="Используйте {{ customer.full_name }}, {{ car.plate_number }}, {{ rental.start_date }} и т.д.",
     )
 
     class Meta:

@@ -913,13 +913,40 @@ def customer_delete_all(request):
 class CustomerListView(ListView):
     model = Customer
     template_name = "rentals/customer_list.html"
-    ordering = ["full_name", "id"]
     paginate_by = 25
     page_size_options = (25, 50, 100)
+    default_sort = "created_desc"
+    sort_options = (
+        ("created_desc", "Дата добавления: сначала новые"),
+        ("created_asc", "Дата добавления: сначала старые"),
+        ("name_asc", "ФИО: А-Я"),
+        ("name_desc", "ФИО: Я-А"),
+        ("discount_desc", "Скидка: больше -> меньше"),
+        ("discount_asc", "Скидка: меньше -> больше"),
+        ("birth_desc", "Дата рождения: моложе"),
+        ("birth_asc", "Дата рождения: старше"),
+        ("driving_desc", "Стаж: больше"),
+        ("driving_asc", "Стаж: меньше"),
+    )
+    sort_map = {
+        "created_desc": ("-created_at", "-id"),
+        "created_asc": ("created_at", "id"),
+        "name_asc": ("full_name", "id"),
+        "name_desc": ("-full_name", "-id"),
+        "discount_desc": ("-discount_percent", "-id"),
+        "discount_asc": ("discount_percent", "id"),
+        "birth_desc": ("-birth_date", "-id"),
+        "birth_asc": ("birth_date", "id"),
+        "driving_desc": ("-driving_since", "-id"),
+        "driving_asc": ("driving_since", "id"),
+    }
 
     def get_queryset(self):
         queryset = super().get_queryset().prefetch_related("tags")
         self.search_query = (self.request.GET.get("q") or "").strip()
+        self.sort_key = (self.request.GET.get("sort") or "").strip()
+        if self.sort_key not in self.sort_map:
+            self.sort_key = self.default_sort
         raw_tags = self.request.GET.getlist("tag") or self.request.GET.getlist("tags")
         self.active_tags = []
         for tag_id in raw_tags:
@@ -959,7 +986,8 @@ class CustomerListView(ListView):
         if self.active_tags:
             queryset = queryset.filter(tags__id__in=self.active_tags)
 
-        return queryset.distinct().order_by(*self.ordering)
+        ordering = self.sort_map[self.sort_key]
+        return queryset.distinct().order_by(*ordering)
 
     def get_paginate_by(self, queryset):
         if hasattr(self, "_page_size"):
@@ -981,11 +1009,18 @@ class CustomerListView(ListView):
         context["search_query"] = getattr(self, "search_query", "")
         context["available_tags"] = CustomerTag.objects.all()
         context["active_tags"] = getattr(self, "active_tags", [])
+        context["sort_options"] = self.sort_options
+        context["active_sort"] = getattr(self, "sort_key", self.default_sort)
+        context["default_sort"] = self.default_sort
         query_params = self.request.GET.copy()
         query_params.pop("page", None)
         query_params.pop("page_size", None)
         context["querystring"] = f"&{query_params.urlencode()}" if query_params else ""
-        context["filters_active"] = bool(self.search_query or self.active_tags)
+        context["filters_active"] = bool(
+            self.search_query
+            or self.active_tags
+            or getattr(self, "sort_key", self.default_sort) != self.default_sort
+        )
         return context
 
 
@@ -1063,6 +1098,34 @@ class RentalCreateView(CreateView):
     def form_valid(self, form):
         form.instance.created_by = self.request.user
         return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["car_pricing"] = [_serialize_car_pricing(car) for car in Car.objects.all()]
+        context["car_initial_label"] = getattr(context.get("form"), "initial_car_label", "")
+        context["customer_initial_label"] = getattr(context.get("form"), "initial_customer_label", "")
+        context["second_driver_initial_label"] = getattr(
+            context.get("form"), "initial_second_driver_label", ""
+        )
+        context["pricing_config"] = pricing_config()
+        context["contract_templates"] = ContractTemplate.objects.all()
+        return context
+
+
+@method_decorator(login_required, name="dispatch")
+class RentalWizardView(CreateView):
+    model = Rental
+    form_class = RentalForm
+    template_name = "rentals/rental_wizard.html"
+    success_url = reverse_lazy("rentals:rental_list")
+
+    def form_valid(self, form):
+        form.instance.created_by = self.request.user
+        response = super().form_valid(form)
+        template_id = self.request.POST.get("generate_contract_template_id")
+        if template_id:
+            return redirect("rentals:generate_contract", rental_id=self.object.pk, template_id=template_id)
+        return response
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

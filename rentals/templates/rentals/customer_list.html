@@ -87,11 +87,26 @@
           </div>
         </div>
       </div>
-      <div class="d-flex justify-content-end gap-2 mt-3">
-        {% if filters_active %}
-          <a class="btn btn-outline-secondary" href="{% url 'rentals:customer_list' %}">Сбросить</a>
-        {% endif %}
-        <button class="btn btn-primary" type="submit">Применить</button>
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+        <div class="d-flex align-items-center gap-2">
+          <label class="form-label fw-semibold mb-0" for="customerSortSelect">Сортировка</label>
+          <select
+            name="sort"
+            id="customerSortSelect"
+            class="form-select form-select-sm"
+            onchange="this.form.submit()"
+          >
+            {% for value, label in sort_options %}
+              <option value="{{ value }}" {% if value == active_sort %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="d-flex gap-2">
+          {% if filters_active %}
+            <a class="btn btn-outline-secondary" href="{% url 'rentals:customer_list' %}">Сбросить</a>
+          {% endif %}
+          <button class="btn btn-primary" type="submit">Применить</button>
+        </div>
       </div>
     </div>
   </form>
@@ -233,6 +248,9 @@
             <input type="hidden" name="page" value="1">
             {% if search_query %}
               <input type="hidden" name="q" value="{{ search_query }}">
+            {% endif %}
+            {% if active_sort and active_sort != default_sort %}
+              <input type="hidden" name="sort" value="{{ active_sort }}">
             {% endif %}
             {% for tag_id in active_tags %}
               <input type="hidden" name="tag" value="{{ tag_id }}">

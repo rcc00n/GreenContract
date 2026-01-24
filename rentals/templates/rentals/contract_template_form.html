@@ -35,7 +35,7 @@
                 <label class="form-label" for="{{ form.file.id_for_label }}">Файл шаблона</label>
                 {{ form.file }}
                 <div class="form-text">
-                  Ворд: будут заменены плейсхолдеры. ПДФ: заполняются поля формы с именами вроде <code>клиент_фио</code>.
+                  Ворд: будут заменены плейсхолдеры. ПДФ: заполняются поля формы с именами вроде <code>customer_full_name</code>.
                 </div>
                 {% for error in form.file.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
@@ -46,7 +46,7 @@
                   <span class="badge text-bg-info">Опционально для ПДФ: будет сконвертировано</span>
                 </div>
                 {{ form.body_html }}
-                <div class="form-text">Используйте плейсхолдеры {% templatetag openvariable %} клиент.фио {% templatetag closevariable %} или {% templatetag openvariable %} аренда.номер_договора {% templatetag closevariable %}.</div>
+                <div class="form-text">Используйте плейсхолдеры {% templatetag openvariable %} customer.full_name {% templatetag closevariable %} или {% templatetag openvariable %} rental.contract_number {% templatetag closevariable %}.</div>
                 {% for error in form.body_html.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
               </div>
 
@@ -111,18 +111,28 @@
               <div class="fw-semibold">Шаблон-рыба для быстрого старта</div>
               <div class="text-muted small">Скопируйте и вставьте в веб-шаблон, Ворд или как подсказку к полям ПДФ.</div>
             </div>
-            <button class="btn btn-sm btn-outline-primary" type="button" data-copy-template="#contractSnippet">Скопировать пример</button>
+            <button class="btn btn-sm btn-outline-primary" type="button" data-copy-template="#contractSnippetHtml">Скопировать пример</button>
           </div>
           {% verbatim %}
-          <pre class="bg-body-tertiary rounded p-3 small" id="contractSnippet">Договор № {{ аренда.номер_договора }}
-г. {{ клиент.адрес_регистрации }}
+          <pre class="bg-body-tertiary rounded p-3 small" id="contractSnippetHtml">Договор № {{ rental.contract_number }}
+г. {{ customer.registration_address }}
 
-Арендодатель передает во временное пользование автомобиль {{ авто.марка }} {{ авто.модель }} ({{ авто.госномер }}) сроком с {{ аренда.дата_начала }} по {{ аренда.дата_окончания }}.
-Территория эксплуатации: {{ аренда.территория_эксплуатации }}. Лимит пробега: {{ аренда.лимит_пробега_км }} км.
+Арендодатель передает во временное пользование автомобиль {{ car.make }} {{ car.model }} ({{ car.plate_number }}) сроком с {{ rental.start_date }} по {{ rental.end_date }}.
+Территория эксплуатации: {{ rental.operation_regions }}. Лимит пробега: {{ rental.mileage_limit_km }} км.
 
-Арендатор: {{ клиент.фио }}, паспорт {{ клиент.паспорт_серия }} {{ клиент.паспорт_номер }}, выдан {{ клиент.паспорт_дата_выдачи }} {{ клиент.паспорт_кем_выдан }}. Телефон: {{ клиент.телефон }}.
+Арендатор: {{ customer.full_name }}, паспорт {{ customer.passport_series }} {{ customer.passport_number }}, выдан {{ customer.passport_issue_date }} {{ customer.passport_issued_by }}. Телефон: {{ customer.phone }}.
 
-Стоимость проката: {{ аренда.итоговая_сумма }}, предоплата: {{ аренда.предоплата }}, к оплате при возврате: {{ аренда.к_оплате }}.</pre>
+Стоимость проката: {{ rental.total_price }}, предоплата: {{ rental.prepayment }}, к оплате при возврате: {{ rental.balance_due }}.</pre>
+
+          <pre class="bg-body-tertiary rounded p-3 small d-none" id="contractSnippetPdf">Договор № rental_contract_number
+г. customer_registration_address
+
+Арендодатель передает во временное пользование автомобиль car_make car_model (car_plate_number) сроком с rental_start_date по rental_end_date.
+Территория эксплуатации: rental_operation_regions. Лимит пробега: rental_mileage_limit_km км.
+
+Арендатор: customer_full_name, паспорт customer_passport_series customer_passport_number, выдан customer_passport_issue_date customer_passport_issued_by. Телефон: customer_phone.
+
+Стоимость проката: rental_total_price, предоплата: rental_prepayment, к оплате при возврате: rental_balance_due.</pre>
           {% endverbatim %}
         </div>
       </div>
@@ -144,6 +154,17 @@
         document.querySelectorAll(".format-html").forEach((el) => el.classList.toggle("d-none", value === "docx"));
         document.querySelectorAll(".format-file").forEach((el) => el.classList.toggle("d-none", value === "html"));
         if (formatHint) formatHint.textContent = `Формат: ${formatLabels[value] || formatLabels.html}`;
+        const htmlSnippet = document.getElementById("contractSnippetHtml");
+        const pdfSnippet = document.getElementById("contractSnippetPdf");
+        const copyButton = document.querySelector("[data-copy-template]");
+        const isPdf = value === "pdf";
+        if (htmlSnippet && pdfSnippet) {
+          htmlSnippet.classList.toggle("d-none", isPdf);
+          pdfSnippet.classList.toggle("d-none", !isPdf);
+        }
+        if (copyButton) {
+          copyButton.setAttribute("data-copy-template", isPdf ? "#contractSnippetPdf" : "#contractSnippetHtml");
+        }
       };
       formatSelect?.addEventListener("change", toggleSections);
       toggleSections();

@@ -119,6 +119,7 @@ PLACEHOLDER_GUIDE = [
     ),
 ]
 
+# Legacy Russian placeholder aliases kept for backward compatibility.
 PLACEHOLDER_ALIASES_RU = {
     "customer.full_name": "клиент.фио",
     "customer.birth_date": "клиент.дата_рождения",
@@ -204,6 +205,22 @@ PLACEHOLDER_ALIASES_RU = {
 }
 
 
+def _build_ru_alias_map() -> dict[str, dict[str, str]]:
+    aliases: dict[str, dict[str, str]] = {}
+    for eng_key, ru_key in PLACEHOLDER_ALIASES_RU.items():
+        try:
+            eng_group, eng_attr = eng_key.split(".", 1)
+            ru_group, ru_attr = ru_key.split(".", 1)
+        except ValueError:
+            continue
+        group_aliases = aliases.setdefault(ru_group, {})
+        group_aliases[ru_attr] = eng_attr
+    return aliases
+
+
+RU_ALIAS_GROUPS = _build_ru_alias_map()
+
+
 class _BoolDisplay:
     def __init__(self, value: bool):
         self._value = bool(value)
@@ -259,6 +276,19 @@ class _EmptyProxy:
         return self._label
 
 
+class _AliasProxy:
+    def __init__(self, obj, aliases: dict[str, str] | None = None):
+        self._obj = obj
+        self._aliases = aliases or {}
+
+    def __getattr__(self, name):
+        translated = self._aliases.get(name, name)
+        return getattr(self._obj, translated)
+
+    def __str__(self):
+        return str(self._obj)
+
+
 class _RentalTemplateProxy:
     def __init__(self, rental: Rental):
         self._rental = rental
@@ -305,19 +335,23 @@ def get_contract_context(rental: Rental) -> dict:
         "generated_at": _fmt_datetime(timezone.localtime()),
         "today": _fmt_date(timezone.localdate()),
     }
+    meta_ru = {**meta}
+    meta_ru.update(
+        {ru_key: meta.get(eng_key, "") for ru_key, eng_key in RU_ALIAS_GROUPS.get("мета", {}).items()}
+    )
     return {
         "rental": rental_proxy,
         "car": rental_proxy.car,
         "customer": rental_proxy.customer,
         "second_driver": rental_proxy.second_driver,
-        "аренда": rental_proxy,
-        "авто": rental_proxy.car,
-        "клиент": rental_proxy.customer,
-        "второй_водитель": rental_proxy.second_driver,
+        "аренда": _AliasProxy(rental_proxy, RU_ALIAS_GROUPS.get("аренда", {})),
+        "авто": _AliasProxy(rental_proxy.car, RU_ALIAS_GROUPS.get("авто", {})),
+        "клиент": _AliasProxy(rental_proxy.customer, RU_ALIAS_GROUPS.get("клиент", {})),
+        "второй_водитель": _AliasProxy(rental_proxy.second_driver, RU_ALIAS_GROUPS.get("второй_водитель", {})),
         "rental_duration_days": duration_days,
         "rental_date_range": date_range,
         "meta": meta,
-        "мета": meta,
+        "мета": meta_ru,
     }
 
 
@@ -549,8 +583,8 @@ def placeholder_guide() -> list[dict]:
                 "title": title,
                 "items": [
                     {
-                        "token": f"{{{{ {PLACEHOLDER_ALIASES_RU.get(key, key)} }}}}",
-                        "alt": PLACEHOLDER_ALIASES_RU.get(key, key).replace(".", "_"),
+                        "token": f"{{{{ {key} }}}}",
+                        "alt": key.replace(".", "_"),
                         "description": description,
                     }
                     for key, description in items.items()
@@ -595,7 +629,7 @@ def _replace_in_paragraphs(paragraphs: Iterable, mapping: dict[str, str]):
 
 def render_docx(contract_template: ContractTemplate, rental: Rental) -> BytesIO:
     """
-    Загружает DOCX-шаблон и заменяет плейсхолдеры вида {{ клиент.фио }}.
+    Загружает DOCX-шаблон и заменяет плейсхолдеры вида {{ customer.full_name }}.
     Применяет замену в абзацах, таблицах, колонтитулах и нижних колонтитулах.
     """
     document = Document(contract_template.file.path)
@@ -636,7 +670,7 @@ def render_pdf(contract_template: ContractTemplate, rental: Rental) -> BytesIO:
 def _fill_pdf_form(template_path: str, rental: Rental) -> BytesIO:
     """
     Fill a PDF with form fields that match placeholder names (underscored),
-    например клиент_фио или аренда_номер_договора.
+    например customer_full_name или rental_contract_number.
     """
     field_values = {key.replace(".", "_"): value for key, value in build_placeholder_values(rental).items()}
     reader = PdfReader(template_path)

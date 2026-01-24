@@ -1,10 +1,10 @@
 <h1>Договор аренды</h1>
-<p><strong>Клиент:</strong> {{ клиент.фио }}</p>
-<p><strong>Авто:</strong> {{ авто.госномер }} ({{ авто.марка }} {{ авто.модель }} {{ авто.год }})</p>
-<p><strong>Даты аренды:</strong> {{ аренда.дата_начала }} по {{ аренда.дата_окончания }}</p>
-<p><strong>Территория эксплуатации:</strong> {{ аренда.территория_эксплуатации }}</p>
-<p><strong>Лимит пробега:</strong> {{ аренда.лимит_пробега_км }} км</p>
-<p><strong>Итоговая сумма:</strong> ₽{{ аренда.итоговая_сумма }}</p>
+<p><strong>Клиент:</strong> {{ customer.full_name }}</p>
+<p><strong>Авто:</strong> {{ car.plate_number }} ({{ car.make }} {{ car.model }} {{ car.year }})</p>
+<p><strong>Даты аренды:</strong> {{ rental.start_date }} по {{ rental.end_date }}</p>
+<p><strong>Территория эксплуатации:</strong> {{ rental.operation_regions }}</p>
+<p><strong>Лимит пробега:</strong> {{ rental.mileage_limit_km }} км</p>
+<p><strong>Итоговая сумма:</strong> ₽{{ rental.total_price }}</p>
 
 <h2>Условия</h2>
 <ol>

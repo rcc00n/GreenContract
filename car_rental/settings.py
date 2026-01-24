@@ -104,6 +104,8 @@ DATETIME_INPUT_FORMATS = ["%d-%m-%Y %H:%M", "%Y-%m-%d %H:%M", "%d.%m.%Y %H:%M", 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 WHITENOISE_USE_FINDERS = True
+MEDIA_URL = os.environ.get("DJANGO_MEDIA_URL", "/media/")
+MEDIA_ROOT = Path(os.environ.get("DJANGO_MEDIA_ROOT", str(BASE_DIR / "media")))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

@@ -314,10 +314,15 @@ class RentalForm(StyledModelForm):
             widget.attrs.setdefault("data-date-input", "true")
 
         if "operation_regions" in self.fields and not self.is_bound:
-            raw_regions = (getattr(self.instance, "operation_regions", "") or "").strip()
-            if raw_regions:
+            raw_regions = self.initial.get("operation_regions")
+            if raw_regions is None or raw_regions == "":
+                raw_regions = getattr(self.instance, "operation_regions", "")
+            parsed: list[str] = []
+            if isinstance(raw_regions, str):
                 parsed = [item.strip() for item in raw_regions.split(",") if item.strip()]
-                self.initial.setdefault("operation_regions", parsed)
+            elif isinstance(raw_regions, (list, tuple, set)):
+                parsed = [str(item).strip() for item in raw_regions if str(item).strip()]
+            self.initial["operation_regions"] = parsed
 
         for name in ("start_time", "end_time"):
             if name in self.fields:

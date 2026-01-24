@@ -1,9 +1,12 @@
+from contextlib import contextmanager
 from io import BytesIO
 import logging
+from pathlib import Path
 import re
 from decimal import Decimal
 from typing import Iterable
 
+from django.conf import settings
 from django.template import engines
 from django.utils import timezone
 from docx import Document
@@ -618,6 +621,38 @@ def render_html_to_pdf(html: str) -> bytes:
     return output.getvalue()
 
 
+@contextmanager
+def _open_contract_template_file(contract_template: ContractTemplate):
+    if not contract_template.file:
+        raise FileNotFoundError("Файл шаблона не прикреплен.")
+
+    name = contract_template.file.name
+    storage = contract_template.file.storage
+
+    if name and storage.exists(name):
+        with storage.open(name, "rb") as handle:
+            yield handle
+            return
+
+    candidate_paths: list[Path] = []
+    if name:
+        candidate_paths.append(Path(settings.MEDIA_ROOT) / name)
+        candidate_paths.append(Path(settings.BASE_DIR) / name)
+
+    for path in candidate_paths:
+        if path.exists():
+            with path.open("rb") as handle:
+                yield handle
+                return
+
+    raise FileNotFoundError(f"Файл шаблона не найден: {name}")
+
+
+def _read_contract_template_bytes(contract_template: ContractTemplate) -> bytes:
+    with _open_contract_template_file(contract_template) as template_file:
+        return template_file.read()
+
+
 def _replace_in_paragraphs(paragraphs: Iterable, mapping: dict[str, str]):
     """Replace placeholders in a list of DOCX paragraphs."""
     for paragraph in paragraphs:
@@ -635,7 +670,10 @@ def render_docx(contract_template: ContractTemplate, rental: Rental) -> BytesIO:
     Загружает DOCX-шаблон и заменяет плейсхолдеры вида {{ customer.full_name }}.
     Применяет замену в абзацах, таблицах, колонтитулах и нижних колонтитулах.
     """
-    document = Document(contract_template.file.path)
+    if not contract_template.file:
+        raise ValueError("Файл шаблона Ворд не загружен.")
+    template_bytes = _read_contract_template_bytes(contract_template)
+    document = Document(BytesIO(template_bytes))
     mapping = placeholder_token_map(rental)
 
     _replace_in_paragraphs(document.paragraphs, mapping)
@@ -660,7 +698,19 @@ def render_pdf(contract_template: ContractTemplate, rental: Rental) -> BytesIO:
     fillable PDF template with AcroForm fields.
     """
     if contract_template.file:
-        return _fill_pdf_form(contract_template.file.path, rental)
+        try:
+            template_bytes = _read_contract_template_bytes(contract_template)
+            return _fill_pdf_form(template_bytes, rental)
+        except FileNotFoundError:
+            if contract_template.body_html:
+                logger.warning(
+                    "PDF template file missing; using HTML fallback.",
+                    extra={"template_id": contract_template.id},
+                )
+                html = render_html_template(contract_template, rental)
+                pdf_bytes = render_html_to_pdf(html)
+                return BytesIO(pdf_bytes)
+            raise
 
     if contract_template.body_html:
         html = render_html_template(contract_template, rental)
@@ -670,13 +720,13 @@ def render_pdf(contract_template: ContractTemplate, rental: Rental) -> BytesIO:
     raise ValueError("Для ПДФ требуется разметка веб-шаблона или загруженный файл ПДФ.")
 
 
-def _fill_pdf_form(template_path: str, rental: Rental) -> BytesIO:
+def _fill_pdf_form(template_bytes: bytes, rental: Rental) -> BytesIO:
     """
     Fill a PDF with form fields that match placeholder names (underscored),
     например customer_full_name или rental_contract_number.
     """
     field_values = {key.replace(".", "_"): value for key, value in build_placeholder_values(rental).items()}
-    reader = PdfReader(template_path)
+    reader = PdfReader(BytesIO(template_bytes))
     writer = PdfWriter()
     for page in reader.pages:
         writer.add_page(page)

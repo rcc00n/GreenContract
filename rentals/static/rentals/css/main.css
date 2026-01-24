@@ -163,6 +163,18 @@ body {
   letter-spacing: 0.3px;
 }
 
+.navbar-brand-logo {
+  display: block;
+  height: 28px;
+  width: auto;
+}
+
+@media (max-width: 576px) {
+  .navbar-brand-logo {
+    height: 24px;
+  }
+}
+
 .navbar.theme-navbar .nav-link {
   font-weight: 600;
 }

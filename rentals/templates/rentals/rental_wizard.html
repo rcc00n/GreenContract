@@ -1941,7 +1941,7 @@
     </script>
 
     <script>
-      (() => {
+      window.addEventListener("DOMContentLoaded", () => {
         const wizard = document.getElementById("contractWizard");
         const stepButtons = Array.from(document.querySelectorAll("[data-wizard-step]"));
         const stepPanels = wizard ? Array.from(wizard.querySelectorAll(".wizard-step-panel")) : [];
@@ -2088,7 +2088,7 @@
             validation.classList.add("d-none");
           }
         });
-      })();
+      });
     </script>
 
     <div class="wizard-nav d-flex flex-wrap justify-content-between align-items-center gap-2">

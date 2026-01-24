@@ -1121,7 +1121,12 @@ class RentalWizardView(CreateView):
 
     def form_valid(self, form):
         form.instance.created_by = self.request.user
+        form.instance.created_via_wizard = True
         response = super().form_valid(form)
+        messages.success(
+            self.request,
+            f"Создана аренда №{self.object.contract_number} через мастер.",
+        )
         template_id = self.request.POST.get("generate_contract_template_id")
         if template_id:
             return redirect("rentals:generate_contract", rental_id=self.object.pk, template_id=template_id)

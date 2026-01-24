@@ -79,7 +79,12 @@
               <td>
                 <div class="d-flex justify-content-between align-items-start gap-2">
                   <div>
-                    <div class="fw-semibold">{{ rental.deal_name }}</div>
+                    <div class="fw-semibold d-flex align-items-center gap-2">
+                      <span>{{ rental.deal_name }}</span>
+                      {% if rental.created_via_wizard %}
+                        <span class="badge text-bg-info">Мастер</span>
+                      {% endif %}
+                    </div>
                     <div class="text-muted small">
                       Номер договора: {{ rental.contract_number }}<br>
                       С {{ rental.start_date|date:"d-m-Y" }} по {{ rental.end_date|date:"d-m-Y" }}

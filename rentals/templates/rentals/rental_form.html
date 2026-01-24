@@ -3,7 +3,12 @@
 {% block content %}
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-      <h1 class="h4 mb-0">{% if object %}Редактировать аренду{% else %}Создать аренду{% endif %}</h1>
+      <div class="d-flex align-items-center gap-2">
+        <h1 class="h4 mb-0">{% if object %}Редактировать аренду{% else %}Создать аренду{% endif %}</h1>
+        {% if object and object.created_via_wizard %}
+          <span class="badge text-bg-info">Мастер</span>
+        {% endif %}
+      </div>
       <p class="text-muted small mb-0">Выберите даты, тариф и статус аренды.</p>
     </div>
     <a href="{% url 'rentals:rental_list' %}" class="btn btn-outline-secondary">Назад к списку</a>

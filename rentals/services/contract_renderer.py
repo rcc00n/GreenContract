@@ -108,6 +108,7 @@ PLACEHOLDER_GUIDE = [
             "rental.crossbars_count": "Количество поперечин",
             "rental.equipment_manual_total": "Фиксированная сумма за оборудование",
             "rental.deal_name": "Удобочитаемое имя сделки",
+            "rental.created_via_wizard": "Создано мастером",
         },
     ),
     (
@@ -200,6 +201,7 @@ PLACEHOLDER_ALIASES_RU = {
     "rental.crossbars_count": "аренда.поперечины_количество",
     "rental.equipment_manual_total": "аренда.оборудование_сумма",
     "rental.deal_name": "аренда.имя_сделки",
+    "rental.created_via_wizard": "аренда.создано_мастером",
     "meta.today": "мета.сегодня",
     "meta.generated_at": "мета.дата_генерации",
 }
@@ -297,6 +299,7 @@ class _RentalTemplateProxy:
         self.ski_rack_included = _BoolDisplay(rental.ski_rack_included)
         self.roof_box_included = _BoolDisplay(rental.roof_box_included)
         self.crossbars_included = _BoolDisplay(rental.crossbars_included)
+        self.created_via_wizard = _BoolDisplay(rental.created_via_wizard)
         self.car = _DateFormattingProxy(rental.car, date_fields={"sts_issue_date"})
         self.customer = _DateFormattingProxy(
             rental.customer,

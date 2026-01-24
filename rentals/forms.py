@@ -556,6 +556,12 @@ class RentalForm(StyledModelForm):
     def save(self, commit=True):
         instance = super().save(commit=False)
         regions = self.cleaned_data.get("operation_regions", "")
+        if not regions:
+            raw_regions = self.data.getlist(self.add_prefix("operation_regions"))
+            if raw_regions:
+                selected_set = {str(value).strip() for value in raw_regions if value and str(value).strip()}
+                ordered = [region for region in OPERATION_REGIONS if region in selected_set]
+                regions = ", ".join(ordered)
         if isinstance(regions, (list, tuple)):
             selected_set = {str(value).strip() for value in regions if value and str(value).strip()}
             ordered = [region for region in OPERATION_REGIONS if region in selected_set]

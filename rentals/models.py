@@ -459,6 +459,11 @@ class Rental(models.Model):
     prepayment = models.DecimalField("Предоплата", max_digits=9, decimal_places=2, default=Decimal("0.00"), blank=True)
     status = models.CharField("Статус", max_length=20, choices=STATUS_CHOICES, default="draft")
     created_by = models.ForeignKey(User, verbose_name="Создал", null=True, blank=True, on_delete=models.SET_NULL)
+    created_via_wizard = models.BooleanField(
+        "Создано мастером",
+        default=False,
+        help_text="Отметка, что договор сформирован через мастер.",
+    )
 
     class Meta:
         verbose_name = "Аренда"

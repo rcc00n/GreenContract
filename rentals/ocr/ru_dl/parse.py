@@ -11,7 +11,7 @@ CATEGORY_PATTERN = re.compile(r"\b(A1|B1|C1|D1|BE|CE|DE|A|B|C|D|M|TM|TB)\b", re.
 
 REQUIRED_FIELDS = {"full_name", "birth_date", "license_number"}
 
-CYRILLIC_RE = re.compile(r"[\u0410-\u042f\u0401]")
+CYRILLIC_RE = re.compile(r"[\u0410-\u042f\u0401\u0430-\u044f\u0451]")
 LABEL_PREFIX_RE = re.compile(r"^\s*\d+[a-zA-Z]?[.)]?\s*")
 DRIVING_MARKERS = (
     "\u0421\u0422\u0410\u0416",  # СТАЖ
@@ -27,6 +27,59 @@ STOPWORDS = (
     "\u0413\u0418\u0411\u0414\u0414",  # ГИБДД
     "\u0420\u041e\u0421\u0421",  # РОСС
     "\u0424\u0415\u0414\u0415\u0420",  # ФЕДЕР
+    "DRIVING",
+    "LICENCE",
+    "LICENSE",
+    "PERMIS",
+    "RUS",
+)
+
+DIGIT_TRANSLATION = str.maketrans(
+    {
+        "O": "0",
+        "o": "0",
+        "Q": "0",
+        "D": "0",
+        "I": "1",
+        "l": "1",
+        "L": "1",
+        "Z": "2",
+        "S": "5",
+        "s": "5",
+        "B": "8",
+        "G": "6",
+        "g": "6",
+        "T": "7",
+    }
+)
+
+LATIN_TO_CYR = str.maketrans(
+    {
+        "A": "\u0410",
+        "a": "\u0430",
+        "B": "\u0412",
+        "b": "\u0432",
+        "E": "\u0415",
+        "e": "\u0435",
+        "K": "\u041a",
+        "k": "\u043a",
+        "M": "\u041c",
+        "m": "\u043c",
+        "H": "\u041d",
+        "h": "\u043d",
+        "O": "\u041e",
+        "o": "\u043e",
+        "P": "\u0420",
+        "p": "\u0440",
+        "C": "\u0421",
+        "c": "\u0441",
+        "T": "\u0422",
+        "t": "\u0442",
+        "X": "\u0425",
+        "x": "\u0445",
+        "Y": "\u0423",
+        "y": "\u0443",
+    }
 )
 
 
@@ -34,10 +87,18 @@ def normalize_whitespace(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip())
 
 
+def _normalize_digit_ocr(text: str | None) -> str:
+    if not text:
+        return ""
+    return (text or "").translate(DIGIT_TRANSLATION)
+
+
 def normalize_date(text: str | None) -> str | None:
     if not text:
         return None
-    iso_match = re.search(r"(\\d{4})-(\\d{2})-(\\d{2})", text)
+    text = _normalize_digit_ocr(text)
+    text = text.replace(",", ".")
+    iso_match = re.search(r"(\d{4})-(\d{2})-(\d{2})", text)
     if iso_match:
         year, month, day = map(int, iso_match.groups())
         try:
@@ -64,7 +125,7 @@ def normalize_date(text: str | None) -> str | None:
 def normalize_license_number(text: str | None) -> str | None:
     if not text:
         return None
-    digits = re.sub(r"\D", "", text)
+    digits = re.sub(r"\D", "", _normalize_digit_ocr(text))
     if not digits:
         return None
     if len(digits) >= 10:
@@ -106,7 +167,11 @@ def _strip_label_prefix(text: str) -> str:
 
 def _clean_name_line(text: str) -> str:
     cleaned = _strip_label_prefix(text)
+    cleaned = cleaned.translate(LATIN_TO_CYR)
     cleaned = re.sub(r"[•·]", " ", cleaned)
+    cleaned = re.sub(r"[^A-Za-z\u0410-\u044f\u0401\u0451\s-]", " ", cleaned)
+    if CYRILLIC_RE.search(cleaned):
+        cleaned = re.sub(r"[A-Za-z]", " ", cleaned)
     cleaned = normalize_whitespace(cleaned)
     return cleaned
 
@@ -192,7 +257,8 @@ def parse_front_from_text(raw_text: str | None, base_conf: float | None = None) 
     upper_lines = [line.upper() for line in lines]
 
     def _is_name_line(line: str, upper_line: str) -> bool:
-        if not CYRILLIC_RE.search(line):
+        normalized = _clean_name_line(line)
+        if not CYRILLIC_RE.search(normalized):
             return False
         if re.search(r"\d", line):
             return False
@@ -210,7 +276,7 @@ def parse_front_from_text(raw_text: str | None, base_conf: float | None = None) 
 
     full_name = None
     if len(name_candidates) >= 2:
-        full_name = f"{name_candidates[0]} {name_candidates[1]}"
+        full_name = " ".join(name_candidates[:3])
     elif name_candidates:
         full_name = name_candidates[0]
 

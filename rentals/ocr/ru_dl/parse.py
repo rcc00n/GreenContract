@@ -34,6 +34,8 @@ STOPWORDS = (
     "RUS",
 )
 
+NAME_CLEAN_RE = re.compile(r"[^A-Za-z\u0410-\u044f\u0401\u0451\s-]")
+
 DIGIT_TRANSLATION = str.maketrans(
     {
         "O": "0",
@@ -179,6 +181,26 @@ def _clean_name_line(text: str) -> str:
 def _has_driving_marker(text: str) -> bool:
     upper = (text or "").upper()
     return any(marker in upper for marker in DRIVING_MARKERS)
+
+
+def _name_quality(text: str) -> float:
+    if not text:
+        return 0.0
+    cleaned = NAME_CLEAN_RE.sub(" ", text)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if not cleaned:
+        return 0.0
+    if re.search(r"\d", cleaned):
+        return 0.0
+    upper = cleaned.upper()
+    if any(word in upper for word in STOPWORDS):
+        return 0.0
+    letters = re.findall(r"[A-Za-z\u0410-\u044f\u0401\u0451]", cleaned)
+    if not letters:
+        return 0.0
+    cyrillic = [ch for ch in letters if CYRILLIC_RE.search(ch)]
+    ratio = len(cyrillic) / len(letters)
+    return round(ratio, 3)
 
 
 def parse_front(rois: dict, context_text: str | None = None) -> dict[str, tuple[object, float]]:

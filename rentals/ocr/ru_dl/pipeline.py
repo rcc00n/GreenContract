@@ -13,9 +13,8 @@ from rentals.ocr.storage import compute_sha256, store_upload
 from .doc_detect import detect_and_warp
 from .ocr_engine import run_ocr
 from .parse import (
-    CYRILLIC_RE,
     REQUIRED_FIELDS,
-    STOPWORDS,
+    _name_quality,
     determine_status,
     normalize_date,
     parse_back,
@@ -57,8 +56,6 @@ FIELD_THRESHOLDS = {
     "full_name_line": 0.7,
 }
 
-NAME_CLEAN_RE = re.compile(r"[^A-Za-z\u0410-\u044f\u0401\u0451\s-]")
-
 
 def _roi_variants(roi: Roi, field: str) -> list[Roi]:
     variants = [roi]
@@ -95,26 +92,6 @@ def _roi_variants(roi: Roi, field: str) -> list[Roi]:
         key = (item.x, item.y, item.w, item.h)
         unique[key] = item
     return list(unique.values())
-
-
-def _name_quality(text: str) -> float:
-    if not text:
-        return 0.0
-    cleaned = NAME_CLEAN_RE.sub(" ", text)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    if not cleaned:
-        return 0.0
-    if re.search(r"\d", cleaned):
-        return 0.0
-    upper = cleaned.upper()
-    if any(word in upper for word in STOPWORDS):
-        return 0.0
-    letters = re.findall(r"[A-Za-z\u0410-\u044f\u0401\u0451]", cleaned)
-    if not letters:
-        return 0.0
-    cyrillic = [ch for ch in letters if CYRILLIC_RE.search(ch)]
-    ratio = len(cyrillic) / len(letters)
-    return round(ratio, 3)
 
 
 def _score_text(field: str, text: str, conf: float) -> float:

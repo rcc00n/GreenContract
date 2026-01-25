@@ -70,8 +70,13 @@ def get_ocr():
                 }
                 try:
                     signature = inspect.signature(PaddleOCR.__init__)
-                    allowed = set(signature.parameters.keys())
-                    kwargs = {key: value for key, value in kwargs.items() if key in allowed}
+                    params = signature.parameters.values()
+                    accepts_kwargs = any(
+                        param.kind == inspect.Parameter.VAR_KEYWORD for param in params
+                    )
+                    if not accepts_kwargs:
+                        allowed = set(signature.parameters.keys())
+                        kwargs = {key: value for key, value in kwargs.items() if key in allowed}
                 except (TypeError, ValueError):
                     pass
                 _OCR_INSTANCE = PaddleOCR(**kwargs)
@@ -126,8 +131,11 @@ def run_ocr(image, detect: bool = False) -> list[tuple[str, float]]:
     kwargs = {"cls": True} if detect else {"det": False, "rec": True, "cls": True}
     try:
         signature = inspect.signature(ocr.ocr)
-        allowed = set(signature.parameters.keys())
-        kwargs = {key: value for key, value in kwargs.items() if key in allowed}
+        params = signature.parameters.values()
+        accepts_kwargs = any(param.kind == inspect.Parameter.VAR_KEYWORD for param in params)
+        if not accepts_kwargs:
+            allowed = set(signature.parameters.keys())
+            kwargs = {key: value for key, value in kwargs.items() if key in allowed}
     except (TypeError, ValueError):
         pass
     try:

@@ -11,5 +11,5 @@ openpyxl
 num2words
 opencv-python
 numpy
-paddleocr
-paddlepaddle
+paddleocr<3.0
+paddlepaddle<3.0

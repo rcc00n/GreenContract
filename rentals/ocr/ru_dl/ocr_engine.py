@@ -16,6 +16,9 @@ _PADDLE_FLAGS = {
     "FLAGS_enable_onednn": "0",
     "FLAGS_enable_pir_in_executor": "0",
     "FLAGS_enable_pir_api": "0",
+    "FLAGS_new_executor": "0",
+    "FLAGS_use_new_executor": "0",
+    "FLAGS_USE_STANDALONE_EXECUTOR": "0",
 }
 
 for _key, _value in _PADDLE_FLAGS.items():

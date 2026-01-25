@@ -25,6 +25,7 @@ urlpatterns = [
     path("customers/delete-all/", views.customer_delete_all, name="customer_delete_all"),
     path("customers/export/", views.export_customers_csv, name="export_customers_csv"),
     path("customers/import/", views.import_customers_csv, name="import_customers_csv"),
+    path("ocr/driver-license/", views.ocr_driver_license, name="ocr_driver_license"),
     path("rentals/", views.RentalListView.as_view(), name="rental_list"),
     path("rentals/new/", views.RentalCreateView.as_view(), name="rental_create"),
     path("rentals/wizard/", views.RentalWizardView.as_view(), name="rental_wizard"),

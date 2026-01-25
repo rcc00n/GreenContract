@@ -107,6 +107,10 @@ WHITENOISE_USE_FINDERS = True
 MEDIA_URL = os.environ.get("DJANGO_MEDIA_URL", "/media/")
 MEDIA_ROOT = Path(os.environ.get("DJANGO_MEDIA_ROOT", str(BASE_DIR / "media")))
 
+OCR_STORE_UPLOADS = os.environ.get("OCR_STORE_UPLOADS", "true").lower() == "true"
+OCR_UPLOAD_TTL_HOURS = int(os.environ.get("OCR_UPLOAD_TTL_HOURS", "72"))
+OCR_DEBUG = os.environ.get("OCR_DEBUG", "false").lower() == "true"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_REDIRECT_URL = "rentals:dashboard"

@@ -44,6 +44,7 @@ from .forms import (
     StyledSetPasswordForm,
 )
 from .models import BusinessSettings, Car, ContractTemplate, Customer, CustomerTag, Rental
+from .ocr import extract_ru_dl
 from .services.contract_renderer import placeholder_guide, render_docx, render_html_template, render_pdf
 from .services.pricing import calculate_rental_pricing, pricing_config
 from .services.stats import (
@@ -62,6 +63,19 @@ EMAIL_MAX_LEN = Customer._meta.get_field("email").max_length
 IMPORT_BATCH_SIZE = max(1, int(os.environ.get("IMPORT_BULK_BATCH_SIZE", "5000")))
 
 logger = logging.getLogger(__name__)
+
+
+@login_required
+@require_POST
+def ocr_driver_license(request):
+    front_file = request.FILES.get("front_image")
+    back_file = request.FILES.get("back_image")
+
+    front_bytes = front_file.read() if front_file else None
+    back_bytes = back_file.read() if back_file else None
+
+    result = extract_ru_dl(front_bytes, back_bytes)
+    return JsonResponse(result)
 
 
 def _parse_bool(value):

@@ -167,10 +167,10 @@ def _strip_label_prefix(text: str) -> str:
 
 def _clean_name_line(text: str) -> str:
     cleaned = _strip_label_prefix(text)
-    cleaned = cleaned.translate(LATIN_TO_CYR)
     cleaned = re.sub(r"[•·]", " ", cleaned)
     cleaned = re.sub(r"[^A-Za-z\u0410-\u044f\u0401\u0451\s-]", " ", cleaned)
     if CYRILLIC_RE.search(cleaned):
+        cleaned = cleaned.translate(LATIN_TO_CYR)
         cleaned = re.sub(r"[A-Za-z]", " ", cleaned)
     cleaned = normalize_whitespace(cleaned)
     return cleaned
@@ -191,6 +191,8 @@ def parse_front(rois: dict, context_text: str | None = None) -> dict[str, tuple[
         patronymic = ""
 
     name_parts = [part for part in (surname, name, patronymic) if part]
+    full_name = None
+    name_conf = 0.0
     if name_parts:
         full_name = " ".join(name_parts)
         name_conf = _avg_conf([
@@ -198,12 +200,17 @@ def parse_front(rois: dict, context_text: str | None = None) -> dict[str, tuple[
             _roi_conf(rois, "name"),
             _roi_conf(rois, "patronymic"),
         ])
-    elif full_name_line:
-        full_name = full_name_line
-        name_conf = _roi_conf(rois, "full_name_line")
-    else:
-        full_name = None
-        name_conf = 0.0
+    if full_name_line:
+        line_conf = _roi_conf(rois, "full_name_line")
+        if not full_name:
+            full_name = full_name_line
+            name_conf = line_conf
+        else:
+            parts_quality = _name_quality(full_name)
+            line_quality = _name_quality(full_name_line)
+            if line_quality > parts_quality + 0.15:
+                full_name = full_name_line
+                name_conf = line_conf
 
     birth_date_raw = _strip_label_prefix(_roi_text(rois, "birth_date"))
     birth_date = normalize_date(birth_date_raw)
@@ -216,11 +223,16 @@ def parse_front(rois: dict, context_text: str | None = None) -> dict[str, tuple[
     license_issued_by = _strip_label_prefix(_roi_text(rois, "license_issued_by"))
     license_issued_by = license_issued_by or None
     license_issued_by_conf = _roi_conf(rois, "license_issued_by")
+    if license_issued_by:
+        upper = license_issued_by.upper()
+        if not any(marker in upper for marker in ("\u0413\u0418\u0411\u0414\u0414", "GIBDD", "\u041c\u0420\u042d\u041e", "MREO")):
+            license_issued_by = None
+            license_issued_by_conf = 0.0
 
     driving_since_raw = _strip_label_prefix(_roi_text(rois, "driving_since"))
     driving_since = normalize_date(driving_since_raw)
     driving_conf = _roi_conf(rois, "driving_since")
-    if driving_since and context_text and not _has_driving_marker(context_text):
+    if driving_since and birth_date and driving_since <= birth_date:
         driving_since = None
         driving_conf = 0.0
 

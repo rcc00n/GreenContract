@@ -139,7 +139,7 @@ def extract(front_bytes: bytes | None, back_bytes: bytes | None):
             images.append(store_upload(image, request_id, side, data))
         except Exception as exc:
             warnings.append(f"Failed to store {side} image: {exc}")
-            images.append({\"role\": side, \"storage_url\": None, \"sha256\": compute_sha256(data or b\"\")})
+            images.append({"role": side, "storage_url": None, "sha256": compute_sha256(data or b"")})
         warped, used_fallback = detect_and_warp(image, CANVAS_SIZE)
         if used_fallback:
             warnings.append(f"{side.capitalize()} contour not detected; used resize fallback.")

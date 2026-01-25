@@ -11,7 +11,7 @@ from rentals.ocr.storage import compute_sha256, store_upload
 
 from .doc_detect import detect_and_warp
 from .ocr_engine import run_ocr
-from .parse import determine_status, parse_back, parse_front
+from .parse import REQUIRED_FIELDS, determine_status, parse_back, parse_front, parse_front_from_text
 from .preprocess import preprocess
 from .rois import BACK_ROIS, CANVAS_SIZE, FRONT_ROIS
 from .schema import build_failure, build_fields, build_response
@@ -105,6 +105,22 @@ def _ocr_rois(image, rois: dict):
     return results
 
 
+def _is_missing_value(value: object) -> bool:
+    return value in (None, "", [])
+
+
+def _merge_parsed(primary: dict[str, tuple[object, float]], fallback: dict[str, tuple[object, float]]):
+    merged = dict(primary or {})
+    for key, payload in (fallback or {}).items():
+        value, conf = payload
+        if _is_missing_value(value):
+            continue
+        current = merged.get(key)
+        if current is None or _is_missing_value(current[0]):
+            merged[key] = (value, conf)
+    return merged
+
+
 def _collect_raw_text(rois: dict) -> str:
     parts = []
     for payload in rois.values():
@@ -112,6 +128,19 @@ def _collect_raw_text(rois: dict) -> str:
         if text:
             parts.append(text)
     return "\n".join(parts)
+
+
+def _ocr_full_image(image) -> tuple[str, float]:
+    try:
+        texts = run_ocr(image, detect=True)
+    except Exception as exc:
+        logger.warning("OCR failed on full image: %s", exc)
+        return "", 0.0
+    if not texts:
+        return "", 0.0
+    merged_text = "\n".join(text.strip() for text, _ in texts if text).strip()
+    avg_conf = round(sum(conf for _, conf in texts) / len(texts), 3) if texts else 0.0
+    return merged_text, avg_conf
 
 
 def extract(front_bytes: bytes | None, back_bytes: bytes | None):
@@ -126,14 +155,15 @@ def extract(front_bytes: bytes | None, back_bytes: bytes | None):
     front_rois: dict[str, dict[str, object]] = {}
     back_rois: dict[str, dict[str, object]] = {}
 
-    def _process_side(side: str, data: bytes | None, rois_def: dict):
+    def _process_side(side: str, data: bytes | None, rois_def: dict, allow_missing: bool = False):
         if not data:
-            warnings.append(f"{side.capitalize()} image missing.")
-            return {}, None
+            if not allow_missing:
+                warnings.append(f"{side.capitalize()} image missing.")
+            return {}, None, ""
         image = _decode_image(data)
         if image is None:
             warnings.append(f"{side.capitalize()} image could not be decoded.")
-            return {}, None
+            return {}, None, ""
         image = _limit_size(image)
         try:
             images.append(store_upload(image, request_id, side, data))
@@ -144,11 +174,14 @@ def extract(front_bytes: bytes | None, back_bytes: bytes | None):
         if used_fallback:
             warnings.append(f"{side.capitalize()} contour not detected; used resize fallback.")
         processed = preprocess(warped)
-        return _ocr_rois(processed, rois_def), warped
+        rois = _ocr_rois(processed, rois_def)
+        return rois, processed, _collect_raw_text(rois)
 
     try:
-        front_rois, _ = _process_side("front", front_bytes, FRONT_ROIS)
-        back_rois, _ = _process_side("back", back_bytes, BACK_ROIS)
+        front_rois, front_processed, front_roi_text = _process_side("front", front_bytes, FRONT_ROIS)
+        back_rois, _, back_roi_text = _process_side(
+            "back", back_bytes, BACK_ROIS, allow_missing=bool(front_bytes)
+        )
     except RuntimeError as exc:
         logger.warning("OCR runtime error: %s", exc)
         return build_failure(request_id=request_id, reason=str(exc))
@@ -156,7 +189,26 @@ def extract(front_bytes: bytes | None, back_bytes: bytes | None):
         logger.exception("OCR pipeline failed")
         return build_failure(request_id=request_id, reason=f"OCR pipeline failed: {exc}")
 
-    raw_text = "\n".join(filter(None, [_collect_raw_text(front_rois), _collect_raw_text(back_rois)])).strip()
+    front_context_text = front_roi_text
+
+    parsed_front = parse_front(front_rois, context_text=front_context_text)
+    if front_processed is not None and front_bytes:
+        missing_required = [
+            name
+            for name in REQUIRED_FIELDS
+            if _is_missing_value(parsed_front.get(name, (None, 0.0))[0])
+        ]
+        if not front_roi_text or missing_required:
+            fallback_text, fallback_conf = _ocr_full_image(front_processed)
+            if fallback_text:
+                front_context_text = "\n".join(filter(None, [front_context_text, fallback_text]))
+                parsed_front = parse_front(front_rois, context_text=front_context_text)
+                parsed_front = _merge_parsed(
+                    parsed_front, parse_front_from_text(fallback_text, base_conf=fallback_conf)
+                )
+                warnings.append("Front fallback OCR used.")
+
+    raw_text = "\n".join(filter(None, [front_context_text, back_roi_text])).strip()
     if not raw_text:
         return build_failure(
             request_id=request_id,
@@ -166,7 +218,7 @@ def extract(front_bytes: bytes | None, back_bytes: bytes | None):
         )
 
     parsed = {}
-    parsed.update(parse_front(front_rois))
+    parsed.update(parsed_front)
     parsed.update(parse_back(back_rois))
     fields = build_fields(parsed)
 

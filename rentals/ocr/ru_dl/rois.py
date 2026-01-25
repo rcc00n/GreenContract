@@ -3,7 +3,7 @@ from dataclasses import dataclass
 CANVAS_WIDTH = 1400
 CANVAS_HEIGHT = 900
 CANVAS_SIZE = (CANVAS_WIDTH, CANVAS_HEIGHT)
-ROI_VERSION = "ru_driver_license_v1"
+ROI_VERSION = "ru_driver_license_v2"
 
 
 @dataclass(frozen=True)
@@ -16,14 +16,14 @@ class Roi:
 
 
 FRONT_ROIS = {
-    "surname": Roi("surname", 480, 150, 860, 60),
-    "name": Roi("name", 480, 220, 860, 60),
-    "patronymic": Roi("patronymic", 480, 290, 860, 60),
-    "full_name_line": Roi("full_name_line", 430, 145, 920, 220),
-    "birth_date": Roi("birth_date", 480, 360, 280, 50),
-    "license_number": Roi("license_number", 480, 520, 420, 60),
-    "license_issued_by": Roi("license_issued_by", 480, 585, 860, 90),
-    "driving_since": Roi("driving_since", 480, 690, 280, 50),
+    "surname": Roi("surname", 520, 230, 780, 55),
+    "name": Roi("name", 520, 290, 780, 60),
+    "patronymic": Roi("patronymic", 520, 350, 780, 45),
+    "full_name_line": Roi("full_name_line", 520, 230, 780, 165),
+    "birth_date": Roi("birth_date", 520, 400, 260, 50),
+    "license_number": Roi("license_number", 520, 510, 420, 60),
+    "license_issued_by": Roi("license_issued_by", 520, 560, 500, 70),
+    "driving_since": Roi("driving_since", 520, 455, 260, 45),
 }
 
 BACK_ROIS = {

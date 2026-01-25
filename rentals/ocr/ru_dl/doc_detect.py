@@ -35,14 +35,20 @@ def detect_and_warp(image_bgr, output_size: tuple[int, int]):
 
     gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    edges = cv2.Canny(blurred, 60, 180)
+    edges = cv2.Canny(blurred, 50, 150)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    edges = cv2.dilate(edges, kernel, iterations=2)
+    edges = cv2.erode(edges, kernel, iterations=1)
 
     contours_data = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     contours = contours_data[0] if len(contours_data) == 2 else contours_data[1]
-    contours = sorted(contours, key=cv2.contourArea, reverse=True)[:5]
+    contours = sorted(contours, key=cv2.contourArea, reverse=True)[:10]
 
     screen_contour = None
+    image_area = float(image_bgr.shape[0] * image_bgr.shape[1])
     for contour in contours:
+        if cv2.contourArea(contour) < image_area * 0.08:
+            continue
         peri = cv2.arcLength(contour, True)
         approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
         if len(approx) == 4:
@@ -51,6 +57,24 @@ def detect_and_warp(image_bgr, output_size: tuple[int, int]):
 
     width, height = output_size
     if screen_contour is None:
+        if contours:
+            largest = contours[0]
+            if cv2.contourArea(largest) >= image_area * 0.05:
+                rect = cv2.minAreaRect(largest)
+                box = cv2.boxPoints(rect)
+                rect_pts = _order_points(box)
+                dst = np.array(
+                    [
+                        [0, 0],
+                        [width - 1, 0],
+                        [width - 1, height - 1],
+                        [0, height - 1],
+                    ],
+                    dtype="float32",
+                )
+                matrix = cv2.getPerspectiveTransform(rect_pts, dst)
+                warped = cv2.warpPerspective(image_bgr, matrix, (width, height))
+                return warped, False
         resized = cv2.resize(image_bgr, output_size)
         return resized, True
 

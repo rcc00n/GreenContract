@@ -1,6 +1,10 @@
 # Local env
 .env
 
+# Python cache
+__pycache__/
+*.py[cod]
+
 # Media/uploads (generated)
 media/
 uploads/

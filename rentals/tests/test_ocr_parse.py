@@ -5,6 +5,7 @@ from rentals.ocr.ru_dl.parse import (
     normalize_date,
     normalize_license_number,
     parse_categories,
+    parse_front,
 )
 
 
@@ -43,3 +44,26 @@ class OCRParseTests(SimpleTestCase):
         status, missing, _ = determine_status(fields)
         self.assertEqual(status, "partial")
         self.assertIn("birth_date", missing)
+
+    def test_full_name_prefers_line_when_surname_missing(self):
+        rois = {
+            "surname": {"text": "", "confidence": 0.1},
+            "name": {"text": "АНДРЕЙ АНАТОЛЬЕВИЧ", "confidence": 0.92},
+            "patronymic": {"text": "", "confidence": 0.0},
+            "full_name_line": {"text": "ГАЦКО АНДРЕЙ АНАТОЛЬЕВИЧ", "confidence": 0.88},
+        }
+        parsed = parse_front(rois)
+        self.assertEqual(parsed["full_name"][0], "ГАЦКО АНДРЕЙ АНАТОЛЬЕВИЧ")
+
+    def test_issuer_ignores_latin_text(self):
+        rois = {
+            "license_issued_by": {"text": "GIBDD 8210", "confidence": 0.9},
+        }
+        parsed = parse_front(rois)
+        self.assertIsNone(parsed["license_issued_by"][0])
+
+        rois = {
+            "license_issued_by": {"text": "ГИБДД 8210 / GIBDD 8210", "confidence": 0.9},
+        }
+        parsed = parse_front(rois)
+        self.assertEqual(parsed["license_issued_by"][0], "ГИБДД 8210")

@@ -16,14 +16,14 @@ class Roi:
 
 
 FRONT_ROIS = {
-    "surname": Roi("surname", 520, 230, 780, 55),
-    "name": Roi("name", 520, 290, 780, 60),
-    "patronymic": Roi("patronymic", 520, 350, 780, 45),
-    "full_name_line": Roi("full_name_line", 520, 230, 780, 165),
-    "birth_date": Roi("birth_date", 520, 400, 260, 50),
-    "license_number": Roi("license_number", 520, 510, 420, 60),
-    "license_issued_by": Roi("license_issued_by", 520, 560, 500, 70),
-    "driving_since": Roi("driving_since", 520, 455, 260, 45),
+    "surname": Roi("surname", 520, 240, 780, 60),
+    "name": Roi("name", 520, 300, 780, 60),
+    "patronymic": Roi("patronymic", 520, 350, 780, 55),
+    "full_name_line": Roi("full_name_line", 520, 240, 780, 170),
+    "birth_date": Roi("birth_date", 520, 400, 300, 55),
+    "license_number": Roi("license_number", 520, 650, 420, 60),
+    "license_issued_by": Roi("license_issued_by", 520, 560, 520, 70),
+    "driving_since": Roi("driving_since", 520, 520, 300, 50),
 }
 
 BACK_ROIS = {

@@ -114,6 +114,8 @@ def _score_text(field: str, text: str, conf: float) -> float:
             score += 0.1
         else:
             score -= 0.15
+        if normalize_date(text):
+            score -= 0.3
     if field == "license_issued_by":
         upper = (text or "").upper()
         if "\u0413\u0418\u0411\u0414\u0414" in upper or "GIBDD" in upper:

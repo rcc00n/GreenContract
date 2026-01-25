@@ -36,6 +36,8 @@ STOPWORDS = (
 
 NAME_CLEAN_RE = re.compile(r"[^A-Za-z\u0410-\u044f\u0401\u0451\s-]")
 
+ISSUER_CLEAN_RE = re.compile(r"[^0-9\u0410-\u044f\u0401\u0451\s-]")
+
 DIGIT_TRANSLATION = str.maketrans(
     {
         "O": "0",
@@ -171,10 +173,29 @@ def _clean_name_line(text: str) -> str:
     cleaned = _strip_label_prefix(text)
     cleaned = re.sub(r"[•·]", " ", cleaned)
     cleaned = re.sub(r"[^A-Za-z\u0410-\u044f\u0401\u0451\s-]", " ", cleaned)
-    if CYRILLIC_RE.search(cleaned):
-        cleaned = cleaned.translate(LATIN_TO_CYR)
-        cleaned = re.sub(r"[A-Za-z]", " ", cleaned)
+    if not CYRILLIC_RE.search(cleaned):
+        return ""
+    cleaned = cleaned.translate(LATIN_TO_CYR)
+    cleaned = re.sub(r"[A-Za-z]", " ", cleaned)
     cleaned = normalize_whitespace(cleaned)
+    return cleaned
+
+
+def _clean_issuer_line(text: str) -> str:
+    cleaned = _strip_label_prefix(text)
+    if not cleaned:
+        return ""
+    cleaned = cleaned.translate(LATIN_TO_CYR)
+    cleaned = ISSUER_CLEAN_RE.sub(" ", cleaned)
+    cleaned = normalize_whitespace(cleaned)
+    if not CYRILLIC_RE.search(cleaned):
+        return ""
+    tokens = cleaned.split()
+    deduped: list[str] = []
+    for token in tokens:
+        if not deduped or deduped[-1] != token:
+            deduped.append(token)
+    cleaned = " ".join(deduped)
     return cleaned
 
 
@@ -230,7 +251,15 @@ def parse_front(rois: dict, context_text: str | None = None) -> dict[str, tuple[
         else:
             parts_quality = _name_quality(full_name)
             line_quality = _name_quality(full_name_line)
-            if line_quality > parts_quality + 0.15:
+            parts_words = len(full_name.split())
+            line_words = len(full_name_line.split())
+            if not surname and line_words >= parts_words:
+                full_name = full_name_line
+                name_conf = line_conf
+            elif line_words > parts_words:
+                full_name = full_name_line
+                name_conf = line_conf
+            elif line_quality > parts_quality + 0.1:
                 full_name = full_name_line
                 name_conf = line_conf
 
@@ -242,12 +271,12 @@ def parse_front(rois: dict, context_text: str | None = None) -> dict[str, tuple[
     license_number = normalize_license_number(license_number_raw)
     license_conf = _roi_conf(rois, "license_number")
 
-    license_issued_by = _strip_label_prefix(_roi_text(rois, "license_issued_by"))
+    license_issued_by = _clean_issuer_line(_roi_text(rois, "license_issued_by"))
     license_issued_by = license_issued_by or None
     license_issued_by_conf = _roi_conf(rois, "license_issued_by")
     if license_issued_by:
         upper = license_issued_by.upper()
-        if not any(marker in upper for marker in ("\u0413\u0418\u0411\u0414\u0414", "GIBDD", "\u041c\u0420\u042d\u041e", "MREO")):
+        if not any(marker in upper for marker in ("\u0413\u0418\u0411\u0414\u0414", "\u041c\u0420\u042d\u041e")):
             license_issued_by = None
             license_issued_by_conf = 0.0
 
@@ -341,13 +370,10 @@ def parse_front_from_text(raw_text: str | None, base_conf: float | None = None) 
 
     license_issued_by = None
     for line, upper_line in zip(lines, upper_lines):
-        if (
-            "\u0413\u0418\u0411\u0414\u0414" in upper_line
-            or "GIBDD" in upper_line
-            or "\u041c\u0420\u042d\u041e" in upper_line
-        ):
-            license_issued_by = _strip_label_prefix(line)
-            break
+        if "\u0413\u0418\u0411\u0414\u0414" in upper_line or "\u041c\u0420\u042d\u041e" in upper_line:
+            license_issued_by = _clean_issuer_line(line)
+            if license_issued_by:
+                break
 
     base = base_conf or 0.55
     base = max(0.4, min(base, 0.85))

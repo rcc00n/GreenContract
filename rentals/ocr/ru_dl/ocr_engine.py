@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import inspect
 import threading
 
@@ -9,6 +10,16 @@ try:
     import numpy as np
 except ImportError:  # pragma: no cover - optional dependency handled at runtime
     np = None
+
+_PADDLE_FLAGS = {
+    "FLAGS_use_mkldnn": "0",
+    "FLAGS_enable_onednn": "0",
+    "FLAGS_enable_pir_in_executor": "0",
+    "FLAGS_enable_pir_api": "0",
+}
+
+for _key, _value in _PADDLE_FLAGS.items():
+    os.environ.setdefault(_key, _value)
 
 try:
     from paddleocr import PaddleOCR
@@ -24,8 +35,27 @@ def _require_paddle():
         raise RuntimeError("PaddleOCR and numpy are required for OCR.")
 
 
+def _configure_paddle_flags():
+    for key, value in _PADDLE_FLAGS.items():
+        os.environ.setdefault(key, value)
+    try:
+        import paddle
+
+        flags = {}
+        for key, value in _PADDLE_FLAGS.items():
+            normalized = value not in ("0", "false", "False", "")
+            flags[key] = normalized
+        try:
+            paddle.set_flags(flags)
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
 def get_ocr():
     _require_paddle()
+    _configure_paddle_flags()
     global _OCR_INSTANCE
     if _OCR_INSTANCE is None:
         with _OCR_LOCK:

@@ -125,6 +125,32 @@ def _extract_texts(obj, acc: list[tuple[str, float]]):
             _extract_texts(item, acc)
 
 
+def _extract_text_boxes(obj, acc: list[dict[str, object]]):
+    if isinstance(obj, (list, tuple)):
+        for item in obj:
+            if (
+                isinstance(item, (list, tuple))
+                and len(item) >= 2
+                and isinstance(item[0], (list, tuple))
+                and isinstance(item[1], (list, tuple))
+                and len(item[1]) >= 2
+                and isinstance(item[1][0], str)
+            ):
+                acc.append(
+                    {
+                        "text": item[1][0],
+                        "confidence": float(item[1][1] or 0.0),
+                        "box": item[0],
+                    }
+                )
+                continue
+            _extract_text_boxes(item, acc)
+        return
+    if isinstance(obj, dict):
+        for value in obj.values():
+            _extract_text_boxes(value, acc)
+
+
 def run_ocr(image, detect: bool = False) -> list[tuple[str, float]]:
     ocr = get_ocr()
     image = _ensure_color(image)
@@ -144,4 +170,26 @@ def run_ocr(image, detect: bool = False) -> list[tuple[str, float]]:
         result = ocr.ocr(image)
     extracted: list[tuple[str, float]] = []
     _extract_texts(result, extracted)
+    return extracted
+
+
+def run_ocr_with_boxes(image) -> list[dict[str, object]]:
+    ocr = get_ocr()
+    image = _ensure_color(image)
+    try:
+        signature = inspect.signature(ocr.ocr)
+        params = signature.parameters.values()
+        accepts_kwargs = any(param.kind == inspect.Parameter.VAR_KEYWORD for param in params)
+        kwargs = {"cls": True}
+        if not accepts_kwargs:
+            allowed = set(signature.parameters.keys())
+            kwargs = {key: value for key, value in kwargs.items() if key in allowed}
+    except (TypeError, ValueError):
+        kwargs = {"cls": True}
+    try:
+        result = ocr.ocr(image, **kwargs) if kwargs else ocr.ocr(image)
+    except TypeError:
+        result = ocr.ocr(image)
+    extracted: list[dict[str, object]] = []
+    _extract_text_boxes(result, extracted)
     return extracted

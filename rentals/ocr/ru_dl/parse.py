@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import difflib
+import os
 import re
 from datetime import datetime
 
@@ -15,8 +17,6 @@ CYRILLIC_RE = re.compile(r"[\u0410-\u042f\u0401\u0430-\u044f\u0451]")
 LABEL_PREFIX_RE = re.compile(r"^\s*\d+[a-zA-Z]?[.)]?\s*")
 DRIVING_MARKERS = (
     "\u0421\u0422\u0410\u0416",  # СТАЖ
-    "STAZH",
-    "SINCE",
 )
 STOPWORDS = (
     "\u0412\u041e\u0414\u0418\u0422\u0415\u041b",  # ВОДИТЕЛ
@@ -37,6 +37,16 @@ STOPWORDS = (
 NAME_CLEAN_RE = re.compile(r"[^A-Za-z\u0410-\u044f\u0401\u0451\s-]")
 
 ISSUER_CLEAN_RE = re.compile(r"[^0-9\u0410-\u044f\u0401\u0451\s-]")
+
+_NAME_DICTIONARY: dict[str, int] | None = None
+
+MARKER_TRANSLATION = str.maketrans(
+    {
+        "\u0410": "A",  # А
+        "\u0412": "B",  # В
+        "\u0411": "B",  # Б
+    }
+)
 
 DIGIT_TRANSLATION = str.maketrans(
     {
@@ -129,13 +139,15 @@ def normalize_date(text: str | None) -> str | None:
 def normalize_license_number(text: str | None) -> str | None:
     if not text:
         return None
-    digits = re.sub(r"\D", "", _normalize_digit_ocr(text))
-    if not digits:
-        return None
-    if len(digits) >= 10:
-        formatted = f"{digits[:2]} {digits[2:4]} {digits[4:10]}"
+    normalized = _normalize_digit_ocr(text)
+    match = re.search(r"\d{10}", normalized)
+    if match:
+        digits = match.group(0)
     else:
-        formatted = digits
+        digits = re.sub(r"\D", "", normalized)
+    if len(digits) != 10:
+        return None
+    formatted = f"{digits[:2]} {digits[2:4]} {digits[4:10]}"
     return formatted.strip()
 
 
@@ -179,6 +191,70 @@ def _clean_name_line(text: str) -> str:
     cleaned = re.sub(r"[A-Za-z]", " ", cleaned)
     cleaned = normalize_whitespace(cleaned)
     return cleaned
+
+
+def _load_name_dictionary() -> dict[str, int]:
+    global _NAME_DICTIONARY
+    if _NAME_DICTIONARY is not None:
+        return _NAME_DICTIONARY
+    path = os.environ.get("OCR_NAME_DICTIONARY_PATH")
+    if not path:
+        _NAME_DICTIONARY = {}
+        return _NAME_DICTIONARY
+    data: dict[str, int] = {}
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                parts = line.split()
+                word = parts[0].upper()
+                freq = 1
+                if len(parts) > 1 and parts[1].isdigit():
+                    freq = int(parts[1])
+                if word:
+                    data[word] = max(freq, data.get(word, 0))
+    except Exception:
+        data = {}
+    _NAME_DICTIONARY = data
+    return _NAME_DICTIONARY
+
+
+def _correct_name_token(token: str, dictionary: dict[str, int]) -> str:
+    if token in dictionary or len(token) < 3:
+        return token
+    candidates = [word for word in dictionary.keys() if abs(len(word) - len(token)) <= 2]
+    best = difflib.get_close_matches(token, candidates, n=1, cutoff=0.88)
+    return best[0] if best else token
+
+
+def _apply_name_dictionary(text: str) -> str:
+    if not text:
+        return text
+    dictionary = _load_name_dictionary()
+    if not dictionary:
+        return text
+    tokens = text.split()
+    corrected = [_correct_name_token(token.upper(), dictionary) for token in tokens]
+    return " ".join(corrected)
+
+
+def _extract_marker_date(raw_text: str | None, markers: tuple[str, ...]) -> str | None:
+    if not raw_text:
+        return None
+    lines = [normalize_whitespace(line) for line in raw_text.splitlines() if line.strip()]
+    normalized_lines = [
+        re.sub(r"\s+", "", line.upper()).translate(MARKER_TRANSLATION) for line in lines
+    ]
+    for idx, normalized in enumerate(normalized_lines):
+        if any(marker in normalized for marker in markers):
+            date = normalize_date(lines[idx])
+            if not date and idx + 1 < len(lines):
+                date = normalize_date(lines[idx + 1])
+            if date:
+                return date
+    return None
 
 
 def _clean_issuer_line(text: str) -> str:
@@ -225,10 +301,10 @@ def _name_quality(text: str) -> float:
 
 
 def parse_front(rois: dict, context_text: str | None = None) -> dict[str, tuple[object, float]]:
-    surname = _clean_name_line(_roi_text(rois, "surname"))
-    name = _clean_name_line(_roi_text(rois, "name"))
-    patronymic = _clean_name_line(_roi_text(rois, "patronymic"))
-    full_name_line = _clean_name_line(_roi_text(rois, "full_name_line"))
+    surname = _apply_name_dictionary(_clean_name_line(_roi_text(rois, "surname")))
+    name = _apply_name_dictionary(_clean_name_line(_roi_text(rois, "name")))
+    patronymic = _apply_name_dictionary(_clean_name_line(_roi_text(rois, "patronymic")))
+    full_name_line = _apply_name_dictionary(_clean_name_line(_roi_text(rois, "full_name_line")))
 
     if re.search(r"\d", patronymic):
         patronymic = ""
@@ -286,6 +362,11 @@ def parse_front(rois: dict, context_text: str | None = None) -> dict[str, tuple[
     if driving_since and birth_date and driving_since <= birth_date:
         driving_since = None
         driving_conf = 0.0
+    if driving_since and context_text:
+        valid_until = _extract_marker_date(context_text, ("4B",))
+        if valid_until and driving_since >= valid_until:
+            driving_since = None
+            driving_conf = 0.0
 
     return {
         "full_name": (full_name, name_conf),
@@ -342,6 +423,8 @@ def parse_front_from_text(raw_text: str | None, base_conf: float | None = None) 
         full_name = " ".join(name_candidates[:3])
     elif name_candidates:
         full_name = name_candidates[0]
+    if full_name:
+        full_name = _apply_name_dictionary(full_name)
 
     dates = []
     for line in lines:

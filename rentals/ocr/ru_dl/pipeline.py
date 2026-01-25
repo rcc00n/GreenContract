@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 import uuid
 
@@ -11,7 +12,8 @@ from django.conf import settings
 from rentals.ocr.storage import compute_sha256, store_upload
 
 from .doc_detect import detect_and_warp
-from .ocr_engine import run_ocr
+from .keypoint_detect import detect_keypoints, warp_with_keypoints
+from .ocr_engine import run_ocr, run_ocr_with_boxes
 from .parse import (
     REQUIRED_FIELDS,
     _name_quality,
@@ -22,7 +24,14 @@ from .parse import (
     parse_front_from_text,
 )
 from .preprocess import preprocess_variants
-from .rois import BACK_ROIS, CANVAS_SIZE, FRONT_ROIS, Roi
+from .rois import (
+    BACK_ROIS,
+    CANVAS_SIZE,
+    DEFAULT_FRONT_TEMPLATE,
+    FRONT_ANCHORS,
+    FRONT_ROI_TEMPLATES,
+    Roi,
+)
 from .schema import build_failure, build_fields, build_response
 
 try:
@@ -108,10 +117,8 @@ def _score_text(field: str, text: str, conf: float) -> float:
         score += 0.25 if date else -0.15
     if field == "license_number":
         digits = re.sub(r"\D", "", text or "")
-        if len(digits) >= 10:
+        if len(digits) == 10:
             score += 0.3
-        elif len(digits) >= 8:
-            score += 0.1
         else:
             score -= 0.15
         if normalize_date(text):
@@ -131,7 +138,7 @@ def _is_good_enough(field: str, text: str, conf: float) -> bool:
         return False
     if field == "license_number":
         digits = re.sub(r"\D", "", text or "")
-        if len(digits) < 8:
+        if len(digits) != 10:
             return False
     if field in NAME_FIELDS and _name_quality(text) < 0.4:
         return False
@@ -317,6 +324,215 @@ def _ocr_full_image(images: list) -> tuple[str, float]:
     return best_text, best_conf
 
 
+ANCHOR_TRANSLATION = str.maketrans(
+    {
+        "А": "A",
+        "В": "B",
+        "Б": "B",
+    }
+)
+
+
+def _normalize_anchor_text(text: str) -> str | None:
+    cleaned = re.sub(r"[^0-9A-Za-z\u0410-\u042f\u0430-\u044f]", "", text or "").upper()
+    if not cleaned:
+        return None
+    cleaned = cleaned.translate(ANCHOR_TRANSLATION)
+    if cleaned in {"1", "2", "3", "5"}:
+        return cleaned
+    if cleaned.startswith("4A"):
+        return "4A"
+    if cleaned.startswith("4B"):
+        return "4B"
+    return None
+
+
+def _box_center(box) -> tuple[float, float] | None:
+    try:
+        xs = [point[0] for point in box]
+        ys = [point[1] for point in box]
+        return (sum(xs) / len(xs), sum(ys) / len(ys))
+    except Exception:
+        return None
+
+
+def _detect_anchors(image_bgr) -> dict[str, tuple[float, float, float]]:
+    anchors: dict[str, tuple[float, float, float]] = {}
+    try:
+        boxes = run_ocr_with_boxes(image_bgr)
+    except Exception as exc:
+        logger.warning("Anchor OCR failed: %s", exc)
+        return anchors
+    for item in boxes:
+        label = _normalize_anchor_text(item.get("text") or "")
+        if not label:
+            continue
+        center = _box_center(item.get("box"))
+        if not center:
+            continue
+        conf = float(item.get("confidence") or 0.0)
+        current = anchors.get(label)
+        if current is None or conf > current[2]:
+            anchors[label] = (center[0], center[1], conf)
+    return anchors
+
+
+def _median(values: list[float]) -> float:
+    if not values:
+        return 0.0
+    values = sorted(values)
+    mid = len(values) // 2
+    if len(values) % 2 == 1:
+        return values[mid]
+    return 0.5 * (values[mid - 1] + values[mid])
+
+
+def _compute_anchor_shift(
+    anchors: dict[str, tuple[float, float, float]], expected: dict[str, tuple[float, float]]
+) -> tuple[float, float, float, int] | None:
+    dxs: list[float] = []
+    dys: list[float] = []
+    pairs: list[tuple[float, float, float, float]] = []
+    for label, (exp_x, exp_y) in expected.items():
+        obs = anchors.get(label)
+        if not obs:
+            continue
+        dx = obs[0] - exp_x
+        dy = obs[1] - exp_y
+        dxs.append(dx)
+        dys.append(dy)
+        pairs.append((exp_x, exp_y, obs[0], obs[1]))
+    if len(dxs) < 2:
+        return None
+    dx = _median(dxs)
+    dy = _median(dys)
+    errors = []
+    for exp_x, exp_y, obs_x, obs_y in pairs:
+        errors.append(abs((obs_x - dx) - exp_x) + abs((obs_y - dy) - exp_y))
+    error = sum(errors) / len(errors) if errors else 0.0
+    return dx, dy, error, len(dxs)
+
+
+def _select_front_template(
+    image_bgr,
+    processed_variants: list,
+) -> tuple[str, dict[str, Roi], tuple[float, float], dict[str, tuple[float, float, float]]]:
+    anchors = _detect_anchors(image_bgr) if _should_use_anchors() else {}
+    best_template = DEFAULT_FRONT_TEMPLATE
+    best_shift = (0.0, 0.0)
+    if anchors:
+        best = None
+        for name, expected in FRONT_ANCHORS.items():
+            shift = _compute_anchor_shift(anchors, expected)
+            if shift is None:
+                continue
+            dx, dy, error, count = shift
+            score = (count, -error)
+            if best is None or score > best[0]:
+                best = (score, name, (dx, dy))
+        if best:
+            _, best_template, best_shift = best
+
+    if not anchors and len(FRONT_ROI_TEMPLATES) > 1:
+        scored = _score_front_templates(processed_variants)
+        if scored is not None:
+            best_template = scored
+
+    rois = FRONT_ROI_TEMPLATES.get(best_template, FRONT_ROI_TEMPLATES[DEFAULT_FRONT_TEMPLATE])
+
+    if best_shift != (0.0, 0.0):
+        shifted: dict[str, Roi] = {}
+        for key, roi in rois.items():
+            x = max(0, int(round(roi.x + best_shift[0])))
+            y = max(0, int(round(roi.y + best_shift[1])))
+            shifted[key] = Roi(roi.name, x, y, roi.w, roi.h)
+        rois = shifted
+
+    return best_template, rois, best_shift, anchors
+
+
+def _should_use_anchors() -> bool:
+    value = getattr(settings, "OCR_USE_ANCHORS", None)
+    if value is None:
+        value = os.environ.get("OCR_USE_ANCHORS")
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() not in {"0", "false", "no", "off"}
+    return bool(value)
+
+
+def _score_front_templates(processed_variants: list) -> str | None:
+    if not processed_variants:
+        return None
+    base_image = processed_variants[0]
+    sample_fields = ("full_name_line", "birth_date", "license_number")
+    best_name = None
+    best_score = -1.0
+    for name, rois in FRONT_ROI_TEMPLATES.items():
+        total = 0.0
+        count = 0
+        for field in sample_fields:
+            roi = rois.get(field)
+            if roi is None:
+                continue
+            x1 = max(0, roi.x)
+            y1 = max(0, roi.y)
+            x2 = min(base_image.shape[1], roi.x + roi.w)
+            y2 = min(base_image.shape[0], roi.y + roi.h)
+            crop = base_image[y1:y2, x1:x2]
+            if crop.size == 0:
+                continue
+            detect = field in DETECT_FIELDS
+            try:
+                texts = run_ocr(crop, detect=detect)
+            except Exception:
+                continue
+            if not texts:
+                continue
+            text, conf = _pick_text_for_field(field, texts)
+            total += _score_text(field, text, conf)
+            count += 1
+        if count == 0:
+            continue
+        avg_score = total / count
+        if avg_score > best_score:
+            best_score = avg_score
+            best_name = name
+    return best_name
+
+
+def _should_use_keypoints() -> bool:
+    value = getattr(settings, "OCR_USE_KEYPOINTS", None)
+    if value is None:
+        value = os.environ.get("OCR_USE_KEYPOINTS")
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() not in {"0", "false", "no", "off"}
+    return bool(value)
+
+
+def _try_keypoint_warp(image_bgr):
+    model_path = getattr(settings, "OCR_KEYPOINT_MODEL_PATH", None) or os.environ.get(
+        "OCR_KEYPOINT_MODEL_PATH"
+    )
+    if not model_path or not _should_use_keypoints():
+        return None
+    try:
+        keypoints = detect_keypoints(image_bgr, model_path=model_path)
+    except Exception as exc:
+        logger.warning("Keypoint detection failed: %s", exc)
+        return None
+    if keypoints is None:
+        return None
+    try:
+        return warp_with_keypoints(image_bgr, CANVAS_SIZE, keypoints)
+    except Exception as exc:
+        logger.warning("Keypoint warp failed: %s", exc)
+        return None
+
+
 def extract(front_bytes: bytes | None, back_bytes: bytes | None):
     request_id = f"ocr_{uuid.uuid4().hex[:10]}"
     warnings: list[str] = []
@@ -333,30 +549,49 @@ def extract(front_bytes: bytes | None, back_bytes: bytes | None):
         if not data:
             if not allow_missing:
                 warnings.append(f"{side.capitalize()} image missing.")
-            return {}, None, ""
+            return {}, None, "", {}
         image = _decode_image(data)
         if image is None:
             warnings.append(f"{side.capitalize()} image could not be decoded.")
-            return {}, None, ""
+            return {}, None, "", {}
         image = _limit_size(image)
         try:
             images.append(store_upload(image, request_id, side, data))
         except Exception as exc:
             warnings.append(f"Failed to store {side} image: {exc}")
             images.append({"role": side, "storage_url": None, "sha256": compute_sha256(data or b"")})
-        warped, used_fallback = detect_and_warp(image, CANVAS_SIZE)
-        if used_fallback:
-            warnings.append(f"{side.capitalize()} contour not detected; used resize fallback.")
+        alignment = "contour"
+        warped = _try_keypoint_warp(image)
+        if warped is not None:
+            alignment = "keypoints"
+        else:
+            warped, used_fallback = detect_and_warp(image, CANVAS_SIZE)
+            if used_fallback:
+                alignment = "resize"
+                warnings.append(f"{side.capitalize()} contour not detected; used resize fallback.")
         processed_variants = preprocess_variants(warped)
-        processed = processed_variants[0]
-        rois = _ocr_rois(processed_variants, rois_def)
-        return rois, processed_variants, _collect_raw_text(rois)
+        meta: dict[str, object] = {"alignment": alignment}
+        if side == "front":
+            template_name, selected_rois, shift, anchors = _select_front_template(
+                warped, processed_variants
+            )
+            rois = _ocr_rois(processed_variants, selected_rois)
+            meta.update(
+                {
+                    "template": template_name,
+                    "anchor_shift": {"dx": round(shift[0], 2), "dy": round(shift[1], 2)},
+                    "anchors": anchors,
+                }
+            )
+        else:
+            rois = _ocr_rois(processed_variants, rois_def)
+        return rois, processed_variants, _collect_raw_text(rois), meta
 
     try:
-        front_rois, front_processed_variants, front_roi_text = _process_side(
-            "front", front_bytes, FRONT_ROIS
+        front_rois, front_processed_variants, front_roi_text, front_meta = _process_side(
+            "front", front_bytes, FRONT_ROI_TEMPLATES[DEFAULT_FRONT_TEMPLATE]
         )
-        back_rois, _, back_roi_text = _process_side(
+        back_rois, _, back_roi_text, back_meta = _process_side(
             "back", back_bytes, BACK_ROIS, allow_missing=bool(front_bytes)
         )
     except RuntimeError as exc:
@@ -411,6 +646,8 @@ def extract(front_bytes: bytes | None, back_bytes: bytes | None):
             "front_raw": front_rois,
             "back_raw": back_rois,
             "raw_text": raw_text,
+            "front_meta": front_meta,
+            "back_meta": back_meta,
         }
 
     return build_response(

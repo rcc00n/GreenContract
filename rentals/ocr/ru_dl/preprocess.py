@@ -40,4 +40,6 @@ def preprocess_variants(image_bgr):
     )
     _, otsu = cv2.threshold(base, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-    return [base, gray, sharpen, adaptive, otsu]
+    contrast = cv2.convertScaleAbs(base, alpha=1.35, beta=10)
+
+    return [base, gray, sharpen, adaptive, otsu, contrast]

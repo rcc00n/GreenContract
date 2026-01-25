@@ -110,6 +110,10 @@ MEDIA_ROOT = Path(os.environ.get("DJANGO_MEDIA_ROOT", str(BASE_DIR / "media")))
 OCR_STORE_UPLOADS = os.environ.get("OCR_STORE_UPLOADS", "true").lower() == "true"
 OCR_UPLOAD_TTL_HOURS = int(os.environ.get("OCR_UPLOAD_TTL_HOURS", "72"))
 OCR_DEBUG = os.environ.get("OCR_DEBUG", "false").lower() == "true"
+OCR_USE_KEYPOINTS = os.environ.get("OCR_USE_KEYPOINTS", "true").lower() == "true"
+OCR_KEYPOINT_MODEL_PATH = os.environ.get("OCR_KEYPOINT_MODEL_PATH")
+OCR_USE_ANCHORS = os.environ.get("OCR_USE_ANCHORS", "true").lower() == "true"
+OCR_NAME_DICTIONARY_PATH = os.environ.get("OCR_NAME_DICTIONARY_PATH")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

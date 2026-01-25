@@ -18,6 +18,7 @@ class OCRParseTests(SimpleTestCase):
     def test_license_number_normalization(self):
         self.assertEqual(normalize_license_number("12 34 567890"), "12 34 567890")
         self.assertEqual(normalize_license_number("1234567890"), "12 34 567890")
+        self.assertIsNone(normalize_license_number("123456789"))
         self.assertIsNone(normalize_license_number("ABCD"))
 
     def test_category_parsing(self):
@@ -67,3 +68,10 @@ class OCRParseTests(SimpleTestCase):
         }
         parsed = parse_front(rois)
         self.assertEqual(parsed["license_issued_by"][0], "ГИБДД 8210")
+
+    def test_driving_since_invalid_against_valid_until(self):
+        rois = {
+            "driving_since": {"text": "16.03.2023", "confidence": 0.9},
+        }
+        parsed = parse_front(rois, context_text="4b 15.03.2023")
+        self.assertIsNone(parsed["driving_since"][0])

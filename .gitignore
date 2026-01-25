@@ -1,0 +1,22 @@
+# Local env
+.env
+
+# Media/uploads (generated)
+media/
+uploads/
+ocr_uploads/
+
+# OCR sample photos / screenshots
+*.jpg
+*.jpeg
+*.jfif
+*.png
+*.gif
+*.bmp
+*.tif
+*.tiff
+*.webp
+*.heic
+
+# Windows alternate data streams
+*:Zone.Identifier

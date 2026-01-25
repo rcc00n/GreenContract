@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import threading
 
 try:
@@ -29,7 +30,18 @@ def get_ocr():
     if _OCR_INSTANCE is None:
         with _OCR_LOCK:
             if _OCR_INSTANCE is None:
-                _OCR_INSTANCE = PaddleOCR(use_angle_cls=True, lang="ru", show_log=False, use_gpu=False)
+                kwargs = {
+                    "use_angle_cls": True,
+                    "lang": "ru",
+                    "show_log": False,
+                }
+                try:
+                    signature = inspect.signature(PaddleOCR.__init__)
+                    allowed = set(signature.parameters.keys())
+                    kwargs = {key: value for key, value in kwargs.items() if key in allowed}
+                except (TypeError, ValueError):
+                    pass
+                _OCR_INSTANCE = PaddleOCR(**kwargs)
     return _OCR_INSTANCE
 
 

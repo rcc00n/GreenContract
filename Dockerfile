@@ -1,7 +1,11 @@
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    FLAGS_use_mkldnn=0 \
+    FLAGS_enable_onednn=0 \
+    FLAGS_enable_pir_in_executor=0 \
+    FLAGS_enable_pir_api=0
 
 WORKDIR /app
 

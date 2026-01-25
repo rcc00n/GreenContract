@@ -54,6 +54,23 @@ def _ensure_color(image):
 
 
 def _extract_texts(obj, acc: list[tuple[str, float]]):
+    if isinstance(obj, dict):
+        text_key_pairs = (
+            ("text", "score"),
+            ("text", "confidence"),
+            ("rec_text", "rec_score"),
+            ("rec_text", "score"),
+        )
+        for text_key, score_key in text_key_pairs:
+            if text_key in obj and score_key in obj and isinstance(obj[text_key], str):
+                acc.append((obj[text_key], float(obj.get(score_key, 0.0) or 0.0)))
+                return
+        if "text" in obj and isinstance(obj["text"], str):
+            acc.append((obj["text"], float(obj.get("score", 0.0) or obj.get("confidence", 0.0) or 0.0)))
+            return
+        for value in obj.values():
+            _extract_texts(value, acc)
+        return
     if isinstance(obj, (list, tuple)):
         if len(obj) == 2 and isinstance(obj[0], str) and isinstance(obj[1], (int, float)):
             acc.append((obj[0], float(obj[1])))
@@ -73,10 +90,17 @@ def _extract_texts(obj, acc: list[tuple[str, float]]):
 def run_ocr(image, detect: bool = False) -> list[tuple[str, float]]:
     ocr = get_ocr()
     image = _ensure_color(image)
-    if detect:
-        result = ocr.ocr(image, cls=True)
-    else:
-        result = ocr.ocr(image, det=False, rec=True, cls=True)
+    kwargs = {"cls": True} if detect else {"det": False, "rec": True, "cls": True}
+    try:
+        signature = inspect.signature(ocr.ocr)
+        allowed = set(signature.parameters.keys())
+        kwargs = {key: value for key, value in kwargs.items() if key in allowed}
+    except (TypeError, ValueError):
+        pass
+    try:
+        result = ocr.ocr(image, **kwargs) if kwargs else ocr.ocr(image)
+    except TypeError:
+        result = ocr.ocr(image)
     extracted: list[tuple[str, float]] = []
     _extract_texts(result, extracted)
     return extracted

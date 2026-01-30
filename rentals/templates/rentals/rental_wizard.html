@@ -1504,14 +1504,23 @@
           }
         }
 
-        function normalizeRegionCode(value) {
-          const match = String(value || "").match(/\d+/);
-          return match ? match[0] : "";
+        function normalizeRegionCode(car) {
+          if (!car) return "";
+          const explicit = String(car.region_code || "").trim();
+          if (/^0*26$/.test(explicit)) return "26";
+          if (/^0*82$/.test(explicit)) return "82";
+          const explicitHas26 = /\b26\b/.test(explicit);
+          const explicitHas82 = /\b82\b/.test(explicit);
+          if (explicitHas26 && !explicitHas82) return "26";
+          if (explicitHas82 && !explicitHas26) return "82";
+          const plate = String(car.plate_number || "").trim();
+          const plateMatch = plate.match(/(\d{2,3})\s*$/);
+          return plateMatch ? plateMatch[1] : "";
         }
 
         function applyRegionDefaults(car) {
           if (!car) return;
-          const regionCode = normalizeRegionCode(car.region_code);
+          const regionCode = normalizeRegionCode(car);
           const targets = regionAutoSelections[regionCode];
           if (!targets || !targets.length) return;
           targets.forEach((label) => {

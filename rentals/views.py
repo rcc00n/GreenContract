@@ -233,6 +233,7 @@ def _serialize_car_pricing(car: Car):
         "id": car.id,
         "label": str(car),
         "plate_number": car.plate_number,
+        "region_code": car.region_code or "",
         "daily_rate": _num(car.daily_rate),
         "rate_1_4_high": _num(car.rate_1_4_high),
         "rate_5_14_high": _num(car.rate_5_14_high),
@@ -1281,22 +1282,26 @@ def customer_search(request):
     if not term:
         return JsonResponse({"results": []})
 
-    date_value = _parse_date(term)
-    condition = (
-        Q(full_name__icontains=term)
-        | Q(phone__icontains=term)
-        | Q(email__icontains=term)
-        | Q(license_number__icontains=term)
-        | Q(license_issued_by__icontains=term)
-        | Q(registration_address__icontains=term)
-        | Q(passport_number__icontains=term)
-        | Q(passport_series__icontains=term)
-        | Q(tags__name__icontains=term)
-    )
-    if date_value:
-        condition |= Q(birth_date=date_value) | Q(driving_since=date_value) | Q(passport_issue_date=date_value)
+    terms = [piece for piece in re.split(r"\s+", term) if piece]
+    matches = Customer.objects.all()
+    for piece in terms:
+        date_value = _parse_date(piece)
+        condition = (
+            Q(full_name__icontains=piece)
+            | Q(phone__icontains=piece)
+            | Q(email__icontains=piece)
+            | Q(license_number__icontains=piece)
+            | Q(license_issued_by__icontains=piece)
+            | Q(registration_address__icontains=piece)
+            | Q(passport_number__icontains=piece)
+            | Q(passport_series__icontains=piece)
+            | Q(tags__name__icontains=piece)
+        )
+        if date_value:
+            condition |= Q(birth_date=date_value) | Q(driving_since=date_value) | Q(passport_issue_date=date_value)
+        matches = matches.filter(condition)
 
-    matches = Customer.objects.filter(condition).order_by("full_name").distinct()[:limit]
+    matches = matches.order_by("full_name").distinct()[:limit]
 
     results = []
     for customer in matches:

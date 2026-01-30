@@ -1404,6 +1404,7 @@
         const pricingConfig = window.JSON.parse((document.getElementById("pricing-config-data") || { textContent: "{}" }).textContent);
         const carSearchInput = document.getElementById("car-search");
         const carSearchResults = document.getElementById("car-search-results");
+        const regionCheckboxes = Array.from(document.querySelectorAll('input[name="operation_regions"]'));
         let selectedCustomerName = (customerSearchInput?.value || "").trim();
         let currentCar = null;
 
@@ -1430,6 +1431,18 @@
         carPricingData.forEach((car) => {
           carIndex.set(String(car.id), car);
         });
+        const regionCheckboxByValue = new Map();
+        regionCheckboxes.forEach((checkbox) => {
+          regionCheckboxByValue.set((checkbox.value || "").trim(), checkbox);
+        });
+        const regionAutoSelections = {
+          "82": ["Республика Крым и Севастополь"],
+          "26": [
+            "Кабардино-Балкарская Республика",
+            "Карачаево-Черкесская Республика",
+            "Ставропольский край",
+          ],
+        };
 
         function clearCarResults() {
           if (!carSearchResults) return;
@@ -1491,6 +1504,24 @@
           }
         }
 
+        function normalizeRegionCode(value) {
+          const match = String(value || "").match(/\d+/);
+          return match ? match[0] : "";
+        }
+
+        function applyRegionDefaults(car) {
+          if (!car) return;
+          const regionCode = normalizeRegionCode(car.region_code);
+          const targets = regionAutoSelections[regionCode];
+          if (!targets || !targets.length) return;
+          targets.forEach((label) => {
+            const checkbox = regionCheckboxByValue.get(label);
+            if (checkbox) {
+              checkbox.checked = true;
+            }
+          });
+        }
+
         if (carSearchInput && carSearchResults && carSelect) {
           const initialLabel = carSearchInput.dataset.initialLabel || "";
           if (initialLabel) {
@@ -1525,6 +1556,12 @@
           });
 
           carSelect.addEventListener("change", updateCarSearchFromSelect);
+        }
+        if (carSelect) {
+          carSelect.addEventListener("change", () => {
+            const car = carIndex.get(String(carSelect.value));
+            applyRegionDefaults(car);
+          });
         }
 
         function roundMoney(value) {

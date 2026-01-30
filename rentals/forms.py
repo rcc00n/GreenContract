@@ -760,6 +760,14 @@ class AdminUserCreationForm(UserCreationForm):
         self.fields["password2"].help_text = "Повторите пароль для проверки."
         self.order_fields(["username", "email", "password1", "password2", "make_superuser"])
 
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.is_staff = True
+        user.is_superuser = bool(self.cleaned_data.get("make_superuser"))
+        if commit:
+            user.save()
+        return user
+
 
 class StyledSetPasswordForm(SetPasswordForm):
     def __init__(self, *args, **kwargs):
@@ -790,11 +798,3 @@ class StyledPasswordChangeForm(PasswordChangeForm):
             if isinstance(widget, forms.CheckboxInput):
                 base_class = "form-check-input"
             widget.attrs["class"] = f"{base_class} {css}".strip()
-
-    def save(self, commit=True):
-        user = super().save(commit=False)
-        user.is_staff = True
-        user.is_superuser = bool(self.cleaned_data.get("make_superuser"))
-        if commit:
-            user.save()
-        return user

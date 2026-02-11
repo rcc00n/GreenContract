@@ -60,6 +60,7 @@ PHONE_MAX_LEN = Customer._meta.get_field("phone").max_length
 LICENSE_MAX_LEN = Customer._meta.get_field("license_number").max_length
 NAME_MAX_LEN = Customer._meta.get_field("full_name").max_length
 EMAIL_MAX_LEN = Customer._meta.get_field("email").max_length
+TAG_MAX_LEN = CustomerTag._meta.get_field("name").max_length
 IMPORT_BATCH_SIZE = max(1, int(os.environ.get("IMPORT_BULK_BATCH_SIZE", "5000")))
 
 logger = logging.getLogger(__name__)
@@ -175,6 +176,14 @@ def _clean_phone_value(value):
     return _limit_length(raw, PHONE_MAX_LEN)
 
 
+def _clean_tag_name(value: str | None) -> str:
+    """Normalize tag names and enforce DB length constraints."""
+    text = (value or "").strip()
+    if not text:
+        return ""
+    return text[:TAG_MAX_LEN]
+
+
 def _split_tags(raw: str | None) -> list[str]:
     """Split a raw tag string (comma/semicolon/pipe) into unique tag names."""
     if not raw:
@@ -182,7 +191,7 @@ def _split_tags(raw: str | None) -> list[str]:
 
     tags = []
     for piece in re.split(r"[;,#/|\n\r]+", str(raw)):
-        normalized = piece.strip()
+        normalized = _clean_tag_name(piece)
         if normalized and normalized not in tags:
             tags.append(normalized)
     return tags
@@ -194,11 +203,22 @@ def _sync_customer_tags(customers_by_license: dict[str, Customer], tags_by_licen
 
     tags_by_license may contain None to skip updates for that row.
     """
-    tag_names = set()
-    for tags in tags_by_license.values():
-        if tags:
-            for tag in tags:
-                tag_names.add(tag)
+    cleaned_by_license: dict[str, list[str]] = {}
+    tag_names: set[str] = set()
+
+    for license_number, tags in tags_by_license.items():
+        if not tags:
+            continue
+
+        cleaned = []
+        for tag in tags:
+            name = _clean_tag_name(tag)
+            if name and name not in cleaned:
+                cleaned.append(name)
+                tag_names.add(name)
+
+        if cleaned:
+            cleaned_by_license[license_number] = cleaned
 
     if not tag_names:
         return
@@ -213,7 +233,7 @@ def _sync_customer_tags(customers_by_license: dict[str, Customer], tags_by_licen
             {tag.name.lower(): tag for tag in CustomerTag.objects.filter(name__in=tag_names)}
         )
 
-    for license_number, tags in tags_by_license.items():
+    for license_number, tags in cleaned_by_license.items():
         if not tags:
             continue
         customer = customers_by_license.get(license_number)

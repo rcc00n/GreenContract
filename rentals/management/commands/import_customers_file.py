@@ -114,11 +114,13 @@ class Command(BaseCommand):
                     )
                     updated_count = len(to_update)
 
-            if tags_by_license:
-                views._sync_customer_tags(  # noqa: SLF001 - reuse importer
-                    {license_number: existing.get(license_number) for license_number in licenses},
-                    tags_by_license,
-                )
+        # Apply tag updates even when field values did not change,
+        # so re-importing the same file can still fix tag sync issues.
+        if tags_by_license:
+            views._sync_customer_tags(  # noqa: SLF001 - reuse importer
+                {license_number: existing.get(license_number) for license_number in licenses},
+                tags_by_license,
+            )
 
         imported = created_count + updated_count
 
@@ -127,4 +129,3 @@ class Command(BaseCommand):
         self.stdout.write(f"Updated: {updated_count}")
         self.stdout.write(f"Skipped empty rows: {skipped_empty}")
         self.stdout.write(f"Merged duplicate rows (by license): {duplicate_rows}")
-

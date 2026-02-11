@@ -1802,11 +1802,13 @@ def import_customers_csv(request):
                         )
                         updated_count = len(to_update)
 
-                if tags_by_license:
-                    _sync_customer_tags(
-                        {license_number: existing.get(license_number) for license_number in licenses},
-                        tags_by_license,
-                    )
+            # Apply tag updates even when field values did not change,
+            # so re-importing the same file can still fix tag sync issues.
+            if tags_by_license:
+                _sync_customer_tags(
+                    {license_number: existing.get(license_number) for license_number in licenses},
+                    tags_by_license,
+                )
 
             imported = created_count + updated_count
 

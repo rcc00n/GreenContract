@@ -37,6 +37,10 @@ RSYNC_EXCLUDES=(
   --exclude ".env"
   --exclude "__pycache__"
   --exclude "*.pyc"
+  # Data exports/imports must never be synced to prod via code deploys.
+  --exclude "*.xls"
+  --exclude "*.xlsx"
+  --exclude "*:Zone.Identifier"
   # Generated/static/data dirs should never be overwritten (or deleted) by deploys.
   --exclude "staticfiles"
   --exclude "media"

@@ -44,7 +44,6 @@ from .forms import (
     StyledSetPasswordForm,
 )
 from .models import BusinessSettings, Car, ContractTemplate, Customer, CustomerTag, Rental
-from .ocr import extract_ru_dl
 from .services.contract_renderer import placeholder_guide, render_docx, render_html_template, render_pdf
 from .services.pricing import calculate_rental_pricing, pricing_config
 from .services.stats import (
@@ -69,6 +68,10 @@ logger = logging.getLogger(__name__)
 @login_required
 @require_POST
 def ocr_driver_license(request):
+    # Lazy import: OCR stack (paddle/opencv) is heavy and not needed for most
+    # management commands (imports, maintenance scripts, etc.).
+    from .ocr import extract_ru_dl
+
     front_file = request.FILES.get("front_image")
     back_file = request.FILES.get("back_image")
 
@@ -233,14 +236,42 @@ def _sync_customer_tags(customers_by_license: dict[str, Customer], tags_by_licen
             {tag.name.lower(): tag for tag in CustomerTag.objects.filter(name__in=tag_names)}
         )
 
+    # Apply tag updates in bulk instead of per-customer `.set()` calls.
+    # This avoids tens of thousands of individual queries for large imports.
+    targets: dict[int, list[int]] = {}
     for license_number, tags in cleaned_by_license.items():
-        if not tags:
-            continue
         customer = customers_by_license.get(license_number)
         if not customer:
             continue
-        tag_objs = [existing_tags.get(tag.lower()) for tag in tags]
-        customer.tags.set([tag for tag in tag_objs if tag])
+        tag_ids = []
+        for tag_name in tags:
+            tag = existing_tags.get(tag_name.lower())
+            if tag:
+                tag_ids.append(tag.id)
+        if tag_ids:
+            targets[customer.id] = tag_ids
+
+    if not targets:
+        return
+
+    through = Customer.tags.through
+    m2m_field = Customer._meta.get_field("tags")
+    src_attname = through._meta.get_field(m2m_field.m2m_field_name()).attname
+    dst_attname = through._meta.get_field(m2m_field.m2m_reverse_field_name()).attname
+
+    with transaction.atomic():
+        through.objects.filter(**{f"{src_attname}__in": list(targets.keys())}).delete()
+
+        batch: list = []
+        for customer_id, tag_ids in targets.items():
+            for tag_id in tag_ids:
+                batch.append(through(**{src_attname: customer_id, dst_attname: tag_id}))
+                if len(batch) >= IMPORT_BATCH_SIZE:
+                    through.objects.bulk_create(batch, batch_size=IMPORT_BATCH_SIZE)
+                    batch.clear()
+
+        if batch:
+            through.objects.bulk_create(batch, batch_size=IMPORT_BATCH_SIZE)
 
 
 def _serialize_car_pricing(car: Car):

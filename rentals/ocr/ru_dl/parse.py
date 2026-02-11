@@ -5,7 +5,7 @@ from __future__ import annotations
 import difflib
 import os
 import re
-from datetime import datetime
+from datetime import date, datetime
 
 DATE_PATTERN = re.compile(r"(\d{1,2})[.\-/ ](\d{1,2})[.\-/ ](\d{2,4})")
 
@@ -14,6 +14,7 @@ CATEGORY_PATTERN = re.compile(r"\b(A1|B1|C1|D1|BE|CE|DE|A|B|C|D|M|TM|TB)\b", re.
 REQUIRED_FIELDS = {"full_name", "birth_date", "license_number"}
 
 CYRILLIC_RE = re.compile(r"[\u0410-\u042f\u0401\u0430-\u044f\u0451]")
+LATIN_RE = re.compile(r"[A-Za-z]")
 LABEL_PREFIX_RE = re.compile(r"^\s*\d+[a-zA-Z]?[.)]?\s*")
 DRIVING_MARKERS = (
     "\u0421\u0422\u0410\u0416",  # СТАЖ
@@ -38,7 +39,18 @@ NAME_CLEAN_RE = re.compile(r"[^A-Za-z\u0410-\u044f\u0401\u0451\s-]")
 
 ISSUER_CLEAN_RE = re.compile(r"[^0-9\u0410-\u044f\u0401\u0451\s-]")
 
+RU_MONTH_RE = re.compile(
+    r"\b(январ|янв|феврал|фев|март|мар|апрел|апр|ма[йя]|июн|июл|август|авг|"
+    r"сентябр|сент|сен|октябр|окт|ноябр|ноя|декабр|дек)\w*\b",
+    re.IGNORECASE,
+)
+
 _NAME_DICTIONARY: dict[str, int] | None = None
+
+try:  # pragma: no cover - optional dependency
+    from rutimeparser import parse as _ru_time_parse
+except Exception:  # pragma: no cover - optional dependency
+    _ru_time_parse = None
 
 MARKER_TRANSLATION = str.maketrans(
     {
@@ -107,10 +119,51 @@ def _normalize_digit_ocr(text: str | None) -> str:
     return (text or "").translate(DIGIT_TRANSLATION)
 
 
+def _has_enough_cyrillic(text: str) -> bool:
+    letters = re.findall(r"[A-Za-z\u0410-\u044f\u0401\u0451]", text or "")
+    if not letters:
+        return False
+    cyrillic = [ch for ch in letters if CYRILLIC_RE.search(ch)]
+    if not cyrillic:
+        return False
+    latin = [ch for ch in letters if LATIN_RE.search(ch)]
+    if latin and (len(cyrillic) / (len(cyrillic) + len(latin)) < 0.5):
+        return False
+    return True
+
+
+def _looks_like_explicit_date(text: str) -> bool:
+    if not text:
+        return False
+    if RU_MONTH_RE.search(text):
+        has_day = re.search(r"\b\d{1,2}\b", text)
+        has_year = re.search(r"\b\d{4}\b", text) or re.search(r"\b\d{2}\b", text)
+        return bool(has_day and has_year)
+    return False
+
+
+def _parse_russian_text_date(text: str | None) -> str | None:
+    if not text or _ru_time_parse is None:
+        return None
+    candidate = normalize_whitespace(text).translate(LATIN_TO_CYR)
+    if not _looks_like_explicit_date(candidate):
+        return None
+    try:
+        parsed = _ru_time_parse(candidate, allowed_results=(date,))
+    except Exception:
+        return None
+    if isinstance(parsed, datetime):
+        parsed = parsed.date()
+    if isinstance(parsed, date):
+        return parsed.strftime("%Y-%m-%d")
+    return None
+
+
 def normalize_date(text: str | None) -> str | None:
     if not text:
         return None
-    text = _normalize_digit_ocr(text)
+    raw_text = text
+    text = _normalize_digit_ocr(raw_text)
     text = text.replace(",", ".")
     iso_match = re.search(r"(\d{4})-(\d{2})-(\d{2})", text)
     if iso_match:
@@ -122,7 +175,7 @@ def normalize_date(text: str | None) -> str | None:
         return parsed.strftime("%Y-%m-%d")
     match = DATE_PATTERN.search(text)
     if not match:
-        return None
+        return _parse_russian_text_date(raw_text)
     day, month, year = match.groups()
     day = int(day)
     month = int(month)
@@ -132,7 +185,7 @@ def normalize_date(text: str | None) -> str | None:
     try:
         parsed = datetime(year, month, day).date()
     except ValueError:
-        return None
+        return _parse_russian_text_date(raw_text)
     return parsed.strftime("%Y-%m-%d")
 
 
@@ -185,12 +238,58 @@ def _clean_name_line(text: str) -> str:
     cleaned = _strip_label_prefix(text)
     cleaned = re.sub(r"[•·]", " ", cleaned)
     cleaned = re.sub(r"[^A-Za-z\u0410-\u044f\u0401\u0451\s-]", " ", cleaned)
-    if not CYRILLIC_RE.search(cleaned):
+    if not _has_enough_cyrillic(cleaned):
         return ""
     cleaned = cleaned.translate(LATIN_TO_CYR)
     cleaned = re.sub(r"[A-Za-z]", " ", cleaned)
     cleaned = normalize_whitespace(cleaned)
     return cleaned
+
+
+def _title_case_ru(text: str) -> str:
+    text = normalize_whitespace(text)
+    if not text:
+        return ""
+    tokens: list[str] = []
+    for token in text.split():
+        parts = []
+        for part in token.split("-"):
+            if not part:
+                continue
+            parts.append(part[:1].upper() + part[1:].lower())
+        if parts:
+            tokens.append("-".join(parts))
+    return " ".join(tokens)
+
+
+def _normalize_name_line(text: str) -> str:
+    cleaned = _clean_name_line(text)
+    if not cleaned:
+        return ""
+    cleaned = _apply_name_dictionary(cleaned)
+    return _title_case_ru(cleaned)
+
+
+def _strip_latin_words(text: str | None) -> str:
+    if not text:
+        return ""
+    parts: list[str] = []
+    for chunk in re.split(r"(\s+)", text):
+        if not chunk.strip():
+            parts.append(chunk)
+            continue
+        letters = re.findall(r"[A-Za-z\u0410-\u044f\u0401\u0451]", chunk)
+        if letters:
+            cyrillic = [ch for ch in letters if CYRILLIC_RE.search(ch)]
+            latin = [ch for ch in letters if LATIN_RE.search(ch)]
+            if not cyrillic:
+                continue
+            if latin and (len(cyrillic) / (len(cyrillic) + len(latin)) < 0.5):
+                continue
+            chunk = chunk.translate(LATIN_TO_CYR)
+            chunk = re.sub(r"[A-Za-z]", "", chunk)
+        parts.append(chunk)
+    return normalize_whitespace("".join(parts))
 
 
 def _load_name_dictionary() -> dict[str, int]:
@@ -301,10 +400,10 @@ def _name_quality(text: str) -> float:
 
 
 def parse_front(rois: dict, context_text: str | None = None) -> dict[str, tuple[object, float]]:
-    surname = _apply_name_dictionary(_clean_name_line(_roi_text(rois, "surname")))
-    name = _apply_name_dictionary(_clean_name_line(_roi_text(rois, "name")))
-    patronymic = _apply_name_dictionary(_clean_name_line(_roi_text(rois, "patronymic")))
-    full_name_line = _apply_name_dictionary(_clean_name_line(_roi_text(rois, "full_name_line")))
+    surname = _normalize_name_line(_roi_text(rois, "surname"))
+    name = _normalize_name_line(_roi_text(rois, "name"))
+    patronymic = _normalize_name_line(_roi_text(rois, "patronymic"))
+    full_name_line = _normalize_name_line(_roi_text(rois, "full_name_line"))
 
     if re.search(r"\d", patronymic):
         patronymic = ""
@@ -320,6 +419,8 @@ def parse_front(rois: dict, context_text: str | None = None) -> dict[str, tuple[
             _roi_conf(rois, "patronymic"),
         ])
     if full_name_line:
+        if _name_quality(full_name_line) < 0.4:
+            full_name_line = ""
         line_conf = _roi_conf(rois, "full_name_line")
         if not full_name:
             full_name = full_name_line
@@ -338,6 +439,8 @@ def parse_front(rois: dict, context_text: str | None = None) -> dict[str, tuple[
             elif line_quality > parts_quality + 0.1:
                 full_name = full_name_line
                 name_conf = line_conf
+    if full_name:
+        full_name = _title_case_ru(full_name)
 
     birth_date_raw = _strip_label_prefix(_roi_text(rois, "birth_date"))
     birth_date = normalize_date(birth_date_raw)
@@ -382,10 +485,11 @@ def parse_back(rois: dict) -> dict[str, tuple[object, float]]:
     categories = parse_categories(categories_text)
     categories_conf = _roi_conf(rois, "categories") or _roi_conf(rois, "raw_text")
 
-    special_marks = _roi_text(rois, "special_marks")
+    special_marks = _strip_latin_words(_roi_text(rois, "special_marks"))
+    special_marks_conf = _roi_conf(rois, "special_marks")
     if not special_marks:
         special_marks = None
-    special_marks_conf = _roi_conf(rois, "special_marks")
+        special_marks_conf = 0.0
 
     return {
         "categories": (categories, categories_conf),
@@ -402,7 +506,7 @@ def parse_front_from_text(raw_text: str | None, base_conf: float | None = None) 
 
     def _is_name_line(line: str, upper_line: str) -> bool:
         normalized = _clean_name_line(line)
-        if not CYRILLIC_RE.search(normalized):
+        if not normalized:
             return False
         if re.search(r"\d", line):
             return False
@@ -414,7 +518,7 @@ def parse_front_from_text(raw_text: str | None, base_conf: float | None = None) 
     for line, upper_line in zip(lines, upper_lines):
         if not _is_name_line(line, upper_line):
             continue
-        cleaned = _clean_name_line(line)
+        cleaned = _normalize_name_line(line)
         if cleaned and cleaned not in name_candidates:
             name_candidates.append(cleaned)
 
@@ -424,7 +528,7 @@ def parse_front_from_text(raw_text: str | None, base_conf: float | None = None) 
     elif name_candidates:
         full_name = name_candidates[0]
     if full_name:
-        full_name = _apply_name_dictionary(full_name)
+        full_name = _title_case_ru(full_name)
 
     dates = []
     for line in lines:

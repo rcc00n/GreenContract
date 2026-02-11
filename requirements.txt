@@ -9,6 +9,7 @@ whitenoise
 xlrd<2
 openpyxl
 num2words
+rutimeparser
 opencv-python
 numpy
 paddleocr<3.0

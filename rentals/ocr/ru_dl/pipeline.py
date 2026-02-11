@@ -17,6 +17,7 @@ from .ocr_engine import run_ocr, run_ocr_with_boxes
 from .parse import (
     REQUIRED_FIELDS,
     _name_quality,
+    _strip_latin_words,
     determine_status,
     normalize_date,
     parse_back,
@@ -645,7 +646,7 @@ def extract(front_bytes: bytes | None, back_bytes: bytes | None):
         debug = {
             "front_raw": front_rois,
             "back_raw": back_rois,
-            "raw_text": raw_text,
+            "raw_text": _strip_latin_words(raw_text),
             "front_meta": front_meta,
             "back_meta": back_meta,
         }

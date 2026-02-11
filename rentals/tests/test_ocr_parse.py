@@ -14,6 +14,11 @@ class OCRParseTests(SimpleTestCase):
         self.assertEqual(normalize_date("12.05.1990"), "1990-05-12")
         self.assertEqual(normalize_date("01/02/05"), "2005-02-01")
         self.assertIsNone(normalize_date("32.13.2020"))
+        from rentals.ocr.ru_dl import parse as ru_parse
+
+        if ru_parse._ru_time_parse is None:
+            self.skipTest("rutimeparser not installed")
+        self.assertEqual(normalize_date("15 октября 2014"), "2014-10-15")
 
     def test_license_number_normalization(self):
         self.assertEqual(normalize_license_number("12 34 567890"), "12 34 567890")
@@ -54,7 +59,7 @@ class OCRParseTests(SimpleTestCase):
             "full_name_line": {"text": "ГАЦКО АНДРЕЙ АНАТОЛЬЕВИЧ", "confidence": 0.88},
         }
         parsed = parse_front(rois)
-        self.assertEqual(parsed["full_name"][0], "ГАЦКО АНДРЕЙ АНАТОЛЬЕВИЧ")
+        self.assertEqual(parsed["full_name"][0], "Гацко Андрей Анатольевич")
 
     def test_issuer_ignores_latin_text(self):
         rois = {

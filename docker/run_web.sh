@@ -9,6 +9,9 @@ LOG_LEVEL="${GUNICORN_LOG_LEVEL:-info}"
 # Apply database migrations automatically on startup so schema stays in sync.
 python manage.py migrate --noinput
 
+# Collect static files for production reverse proxies (Caddy/Nginx).
+python manage.py collectstatic --noinput
+
 exec gunicorn car_rental.wsgi:application \
   --bind "0.0.0.0:${PORT}" \
   --timeout "${TIMEOUT}" \

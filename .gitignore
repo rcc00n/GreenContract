@@ -22,5 +22,9 @@ ocr_uploads/
 *.webp
 *.heic
 
+# Data exports/imports (avoid committing customer data)
+*.xls
+*.xlsx
+
 # Windows alternate data streams
 *:Zone.Identifier

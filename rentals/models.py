@@ -325,6 +325,19 @@ class Customer(models.Model):
     def __str__(self):
         return self.full_name
 
+    def _split_full_name(self) -> list[str]:
+        return [part for part in (self.full_name or "").strip().split() if part]
+
+    @property
+    def surname(self) -> str:
+        parts = self._split_full_name()
+        return parts[0] if parts else (self.full_name or "")
+
+    @property
+    def given_names(self) -> str:
+        parts = self._split_full_name()
+        return " ".join(parts[1:]) if len(parts) > 1 else ""
+
 
 class CustomerTag(models.Model):
     name = models.CharField("Название тега", max_length=50, unique=True)

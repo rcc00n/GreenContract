@@ -474,6 +474,10 @@ def _normalize_car_row(row):
             "Объём бака",
             "объем бака",
             "объём бака",
+            "Объем бака (л)",
+            "Объём бака (л)",
+            "объем бака (л)",
+            "объём бака (л)",
             "Объем бака, л",
             "Объём бака, л",
         ],
@@ -484,8 +488,14 @@ def _normalize_car_row(row):
             "fuel_tank_cost_rub",
             "Объем бака(руб.)",
             "Объём бака(руб.)",
+            "Объем бака (руб.)",
+            "Объём бака (руб.)",
+            "объем бака (руб.)",
+            "объём бака (руб.)",
             "Объем бака (руб)",
             "Объём бака (руб)",
+            "объем бака (руб)",
+            "объём бака (руб)",
             "Стоимость полного бака, ₽",
         ],
     )
@@ -536,11 +546,43 @@ def _normalize_car_row(row):
     rate_15_low = _parse_decimal(rate_15_low) if rate_15_low not in (None, "") else None
 
     def _header_candidates(field_name: str, label: str) -> list[str]:
-        candidates = [field_name, label]
-        if isinstance(label, str):
-            normalized = label.replace("ё", "е").replace("Ё", "Е")
-            if normalized not in candidates:
-                candidates.append(normalized)
+        # Support common header variants from different templates:
+        # - case differences ("Гос. Номера" vs "Гос. номера")
+        # - optional prefix ("Стоимость при утере ...")
+        candidates: list[str] = []
+
+        def _add(value: str | None):
+            if not value:
+                return
+            if value not in candidates:
+                candidates.append(value)
+
+        _add(field_name)
+        _add(label)
+
+        if not isinstance(label, str):
+            return candidates
+
+        normalized = label.replace("ё", "е").replace("Ё", "Е")
+        _add(normalized)
+
+        # A few spreadsheets title-case words after dots/abbreviations.
+        _add(label.title())
+        if normalized != label:
+            _add(normalized.title())
+
+        for prefix in (
+            "Стоимость при утере ",
+            "стоимость при утере ",
+            "Стоимости при утере ",
+            "стоимости при утере ",
+        ):
+            _add(prefix + label)
+            _add(prefix + normalized)
+            _add(prefix + label.title())
+            if normalized != label:
+                _add(prefix + normalized.title())
+
         return candidates
 
     loss_fee_values = {}

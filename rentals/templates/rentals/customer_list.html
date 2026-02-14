@@ -148,8 +148,8 @@
               <td class="text-muted small">{{ forloop.counter }}</td>
             {% endif %}
             <td>
-              <div class="fw-semibold">{{ customer.full_name }}</div>
-              {% if customer.birth_date %}<div class="text-muted small">Дата рождения: {{ customer.birth_date|date:"d-m-Y" }}</div>{% endif %}
+              <div class="fw-semibold">{{ customer.surname }}</div>
+              {% if customer.given_names %}<div class="text-muted small">{{ customer.given_names }}</div>{% endif %}
               {% if customer.discount_percent is not None %}
                 <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle mt-1">
                   Скидка {{ customer.discount_percent|floatformat:"-2" }}%
@@ -310,6 +310,7 @@
 
   <script>
     (() => {
+      const focusStorageKey = "customerList:restoreSearchFocus";
       const form = document.getElementById("customerFilterForm");
       const searchInput = document.getElementById("customerSearchInput");
       const tagInputs = form ? Array.from(form.querySelectorAll("input[name='tag']")) : [];
@@ -326,6 +327,48 @@
         if (!form) return;
         form.requestSubmit ? form.requestSubmit() : form.submit();
       };
+
+      const rememberSearchFocus = () => {
+        if (!form || !searchInput) return;
+        if (document.activeElement !== searchInput) return;
+        try {
+          sessionStorage.setItem(
+            focusStorageKey,
+            JSON.stringify({
+              start: typeof searchInput.selectionStart === "number" ? searchInput.selectionStart : null,
+              end: typeof searchInput.selectionEnd === "number" ? searchInput.selectionEnd : null,
+            }),
+          );
+        } catch (err) {
+          // Ignore storage errors (private mode, disabled storage, etc.).
+        }
+      };
+
+      const restoreSearchFocus = () => {
+        if (!searchInput) return;
+        let payload = null;
+        try {
+          payload = JSON.parse(sessionStorage.getItem(focusStorageKey) || "null");
+          sessionStorage.removeItem(focusStorageKey);
+        } catch (err) {
+          payload = null;
+        }
+        if (!payload) return;
+
+        const len = searchInput.value.length;
+        const start = Number.isFinite(payload.start) ? Math.min(payload.start, len) : len;
+        const end = Number.isFinite(payload.end) ? Math.min(payload.end, len) : len;
+
+        searchInput.focus({ preventScroll: true });
+        try {
+          searchInput.setSelectionRange(start, end);
+        } catch (err) {
+          // Ignore if browser refuses selection changes.
+        }
+      };
+
+      restoreSearchFocus();
+      form?.addEventListener("submit", rememberSearchFocus);
 
       searchInput?.addEventListener("input", () => {
         clearTimeout(timer);

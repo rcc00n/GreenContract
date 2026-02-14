@@ -111,274 +111,355 @@
     </div>
   </form>
 
-  <div class="card shadow-sm">
-    <div class="table-responsive">
-      <table class="table align-middle mb-0">
-        <thead class="table-light">
-          <tr>
-            <th class="text-muted small" style="width: 70px;">#</th>
-            <th>Клиент</th>
-            <th>Контакты</th>
-            <th>Документы и стаж</th>
-            <th>Адрес прописки</th>
-            <th class="text-end">Действия</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for customer in object_list %}
-            {% with tags=customer.tags.all %}
-            <tr data-search-text="
-                {{ customer.full_name }}
-                {{ customer.phone }}
-                {{ customer.email }}
-                {{ customer.license_number }} {{ customer.license_issued_by }}
-                {{ customer.passport_series }} {{ customer.passport_number }}
-                {{ customer.passport_issued_by }}
-                {{ customer.registration_address }}
-                {{ customer.birth_date|date:"d-m-Y" }}
-                {{ customer.driving_since|date:"d-m-Y" }}
-                {{ customer.discount_percent }}
-                {% for tag in tags %}{{ tag.name }} {% endfor %}
-              ">
-              {% if page_obj %}
-                {% with row_number=page_obj.start_index|add:forloop.counter0 %}
-                  <td class="text-muted small">{{ row_number }}</td>
-                {% endwith %}
-            {% else %}
-              <td class="text-muted small">{{ forloop.counter }}</td>
-            {% endif %}
-            <td>
-              <div class="fw-semibold">{{ customer.surname }}</div>
-              {% if customer.given_names %}<div class="text-muted small">{{ customer.given_names }}</div>{% endif %}
-              {% if customer.discount_percent is not None %}
-                <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle mt-1">
-                  Скидка {{ customer.discount_percent|floatformat:"-2" }}%
-                </span>
-              {% endif %}
-              {% if tags %}
-                <div class="d-flex flex-wrap gap-1 mt-1">
-                  {% for tag in tags %}
-                    <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle">{{ tag.name }}</span>
-                  {% endfor %}
-                </div>
-              {% endif %}
-            </td>
-            <td>
-              <div class="fw-semibold">{{ customer.phone|default:"—" }}</div>
-              <div class="text-muted small">{{ customer.email|default:"—" }}</div>
-            </td>
-            <td class="small">
-              <div class="fw-semibold">
-                Паспорт:
-                {% if customer.passport_series or customer.passport_number %}
-                  {{ customer.passport_series|default:"" }} {{ customer.passport_number|default:"" }}
-                {% else %}
-                  —
-                {% endif %}
-              </div>
-              <div class="text-muted">
-                {% if customer.passport_issued_by or customer.passport_issue_date %}
-                  {{ customer.passport_issued_by|default:"Кем выдан не заполнено" }}
-                  {% if customer.passport_issue_date %} · {{ customer.passport_issue_date|date:"d-m-Y" }}{% endif %}
-                {% else %}
-                  Данные о выдаче не заполнены
-                {% endif %}
-              </div>
-              <div class="fw-semibold mt-2">
-                Вод. удостоверение:
-                {% if customer.license_number %}
-                  {{ customer.license_number }}
-                {% else %}
-                  —
-                {% endif %}
-              </div>
-              <div class="text-muted">
-                {% if customer.license_issued_by %}Выдано: {{ customer.license_issued_by }}{% endif %}
-                {% if customer.driving_since %}
-                  {% if customer.license_issued_by %} · {% endif %}
-                  Стаж с {{ customer.driving_since|date:"d-m-Y" }}
-                {% endif %}
-                {% if not customer.license_issued_by and not customer.driving_since %}
-                  —
-                {% endif %}
-              </div>
-            </td>
-            <td class="small text-muted">
-                {% if customer.registration_address %}<div>Адрес прописки: {{ customer.registration_address|truncatechars:90 }}</div>{% endif %}
-                {% if not customer.registration_address %}
-                  <div>—</div>
-                {% endif %}
-            </td>
-            <td class="text-end">
-              <div class="d-inline-flex gap-2 justify-content-end">
-                  <a href="{% url 'rentals:customer_update' customer.pk %}" class="btn btn-sm btn-outline-secondary">Изменить</a>
-                  <form method="post" action="{% url 'rentals:customer_delete' customer.pk %}" class="d-inline">
-                    {% csrf_token %}
-                    <button
-                      type="submit"
-                      class="btn btn-sm btn-outline-danger"
-                      onclick="return confirm('Удалить {{ customer.full_name }}?');"
-                    >
-                      Удалить
-                    </button>
-                  </form>
-              </div>
-            </td>
-          </tr>
-            {% endwith %}
-          {% empty %}
+  <div id="customerResultsContainer">
+    <div class="card shadow-sm">
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead class="table-light">
             <tr>
-              <td colspan="6" class="text-center text-muted py-4">
-                {% if filters_active %}
-                  Нет клиентов по текущим фильтрам.
-                {% else %}
-                  Клиентов пока нет. Добавьте первую карточку водителя.
+              <th class="text-muted small" style="width: 70px;">#</th>
+              <th>Клиент</th>
+              <th>Контакты</th>
+              <th>Документы и стаж</th>
+              <th>Адрес прописки</th>
+              <th class="text-end">Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for customer in object_list %}
+              {% with tags=customer.tags.all %}
+              <tr data-search-text="
+                  {{ customer.full_name }}
+                  {{ customer.phone }}
+                  {{ customer.email }}
+                  {{ customer.license_number }} {{ customer.license_issued_by }}
+                  {{ customer.passport_series }} {{ customer.passport_number }}
+                  {{ customer.passport_issued_by }}
+                  {{ customer.registration_address }}
+                  {{ customer.birth_date|date:"d-m-Y" }}
+                  {{ customer.driving_since|date:"d-m-Y" }}
+                  {{ customer.discount_percent }}
+                  {% for tag in tags %}{{ tag.name }} {% endfor %}
+                ">
+                {% if page_obj %}
+                  {% with row_number=page_obj.start_index|add:forloop.counter0 %}
+                    <td class="text-muted small">{{ row_number }}</td>
+                  {% endwith %}
+              {% else %}
+                <td class="text-muted small">{{ forloop.counter }}</td>
+              {% endif %}
+              <td>
+                <div class="fw-semibold">{{ customer.surname }}</div>
+                {% if customer.given_names %}<div class="text-muted small">{{ customer.given_names }}</div>{% endif %}
+                {% if customer.discount_percent is not None %}
+                  <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle mt-1">
+                    Скидка {{ customer.discount_percent|floatformat:"-2" }}%
+                  </span>
+                {% endif %}
+                {% if tags %}
+                  <div class="d-flex flex-wrap gap-1 mt-1">
+                    {% for tag in tags %}
+                      <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle">{{ tag.name }}</span>
+                    {% endfor %}
+                  </div>
                 {% endif %}
               </td>
+              <td>
+                <div class="fw-semibold">{{ customer.phone|default:"—" }}</div>
+                <div class="text-muted small">{{ customer.email|default:"—" }}</div>
+              </td>
+              <td class="small">
+                <div class="fw-semibold">
+                  Паспорт:
+                  {% if customer.passport_series or customer.passport_number %}
+                    {{ customer.passport_series|default:"" }} {{ customer.passport_number|default:"" }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </div>
+                <div class="text-muted">
+                  {% if customer.passport_issued_by or customer.passport_issue_date %}
+                    {{ customer.passport_issued_by|default:"Кем выдан не заполнено" }}
+                    {% if customer.passport_issue_date %} · {{ customer.passport_issue_date|date:"d-m-Y" }}{% endif %}
+                  {% else %}
+                    Данные о выдаче не заполнены
+                  {% endif %}
+                </div>
+                <div class="fw-semibold mt-2">
+                  Вод. удостоверение:
+                  {% if customer.license_number %}
+                    {{ customer.license_number }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </div>
+                <div class="text-muted">
+                  {% if customer.license_issued_by %}Выдано: {{ customer.license_issued_by }}{% endif %}
+                  {% if customer.driving_since %}
+                    {% if customer.license_issued_by %} · {% endif %}
+                    Стаж с {{ customer.driving_since|date:"d-m-Y" }}
+                  {% endif %}
+                  {% if not customer.license_issued_by and not customer.driving_since %}
+                    —
+                  {% endif %}
+                </div>
+              </td>
+              <td class="small text-muted">
+                  {% if customer.registration_address %}<div>Адрес прописки: {{ customer.registration_address|truncatechars:90 }}</div>{% endif %}
+                  {% if not customer.registration_address %}
+                    <div>—</div>
+                  {% endif %}
+              </td>
+              <td class="text-end">
+                <div class="d-inline-flex gap-2 justify-content-end">
+                    <a href="{% url 'rentals:customer_update' customer.pk %}" class="btn btn-sm btn-outline-secondary">Изменить</a>
+                    <form method="post" action="{% url 'rentals:customer_delete' customer.pk %}" class="d-inline">
+                      {% csrf_token %}
+                      <button
+                        type="submit"
+                        class="btn btn-sm btn-outline-danger"
+                        onclick="return confirm('Удалить {{ customer.full_name }}?');"
+                      >
+                        Удалить
+                      </button>
+                    </form>
+                </div>
+              </td>
             </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% if page_obj %}
-      <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between p-3 border-top pagination-bar">
-        <div class="d-flex align-items-center gap-2">
-          <span class="text-muted small">Строк на странице</span>
-          <form method="get" class="d-flex align-items-center gap-2">
-            <input type="hidden" name="page" value="1">
-            {% if search_query %}
-              <input type="hidden" name="q" value="{{ search_query }}">
-            {% endif %}
-            {% if active_sort and active_sort != default_sort %}
-              <input type="hidden" name="sort" value="{{ active_sort }}">
-            {% endif %}
-            {% for tag_id in active_tags %}
-              <input type="hidden" name="tag" value="{{ tag_id }}">
+              {% endwith %}
+            {% empty %}
+              <tr>
+                <td colspan="6" class="text-center text-muted py-4">
+                  {% if filters_active %}
+                    Нет клиентов по текущим фильтрам.
+                  {% else %}
+                    Клиентов пока нет. Добавьте первую карточку водителя.
+                  {% endif %}
+                </td>
+              </tr>
             {% endfor %}
-            <select name="page_size" class="form-select form-select-sm" onchange="this.form.submit()">
-              {% for size in page_size_options %}
-                <option value="{{ size }}" {% if size == current_page_size %}selected{% endif %}>{{ size }}</option>
-              {% endfor %}
-            </select>
-          </form>
-        </div>
-        <div class="d-flex flex-wrap align-items-center gap-3">
-          <span class="text-muted small">
-            Показано {{ page_obj.start_index }}-{{ page_obj.end_index }} из {{ page_obj.paginator.count }}
-          </span>
-          {% with page_size=page_obj.paginator.per_page %}
-            <nav aria-label="Навигация по страницам клиентов">
-              <ul class="pagination pagination-sm mb-0">
-                <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
-                  {% if page_obj.has_previous %}
-                    <a class="page-link" href="?page=1&page_size={{ page_size }}{{ querystring }}" aria-label="Первая страница">&laquo;</a>
-                  {% else %}
-                    <span class="page-link">&laquo;</span>
-                  {% endif %}
-                </li>
-                <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
-                  {% if page_obj.has_previous %}
-                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}&page_size={{ page_size }}{{ querystring }}" aria-label="Предыдущая страница">&lsaquo;</a>
-                  {% else %}
-                    <span class="page-link">&lsaquo;</span>
-                  {% endif %}
-                </li>
-                <li class="page-item disabled">
-                  <span class="page-link text-muted">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
-                </li>
-                <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
-                  {% if page_obj.has_next %}
-                    <a class="page-link" href="?page={{ page_obj.next_page_number }}&page_size={{ page_size }}{{ querystring }}" aria-label="Следующая страница">&rsaquo;</a>
-                  {% else %}
-                    <span class="page-link">&rsaquo;</span>
-                  {% endif %}
-                </li>
-                <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
-                  {% if page_obj.has_next %}
-                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&page_size={{ page_size }}{{ querystring }}" aria-label="Последняя страница">&raquo;</a>
-                  {% else %}
-                    <span class="page-link">&raquo;</span>
-                  {% endif %}
-                </li>
-              </ul>
-            </nav>
-          {% endwith %}
-        </div>
+          </tbody>
+        </table>
       </div>
-    {% endif %}
+      {% if page_obj %}
+        <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between p-3 border-top pagination-bar">
+          <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small">Строк на странице</span>
+            <form method="get" class="d-flex align-items-center gap-2">
+              <input type="hidden" name="page" value="1">
+              {% if search_query %}
+                <input type="hidden" name="q" value="{{ search_query }}">
+              {% endif %}
+              {% if active_sort and active_sort != default_sort %}
+                <input type="hidden" name="sort" value="{{ active_sort }}">
+              {% endif %}
+              {% for tag_id in active_tags %}
+                <input type="hidden" name="tag" value="{{ tag_id }}">
+              {% endfor %}
+              <select name="page_size" class="form-select form-select-sm">
+                {% for size in page_size_options %}
+                  <option value="{{ size }}" {% if size == current_page_size %}selected{% endif %}>{{ size }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </div>
+          <div class="d-flex flex-wrap align-items-center gap-3">
+            <span class="text-muted small">
+              Показано {{ page_obj.start_index }}-{{ page_obj.end_index }} из {{ page_obj.paginator.count }}
+            </span>
+            {% with page_size=page_obj.paginator.per_page %}
+              <nav aria-label="Навигация по страницам клиентов">
+                <ul class="pagination pagination-sm mb-0">
+                  <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                    {% if page_obj.has_previous %}
+                      <a class="page-link" href="?page=1&page_size={{ page_size }}{{ querystring }}" aria-label="Первая страница">&laquo;</a>
+                    {% else %}
+                      <span class="page-link">&laquo;</span>
+                    {% endif %}
+                  </li>
+                  <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                    {% if page_obj.has_previous %}
+                      <a class="page-link" href="?page={{ page_obj.previous_page_number }}&page_size={{ page_size }}{{ querystring }}" aria-label="Предыдущая страница">&lsaquo;</a>
+                    {% else %}
+                      <span class="page-link">&lsaquo;</span>
+                    {% endif %}
+                  </li>
+                  <li class="page-item disabled">
+                    <span class="page-link text-muted">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+                  </li>
+                  <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                    {% if page_obj.has_next %}
+                      <a class="page-link" href="?page={{ page_obj.next_page_number }}&page_size={{ page_size }}{{ querystring }}" aria-label="Следующая страница">&rsaquo;</a>
+                    {% else %}
+                      <span class="page-link">&rsaquo;</span>
+                    {% endif %}
+                  </li>
+                  <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                    {% if page_obj.has_next %}
+                      <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&page_size={{ page_size }}{{ querystring }}" aria-label="Последняя страница">&raquo;</a>
+                    {% else %}
+                      <span class="page-link">&raquo;</span>
+                    {% endif %}
+                  </li>
+                </ul>
+              </nav>
+            {% endwith %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
   </div>
 
   <script>
     (() => {
-      const focusStorageKey = "customerList:restoreSearchFocus";
       const form = document.getElementById("customerFilterForm");
       const searchInput = document.getElementById("customerSearchInput");
+      const sortSelect = document.getElementById("customerSortSelect");
       const tagInputs = form ? Array.from(form.querySelectorAll("input[name='tag']")) : [];
       const tagFilterContainer = document.getElementById("tagFilterContainer");
       const tagFilterList = document.getElementById("tagFilterList");
       const tagToggleButton = document.getElementById("tagToggleButton");
+      const resultsContainer = document.getElementById("customerResultsContainer");
       const collapseHeight = tagFilterContainer
         ? parseFloat(getComputedStyle(tagFilterContainer).getPropertyValue("--tag-collapse-height")) || 132
         : 132;
       let timer = null;
       let resizeTimer = null;
+      let activeRequest = null;
 
-      const submitForm = () => {
+      const urlFromForm = (formEl) => {
+        const url = new URL(window.location.href);
+        url.search = "";
+        const params = new URLSearchParams(new FormData(formEl));
+
+        // Keep the URL clean: drop empty values.
+        for (const [key, value] of Array.from(params.entries())) {
+          if (value === "") params.delete(key);
+        }
+
+        url.search = params.toString();
+        return url;
+      };
+
+      const syncPageSizeHidden = (url) => {
         if (!form) return;
-        form.requestSubmit ? form.requestSubmit() : form.submit();
+        const hidden = form.querySelector("input[name='page_size']");
+        if (!hidden) return;
+        const pageSize = url.searchParams.get("page_size");
+        if (pageSize) hidden.value = pageSize;
       };
 
-      const rememberSearchFocus = () => {
-        if (!form || !searchInput) return;
-        if (document.activeElement !== searchInput) return;
+      const setLoading = (loading) => {
+        if (!resultsContainer) return;
+        resultsContainer.setAttribute("aria-busy", loading ? "true" : "false");
+        resultsContainer.style.opacity = loading ? "0.55" : "";
+      };
+
+      const fetchAndRender = async (url) => {
+        if (!resultsContainer) return;
+
+        if (activeRequest) {
+          activeRequest.abort();
+        }
+
+        const controller = new AbortController();
+        activeRequest = controller;
+
+        setLoading(true);
         try {
-          sessionStorage.setItem(
-            focusStorageKey,
-            JSON.stringify({
-              start: typeof searchInput.selectionStart === "number" ? searchInput.selectionStart : null,
-              end: typeof searchInput.selectionEnd === "number" ? searchInput.selectionEnd : null,
-            }),
-          );
+          const response = await fetch(url.toString(), {
+            signal: controller.signal,
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+          });
+          if (!response.ok) throw new Error("Request failed");
+
+          const html = await response.text();
+          if (controller.signal.aborted) return;
+
+          const doc = new DOMParser().parseFromString(html, "text/html");
+          const incoming = doc.getElementById("customerResultsContainer");
+          if (!incoming) {
+            window.location.assign(url.toString());
+            return;
+          }
+
+          resultsContainer.innerHTML = incoming.innerHTML;
+          history.replaceState({}, "", url.toString());
+          syncPageSizeHidden(url);
         } catch (err) {
-          // Ignore storage errors (private mode, disabled storage, etc.).
+          if (err && err.name === "AbortError") return;
+          window.location.assign(url.toString());
+        } finally {
+          if (activeRequest === controller) {
+            activeRequest = null;
+          }
+          setLoading(false);
         }
       };
 
-      const restoreSearchFocus = () => {
-        if (!searchInput) return;
-        let payload = null;
-        try {
-          payload = JSON.parse(sessionStorage.getItem(focusStorageKey) || "null");
-          sessionStorage.removeItem(focusStorageKey);
-        } catch (err) {
-          payload = null;
-        }
-        if (!payload) return;
-
-        const len = searchInput.value.length;
-        const start = Number.isFinite(payload.start) ? Math.min(payload.start, len) : len;
-        const end = Number.isFinite(payload.end) ? Math.min(payload.end, len) : len;
-
-        searchInput.focus({ preventScroll: true });
-        try {
-          searchInput.setSelectionRange(start, end);
-        } catch (err) {
-          // Ignore if browser refuses selection changes.
-        }
+      const applyFromForm = () => {
+        if (!form) return;
+        const url = urlFromForm(form);
+        fetchAndRender(url);
       };
 
-      restoreSearchFocus();
-      form?.addEventListener("submit", rememberSearchFocus);
+      // Avoid inline `onchange="this.form.submit()"` behavior if present.
+      if (sortSelect) sortSelect.onchange = null;
+
+      form?.addEventListener("submit", (event) => {
+        // Enhanced GET: update results without a full page reload.
+        event.preventDefault();
+        applyFromForm();
+      });
 
       searchInput?.addEventListener("input", () => {
         clearTimeout(timer);
-        timer = setTimeout(submitForm, 400);
+        const term = searchInput.value.trim();
+        timer = setTimeout(() => {
+          // Auto-search only when empty (reset) or 2+ chars to reduce request spam.
+          if (term.length === 0 || term.length >= 2) {
+            applyFromForm();
+          }
+        }, 300);
       });
 
       tagInputs.forEach((checkbox) => {
         checkbox.addEventListener("change", () => {
-          submitForm();
+          applyFromForm();
         });
+      });
+
+      sortSelect?.addEventListener("change", () => {
+        applyFromForm();
+      });
+
+      // Pagination + page size (event delegation: results are replaced).
+      resultsContainer?.addEventListener("click", (event) => {
+        const link = event.target.closest("a.page-link");
+        if (!link) return;
+
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        if (link.getAttribute("target") === "_blank") return;
+
+        const href = link.getAttribute("href");
+        if (!href) return;
+
+        const url = new URL(href, window.location.origin);
+        if (url.origin !== window.location.origin) return;
+
+        event.preventDefault();
+        fetchAndRender(url);
+      });
+
+      resultsContainer?.addEventListener("change", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLSelectElement)) return;
+        if (target.name !== "page_size") return;
+        const formEl = target.form;
+        if (!formEl) return;
+
+        const url = urlFromForm(formEl);
+        fetchAndRender(url);
       });
 
       const updateTagOverflowState = () => {

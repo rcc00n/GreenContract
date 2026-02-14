@@ -565,6 +565,9 @@ def _normalize_car_row(row):
 
         normalized = label.replace("ё", "е").replace("Ё", "Е")
         _add(normalized)
+        _add(label.lower())
+        if normalized != label:
+            _add(normalized.lower())
 
         # A few spreadsheets title-case words after dots/abbreviations.
         _add(label.title())
@@ -579,9 +582,18 @@ def _normalize_car_row(row):
         ):
             _add(prefix + label)
             _add(prefix + normalized)
+            _add(prefix + label.lower())
+            _add(prefix + normalized.lower())
             _add(prefix + label.title())
             if normalized != label:
                 _add(prefix + normalized.title())
+
+        # Backward-compatible aliases for known one-off templates.
+        if field_name == "loss_gps_fee":
+            _add("GPS")
+            _add("gps")
+            # Some spreadsheets include "Автобокс с креплением" instead of "Навигатор".
+            _add("Автобокс с креплением")
 
         return candidates
 

@@ -235,6 +235,8 @@ class CustomerForm(StyledModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.required = False
         for date_field in ("birth_date", "passport_issue_date"):
             if date_field in self.fields:
                 _configure_date_field(self.fields[date_field])

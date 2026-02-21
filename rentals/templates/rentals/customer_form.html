@@ -56,18 +56,150 @@
               </div>
             </div>
             <div class="row g-3">
-              {% for field in form %}
-                <div class="{% if field.name == 'registration_address' or field.name == 'tags_text' %}col-12{% else %}col-md-6{% endif %}">
-                  <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                  {{ field }}
-                  {% if field.help_text %}
-                    <div class="form-text">{{ field.help_text }}</div>
-                  {% endif %}
-                  {% for error in field.errors %}
-                    <div class="invalid-feedback d-block">{{ error }}</div>
-                  {% endfor %}
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.full_name.id_for_label }}">{{ form.full_name.label }}</label>
+                {{ form.full_name }}
+                {% if form.full_name.help_text %}
+                  <div class="form-text">{{ form.full_name.help_text }}</div>
+                {% endif %}
+                {% for error in form.full_name.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.birth_date.id_for_label }}">{{ form.birth_date.label }}</label>
+                {{ form.birth_date }}
+                {% if form.birth_date.help_text %}
+                  <div class="form-text">{{ form.birth_date.help_text }}</div>
+                {% endif %}
+                {% for error in form.birth_date.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+                {{ form.email }}
+                {% if form.email.help_text %}
+                  <div class="form-text">{{ form.email.help_text }}</div>
+                {% endif %}
+                {% for error in form.email.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.phone.id_for_label }}">{{ form.phone.label }}</label>
+                {{ form.phone }}
+                {% if form.phone.help_text %}
+                  <div class="form-text">{{ form.phone.help_text }}</div>
+                {% endif %}
+                {% for error in form.phone.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.license_number.id_for_label }}">{{ form.license_number.label }}</label>
+                {{ form.license_number }}
+                {% if form.license_number.help_text %}
+                  <div class="form-text">{{ form.license_number.help_text }}</div>
+                {% endif %}
+                {% for error in form.license_number.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.license_issued_by.id_for_label }}">{{ form.license_issued_by.label }}</label>
+                {{ form.license_issued_by }}
+                {% if form.license_issued_by.help_text %}
+                  <div class="form-text">{{ form.license_issued_by.help_text }}</div>
+                {% endif %}
+                {% for error in form.license_issued_by.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.driving_since.id_for_label }}">{{ form.driving_since.label }}</label>
+                {{ form.driving_since }}
+                {% if form.driving_since.help_text %}
+                  <div class="form-text">{{ form.driving_since.help_text }}</div>
+                {% endif %}
+                {% for error in form.driving_since.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              </div>
+              <div class="col-12">
+                <div class="row g-2">
+                  <div class="col-md-4">
+                    <label class="form-label" for="{{ form.passport_series.id_for_label }}">{{ form.passport_series.label }}</label>
+                    {{ form.passport_series }}
+                    {% if form.passport_series.help_text %}
+                      <div class="form-text">{{ form.passport_series.help_text }}</div>
+                    {% endif %}
+                    {% for error in form.passport_series.errors %}
+                      <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
+                  </div>
+                  <div class="col-md-8">
+                    <label class="form-label" for="{{ form.passport_number.id_for_label }}">{{ form.passport_number.label }}</label>
+                    {{ form.passport_number }}
+                    {% if form.passport_number.help_text %}
+                      <div class="form-text">{{ form.passport_number.help_text }}</div>
+                    {% endif %}
+                    {% for error in form.passport_number.errors %}
+                      <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
+                  </div>
                 </div>
-              {% endfor %}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.passport_issued_by.id_for_label }}">{{ form.passport_issued_by.label }}</label>
+                {{ form.passport_issued_by }}
+                {% if form.passport_issued_by.help_text %}
+                  <div class="form-text">{{ form.passport_issued_by.help_text }}</div>
+                {% endif %}
+                {% for error in form.passport_issued_by.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.passport_issue_date.id_for_label }}">{{ form.passport_issue_date.label }}</label>
+                {{ form.passport_issue_date }}
+                {% if form.passport_issue_date.help_text %}
+                  <div class="form-text">{{ form.passport_issue_date.help_text }}</div>
+                {% endif %}
+                {% for error in form.passport_issue_date.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="{{ form.registration_address.id_for_label }}">{{ form.registration_address.label }}</label>
+                {{ form.registration_address }}
+                {% if form.registration_address.help_text %}
+                  <div class="form-text">{{ form.registration_address.help_text }}</div>
+                {% endif %}
+                {% for error in form.registration_address.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.discount_percent.id_for_label }}">{{ form.discount_percent.label }}</label>
+                {{ form.discount_percent }}
+                {% if form.discount_percent.help_text %}
+                  <div class="form-text">{{ form.discount_percent.help_text }}</div>
+                {% endif %}
+                {% for error in form.discount_percent.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="{{ form.tags_text.id_for_label }}">{{ form.tags_text.label }}</label>
+                {{ form.tags_text }}
+                {% if form.tags_text.help_text %}
+                  <div class="form-text">{{ form.tags_text.help_text }}</div>
+                {% endif %}
+                {% for error in form.tags_text.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              </div>
             </div>
             <div class="d-flex justify-content-end gap-2 pt-3">
               <a href="{% url 'rentals:customer_list' %}" class="btn btn-outline-secondary">Отмена</a>

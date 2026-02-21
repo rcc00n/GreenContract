@@ -113,7 +113,7 @@
               <div class="col-md-6">
                 <label class="form-label" for="customer-search">Клиент</label>
                 {{ form.customer }}
-                <div class="d-flex align-items-start gap-2">
+                <div class="d-flex align-items-start gap-2 flex-wrap">
                   <div class="flex-grow-1 position-relative">
                     <input
                       type="search"
@@ -131,41 +131,43 @@
                       style="max-height: 280px; overflow-y: auto;"
                     ></div>
                   </div>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-primary align-self-start"
-                    data-bs-toggle="modal"
-                    data-bs-target="#customer-quick-create-modal"
-                    data-quick-create-target="customer"
-                    data-quick-create-title="Новый клиент"
-                  >
-                    Создать нового клиента
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-secondary align-self-start disabled"
-                    id="customer-profile-link"
-                    data-profile-url-template="{% url 'rentals:customer_profile' 0 %}"
-                    data-profile-title="Профиль клиента"
-                    data-bs-toggle="modal"
-                    data-bs-target="#customer-profile-modal"
-                    aria-disabled="true"
-                    tabindex="-1"
-                  >
-                    Профиль
-                  </button>
-                  <a
-                    href="#"
-                    class="btn btn-sm btn-outline-secondary align-self-start disabled"
-                    id="customer-edit-link"
-                    data-edit-url-template="{% url 'rentals:customer_update' 0 %}"
-                    target="_blank"
-                    rel="noopener"
-                    aria-disabled="true"
-                    tabindex="-1"
-                  >
-                    Редактировать клиента
-                  </a>
+                  <div class="d-flex flex-wrap gap-2 align-items-start">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary align-self-start text-nowrap"
+                      data-bs-toggle="modal"
+                      data-bs-target="#customer-quick-create-modal"
+                      data-quick-create-target="customer"
+                      data-quick-create-title="Новый клиент"
+                    >
+                      Создать клиента
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-secondary align-self-start disabled text-nowrap"
+                      id="customer-profile-link"
+                      data-profile-url-template="{% url 'rentals:customer_profile' 0 %}"
+                      data-profile-title="Профиль клиента"
+                      data-bs-toggle="modal"
+                      data-bs-target="#customer-profile-modal"
+                      aria-disabled="true"
+                      tabindex="-1"
+                    >
+                      Профиль
+                    </button>
+                    <a
+                      href="#"
+                      class="btn btn-sm btn-outline-secondary align-self-start disabled text-nowrap"
+                      id="customer-edit-link"
+                      data-edit-url-template="{% url 'rentals:customer_update' 0 %}"
+                      target="_blank"
+                      rel="noopener"
+                      aria-disabled="true"
+                      tabindex="-1"
+                    >
+                      Редактировать
+                    </a>
+                  </div>
                 </div>
                 <div class="form-text">
                   Поиск по имени, телефону, эл. почте или номеру удостоверения. Минимум 2 символа.
@@ -198,7 +200,7 @@
                     data-initial-open="{% if second_driver_initial_label or form.second_driver.errors %}true{% else %}false{% endif %}"
                   >
                     {{ form.second_driver }}
-                    <div class="d-flex align-items-start gap-2">
+                    <div class="d-flex align-items-start gap-2 flex-wrap">
                       <div class="flex-grow-1 position-relative">
                         <input
                           type="search"
@@ -216,41 +218,43 @@
                           style="max-height: 280px; overflow-y: auto;"
                         ></div>
                       </div>
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-outline-primary align-self-start"
-                        data-bs-toggle="modal"
-                        data-bs-target="#customer-quick-create-modal"
-                        data-quick-create-target="second_driver"
-                        data-quick-create-title="Новый водитель"
-                      >
-                        Создать водителя
-                      </button>
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-outline-secondary align-self-start disabled"
-                        id="second-driver-profile-link"
-                        data-profile-url-template="{% url 'rentals:customer_profile' 0 %}"
-                        data-profile-title="Профиль водителя"
-                        data-bs-toggle="modal"
-                        data-bs-target="#customer-profile-modal"
-                        aria-disabled="true"
-                        tabindex="-1"
-                      >
-                        Профиль
-                      </button>
-                      <a
-                        href="#"
-                        class="btn btn-sm btn-outline-secondary align-self-start disabled"
-                        id="second-driver-edit-link"
-                        data-edit-url-template="{% url 'rentals:customer_update' 0 %}"
-                        target="_blank"
-                        rel="noopener"
-                        aria-disabled="true"
-                        tabindex="-1"
-                      >
-                        Редактировать
-                      </a>
+                      <div class="d-flex flex-wrap gap-2 align-items-start">
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-primary align-self-start text-nowrap"
+                          data-bs-toggle="modal"
+                          data-bs-target="#customer-quick-create-modal"
+                          data-quick-create-target="second_driver"
+                          data-quick-create-title="Новый водитель"
+                        >
+                          Создать
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-secondary align-self-start disabled text-nowrap"
+                          id="second-driver-profile-link"
+                          data-profile-url-template="{% url 'rentals:customer_profile' 0 %}"
+                          data-profile-title="Профиль водителя"
+                          data-bs-toggle="modal"
+                          data-bs-target="#customer-profile-modal"
+                          aria-disabled="true"
+                          tabindex="-1"
+                        >
+                          Профиль
+                        </button>
+                        <a
+                          href="#"
+                          class="btn btn-sm btn-outline-secondary align-self-start disabled text-nowrap"
+                          id="second-driver-edit-link"
+                          data-edit-url-template="{% url 'rentals:customer_update' 0 %}"
+                          target="_blank"
+                          rel="noopener"
+                          aria-disabled="true"
+                          tabindex="-1"
+                        >
+                          Редактировать
+                        </a>
+                      </div>
                     </div>
                     <div class="form-text">Поиск по имени, телефону, эл. почте или номеру удостоверения.</div>
                     <div class="small text-muted mt-1" id="second-driver-selected-summary">

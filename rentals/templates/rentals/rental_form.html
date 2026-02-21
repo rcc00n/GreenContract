@@ -2141,15 +2141,14 @@
     data-create-url="{% url 'rentals:customer_quick_create' %}"
   >
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
-      <div class="modal-content">
-        <form id="customer-quick-create-form" novalidate>
-          <div class="modal-header">
-            <h5 class="modal-title" id="customer-quick-create-title">Новый клиент</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
-          </div>
-          <div class="modal-body">
-            <div class="alert alert-danger d-none" id="customer-quick-create-error"></div>
-            <div class="row g-3">
+      <form id="customer-quick-create-form" class="modal-content" novalidate>
+        <div class="modal-header">
+          <h5 class="modal-title" id="customer-quick-create-title">Новый клиент</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-danger d-none" id="customer-quick-create-error"></div>
+          <div class="row g-3">
               <div class="col-md-6">
                 <label class="form-label" for="quick-full-name">ФИО</label>
                 <input type="text" class="form-control" id="quick-full-name" name="full_name">
@@ -2220,14 +2219,13 @@
                 <label class="form-label" for="quick-registration-address">Адрес прописки</label>
                 <textarea class="form-control" id="quick-registration-address" name="registration_address" rows="2"></textarea>
               </div>
-            </div>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
-            <button type="submit" class="btn btn-primary" id="customer-quick-create-submit">Сохранить</button>
-          </div>
-        </form>
-      </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-primary" id="customer-quick-create-submit">Сохранить</button>
+        </div>
+      </form>
     </div>
   </div>
 

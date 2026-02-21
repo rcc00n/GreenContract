@@ -83,6 +83,19 @@
                   >
                     Создать нового клиента
                   </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary align-self-start disabled"
+                    id="customer-profile-link"
+                    data-profile-url-template="{% url 'rentals:customer_profile' 0 %}"
+                    data-profile-title="Профиль клиента"
+                    data-bs-toggle="modal"
+                    data-bs-target="#customer-profile-modal"
+                    aria-disabled="true"
+                    tabindex="-1"
+                  >
+                    Профиль
+                  </button>
                   <a
                     href="#"
                     class="btn btn-sm btn-outline-secondary align-self-start disabled"
@@ -154,6 +167,19 @@
                         data-quick-create-title="Новый водитель"
                       >
                         Создать водителя
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary align-self-start disabled"
+                        id="second-driver-profile-link"
+                        data-profile-url-template="{% url 'rentals:customer_profile' 0 %}"
+                        data-profile-title="Профиль водителя"
+                        data-bs-toggle="modal"
+                        data-bs-target="#customer-profile-modal"
+                        aria-disabled="true"
+                        tabindex="-1"
+                      >
+                        Профиль
                       </button>
                       <a
                         href="#"
@@ -614,7 +640,9 @@
           const hiddenField = document.getElementById(config.hiddenId);
           const summary = document.getElementById(config.summaryId);
           const editLink = document.getElementById(config.editLinkId);
+          const profileLink = document.getElementById(config.profileLinkId);
           const editUrlTemplate = editLink?.dataset.editUrlTemplate;
+          const profileUrlTemplate = profileLink?.dataset.profileUrlTemplate;
           const searchUrl = searchInput?.dataset.searchUrl;
           const initialLabel = searchInput?.dataset.initialLabel;
           let debounceTimer = null;
@@ -668,13 +696,32 @@
             editLink.removeAttribute("tabindex");
           }
 
+          function setProfileLink(customerId) {
+            if (!profileLink) return;
+            if (!customerId || !profileUrlTemplate) {
+              profileLink.classList.add("disabled");
+              profileLink.setAttribute("aria-disabled", "true");
+              profileLink.setAttribute("tabindex", "-1");
+              profileLink.dataset.customerId = "";
+              return;
+            }
+            profileLink.dataset.customerId = String(customerId);
+            profileLink.classList.remove("disabled");
+            profileLink.removeAttribute("aria-disabled");
+            profileLink.removeAttribute("tabindex");
+          }
+
           function clearSelection() {
             hiddenField.value = "";
             searchInput.value = "";
             lastSelectedLabel = "";
             setEditLink("");
+            setProfileLink("");
             setSummary(messages.empty);
             clearResults();
+            if (config.onClear) {
+              config.onClear();
+            }
           }
 
           function selectCustomer(item) {
@@ -686,6 +733,7 @@
             lastSelectedLabel = label;
             setSummary(label);
             setEditLink(item.id);
+            setProfileLink(item.id);
             if (config.onSelect) {
               config.onSelect(item);
             }
@@ -800,15 +848,18 @@
             searchInput.value = initialLabel;
             setSummary(initialLabel);
             setEditLink(hiddenField.value);
+            setProfileLink(hiddenField.value);
             if (config.onSelect) {
               config.onSelect({ id: hiddenField.value, name: searchInput.value || initialLabel });
             }
           } else if (hiddenField.value) {
             setSummary(messages.selected);
             setEditLink(hiddenField.value);
+            setProfileLink(hiddenField.value);
           } else {
             setSummary(messages.minChars, true);
             setEditLink("");
+            setProfileLink("");
           }
 
           return {
@@ -826,6 +877,7 @@
           hiddenId: "id_customer",
           summaryId: "customer-selected-summary",
           editLinkId: "customer-edit-link",
+          profileLinkId: "customer-profile-link",
           onSelect: (item) => {
             document.dispatchEvent(new CustomEvent("rental:customer-change", { detail: { name: item.name } }));
           },
@@ -839,6 +891,7 @@
           hiddenId: "id_second_driver",
           summaryId: "second-driver-selected-summary",
           editLinkId: "second-driver-edit-link",
+          profileLinkId: "second-driver-profile-link",
           emptyMessage: "Второй водитель не выбран",
           selectedMessage: "Второй водитель выбран",
           selectionMessage: "Выберите водителя из результатов поиска.",
@@ -977,6 +1030,87 @@
                 if (quickCreateSubmit) {
                   quickCreateSubmit.disabled = false;
                 }
+              });
+          });
+        }
+
+        const profileModal = document.getElementById("customer-profile-modal");
+        const profileTitle = document.getElementById("customer-profile-title");
+        const profileContent = document.getElementById("customer-profile-content");
+        const profileError = document.getElementById("customer-profile-error");
+
+        function renderProfileField(label, value) {
+          const safeValue = value || "—";
+          return `
+            <div class="col-md-6">
+              <div class="text-muted small">${label}</div>
+              <div class="fw-semibold">${safeValue}</div>
+            </div>
+          `;
+        }
+
+        function renderProfile(data) {
+          if (!profileContent) return;
+          const tags = (data.tags || []).join(", ");
+          const pieces = [
+            renderProfileField("ФИО", data.full_name),
+            renderProfileField("Телефон", data.phone),
+            renderProfileField("Эл. почта", data.email),
+            renderProfileField("Дата рождения", data.birth_date),
+            renderProfileField("Номер ВУ", data.license_number),
+            renderProfileField("Кем выдано ВУ", data.license_issued_by),
+            renderProfileField("Стаж с", data.driving_since),
+            renderProfileField(
+              "Паспорт",
+              [data.passport_series, data.passport_number].filter(Boolean).join(" ").trim()
+            ),
+            renderProfileField("Кем выдан паспорт", data.passport_issued_by),
+            renderProfileField("Дата выдачи паспорта", data.passport_issue_date),
+            renderProfileField("Адрес прописки", data.registration_address),
+            renderProfileField("Скидка, %", data.discount_percent),
+            renderProfileField("Теги", tags),
+          ];
+          profileContent.innerHTML = pieces.join("");
+        }
+
+        if (profileModal) {
+          profileModal.addEventListener("show.bs.modal", (event) => {
+            const trigger = event.relatedTarget;
+            if (!trigger || trigger.classList.contains("disabled")) {
+              event.preventDefault();
+              return;
+            }
+            const customerId = trigger.dataset.customerId;
+            const template = trigger.dataset.profileUrlTemplate;
+            const title = trigger.dataset.profileTitle || "Профиль клиента";
+            if (profileTitle) profileTitle.textContent = title;
+            if (profileError) {
+              profileError.classList.add("d-none");
+              profileError.textContent = "";
+            }
+            if (!profileContent) return;
+            profileContent.innerHTML = `<div class="text-muted">Загрузка...</div>`;
+            if (!customerId || !template) {
+              profileContent.innerHTML = `<div class="text-muted">Клиент не выбран.</div>`;
+              return;
+            }
+            const url = template.replace("/0/", `/${customerId}/`);
+            fetch(url)
+              .then((response) => (response.ok ? response.json() : Promise.reject()))
+              .then((data) => {
+                const customer = data?.customer;
+                if (!customer) {
+                  profileContent.innerHTML = `<div class="text-muted">Данные не найдены.</div>`;
+                  return;
+                }
+                renderProfile(customer);
+              })
+              .catch(() => {
+                if (profileError) {
+                  profileError.textContent = "Не удалось загрузить профиль клиента.";
+                  profileError.classList.remove("d-none");
+                }
+                profileContent.innerHTML = "";
               });
           });
         }
@@ -2093,6 +2227,21 @@
             <button type="submit" class="btn btn-primary" id="customer-quick-create-submit">Сохранить</button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="customer-profile-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="customer-profile-title">Профиль клиента</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-danger d-none" id="customer-profile-error"></div>
+          <div class="row g-3" id="customer-profile-content"></div>
+        </div>
       </div>
     </div>
   </div>

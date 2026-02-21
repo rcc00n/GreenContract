@@ -158,6 +158,18 @@ def _is_year_only_value(value) -> bool:
     return bool(re.fullmatch(r"\d{4}", text))
 
 
+def _format_date(value, fmt: str = "%d-%m-%Y") -> str:
+    return value.strftime(fmt) if value else ""
+
+
+def _format_driving_since(customer: Customer) -> str:
+    if not customer.driving_since:
+        return ""
+    if customer.driving_since_year_only:
+        return customer.driving_since.strftime("%Y")
+    return customer.driving_since.strftime("%d-%m-%Y")
+
+
 def _clean_status(value):
     value = (value or "").strip().lower()
     valid_statuses = {choice[0] for choice in Rental.STATUS_CHOICES}
@@ -1491,6 +1503,33 @@ def customer_quick_create(request):
                 "email": customer.email or "",
                 "license_number": customer.license_number,
                 "label": label,
+            }
+        }
+    )
+
+
+@login_required
+def customer_profile(request, pk: int):
+    customer = get_object_or_404(Customer, pk=pk)
+    tags = list(customer.tags.values_list("name", flat=True))
+    return JsonResponse(
+        {
+            "customer": {
+                "id": customer.id,
+                "full_name": customer.full_name,
+                "phone": customer.phone or "",
+                "email": customer.email or "",
+                "birth_date": _format_date(customer.birth_date),
+                "license_number": customer.license_number,
+                "license_issued_by": customer.license_issued_by or "",
+                "driving_since": _format_driving_since(customer),
+                "passport_series": customer.passport_series or "",
+                "passport_number": customer.passport_number or "",
+                "passport_issued_by": customer.passport_issued_by or "",
+                "passport_issue_date": _format_date(customer.passport_issue_date),
+                "registration_address": customer.registration_address or "",
+                "discount_percent": str(customer.discount_percent) if customer.discount_percent is not None else "",
+                "tags": tags,
             }
         }
     )

@@ -441,6 +441,10 @@ def _fmt_date(value) -> str:
     return value.strftime("%d.%m.%Y") if value else ""
 
 
+def _fmt_year(value) -> str:
+    return value.strftime("%Y") if value else ""
+
+
 def _fmt_datetime(value) -> str:
     return value.strftime("%d.%m.%Y %H:%M") if value else ""
 
@@ -516,7 +520,7 @@ def build_placeholder_values(rental: Rental) -> dict[str, str]:
         "customer.email": customer.email,
         "customer.license_number": customer.license_number,
         "customer.license_issued_by": customer.license_issued_by,
-        "customer.driving_since": _fmt_date(customer.driving_since),
+        "customer.driving_since": _fmt_year(customer.driving_since),
         "customer.discount_percent": _fmt_decimal(customer.discount_percent),
         "customer.passport_series": customer.passport_series,
         "customer.passport_number": customer.passport_number,
@@ -532,7 +536,7 @@ def build_placeholder_values(rental: Rental) -> dict[str, str]:
         "second_driver.email": second_driver.email if second_driver else "",
         "second_driver.license_number": second_driver.license_number if second_driver else "",
         "second_driver.license_issued_by": second_driver.license_issued_by if second_driver else "",
-        "second_driver.driving_since": _fmt_date(second_driver.driving_since) if second_driver else "",
+        "second_driver.driving_since": _fmt_year(second_driver.driving_since) if second_driver else "",
         "second_driver.discount_percent": _fmt_decimal(second_driver.discount_percent) if second_driver else "",
         "second_driver.passport_series": second_driver.passport_series if second_driver else "",
         "second_driver.passport_number": second_driver.passport_number if second_driver else "",

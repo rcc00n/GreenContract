@@ -24,6 +24,8 @@ from .services.pricing import (
 
 DATE_INPUT_FORMATS = ("%d-%m-%Y", "%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y")
 DATE_PLACEHOLDER = "ДД-ММ-ГГГГ"
+DRIVING_SINCE_INPUT_FORMATS = ("%Y", *DATE_INPUT_FORMATS)
+DRIVING_SINCE_PLACEHOLDER = "ГГГГ"
 
 
 def _configure_date_field(field: forms.DateField):
@@ -32,6 +34,14 @@ def _configure_date_field(field: forms.DateField):
     widget.format = "%d-%m-%Y"
     widget.attrs.setdefault("placeholder", DATE_PLACEHOLDER)
     field.input_formats = DATE_INPUT_FORMATS
+
+
+def _configure_driving_since_field(field: forms.DateField):
+    widget = field.widget
+    widget.input_type = "text"
+    widget.format = "%Y"
+    widget.attrs.setdefault("placeholder", DRIVING_SINCE_PLACEHOLDER)
+    field.input_formats = DRIVING_SINCE_INPUT_FORMATS
 
 
 def _apply_bootstrap_classes(fields):
@@ -198,7 +208,7 @@ class CustomerForm(StyledModelForm):
             "birth_date": "Формат ДД-ММ-ГГГГ.",
             "license_number": "Номер водительского удостоверения.",
             "license_issued_by": "Кем выдано водительское удостоверение.",
-            "driving_since": "Дата начала стажа вождения (ДД-ММ-ГГГГ).",
+            "driving_since": "Дата начала стажа вождения (ГГГГ; можно указать ДД-ММ-ГГГГ).",
             "passport_series": "Серия паспорта (4 цифры).",
             "passport_number": "Номер паспорта (6 цифр) или иной документ.",
             "passport_issue_date": "Дата выдачи документа (ДД-ММ-ГГГГ).",
@@ -225,9 +235,11 @@ class CustomerForm(StyledModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for date_field in ("birth_date", "driving_since", "passport_issue_date"):
+        for date_field in ("birth_date", "passport_issue_date"):
             if date_field in self.fields:
                 _configure_date_field(self.fields[date_field])
+        if "driving_since" in self.fields:
+            _configure_driving_since_field(self.fields["driving_since"])
         if "discount_percent" in self.fields:
             widget = self.fields["discount_percent"].widget
             widget.attrs.setdefault("step", "0.1")

@@ -2,7 +2,7 @@ import csv
 import logging
 import os
 import re
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from urllib.parse import quote
 
@@ -114,6 +114,35 @@ def _parse_date(value):
         except ValueError:
             continue
     return None
+
+
+def _parse_year(value):
+    year = _parse_int(value)
+    if year is None:
+        return None
+    if not 1000 <= year <= 9999:
+        return None
+    try:
+        return datetime(year, 1, 1).date()
+    except ValueError:
+        return None
+
+
+def _parse_year_or_date(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, (int, float, Decimal)) and not isinstance(value, bool):
+        parsed_year = _parse_year(value)
+        if parsed_year:
+            return parsed_year
+    text = str(value).strip()
+    if re.fullmatch(r"\d{4}", text):
+        return _parse_year(text)
+    return _parse_date(text)
 
 
 def _clean_status(value):
@@ -782,7 +811,7 @@ def _normalize_customer_row(row, row_index: int):
         "phone": phone,
         "license_number": license_number,
         "license_issued_by": license_issued_by,
-        "driving_since": _parse_date(driving_since_raw),
+        "driving_since": _parse_year_or_date(driving_since_raw),
         "registration_address": primary_address or None,
         "passport_series": passport_series,
         "passport_number": passport_number,
@@ -1533,7 +1562,7 @@ def export_customers_csv(request):
                 smart_str(customer.phone or ""),
                 smart_str(customer.license_number),
                 smart_str(customer.license_issued_by or ""),
-                customer.driving_since.strftime("%d-%m-%Y") if customer.driving_since else "",
+                customer.driving_since.strftime("%Y") if customer.driving_since else "",
                 smart_str(customer.passport_series or ""),
                 smart_str(customer.passport_number or ""),
                 customer.passport_issue_date.strftime("%d-%m-%Y") if customer.passport_issue_date else "",

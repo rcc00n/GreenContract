@@ -281,7 +281,7 @@ class Customer(models.Model):
         "Стаж с",
         blank=True,
         null=True,
-        help_text="Дата начала стажа вождения (Стаж с ...).",
+        help_text="Дата начала стажа вождения (ГГГГ; можно указать полную дату).",
     )
     passport_series = models.CharField("Серия паспорта", max_length=10, blank=True, null=True)
     passport_number = models.CharField("Номер паспорта", max_length=20, blank=True, null=True)

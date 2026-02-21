@@ -137,7 +137,7 @@
                   {{ customer.passport_issued_by }}
                   {{ customer.registration_address }}
                   {{ customer.birth_date|date:"d-m-Y" }}
-                  {{ customer.driving_since|date:"d-m-Y" }}
+                  {{ customer.driving_since|date:"Y" }}
                   {{ customer.discount_percent }}
                   {% for tag in tags %}{{ tag.name }} {% endfor %}
                 ">
@@ -197,7 +197,7 @@
                   {% if customer.license_issued_by %}Выдано: {{ customer.license_issued_by }}{% endif %}
                   {% if customer.driving_since %}
                     {% if customer.license_issued_by %} · {% endif %}
-                    Стаж с {{ customer.driving_since|date:"d-m-Y" }}
+                    Стаж с {{ customer.driving_since|date:"Y" }}
                   {% endif %}
                   {% if not customer.license_issued_by and not customer.driving_since %}
                     —

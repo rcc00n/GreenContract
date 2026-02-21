@@ -1454,10 +1454,17 @@
           return new Date(Date.UTC(year, month - 1, day));
         }
 
-        function diffDays(start, end) {
+        function diffDays(start, end, startMinutes, endMinutes) {
           if (!start || !end) return 0;
           const diff = Math.round((end - start) / msPerDay);
-          return diff > 0 ? diff : 0;
+          if (diff <= 0) return 0;
+          let days = diff;
+          if (startMinutes !== null && startMinutes !== undefined && endMinutes !== null && endMinutes !== undefined) {
+            if (endMinutes > startMinutes) {
+              days += 1;
+            }
+          }
+          return days;
         }
 
         function parseTimeMinutes(value) {
@@ -1645,7 +1652,9 @@
           currentCar = carPricingData.find((item) => item.id === carId);
           const startDate = parseDate(startInput?.value);
           const endDate = parseDate(endInput?.value);
-          const days = diffDays(startDate, endDate);
+          const startMinutes = parseTimeMinutes(startTimeInput?.value);
+          const endMinutes = parseTimeMinutes(endTimeInput?.value);
+          const days = diffDays(startDate, endDate, startMinutes, endMinutes);
 
           updateCarDetails(currentCar);
           updateDealPreview(currentCar);

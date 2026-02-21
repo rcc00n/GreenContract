@@ -533,7 +533,10 @@ class Rental(models.Model):
     def duration_days(self) -> int:
         if not self.start_date or not self.end_date:
             return 0
-        return max((self.end_date - self.start_date).days, 0)
+        days = (self.end_date - self.start_date).days
+        if self.start_time and self.end_time and self.end_time > self.start_time:
+            days += 1
+        return max(days, 0)
 
     @property
     def date_range(self) -> str:

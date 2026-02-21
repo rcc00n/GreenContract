@@ -125,11 +125,19 @@ class PricingBreakdown:
     balance_due: Decimal
 
 
-def rental_days(start_date: date | None, end_date: date | None) -> int:
+def rental_days(
+    start_date: date | None,
+    end_date: date | None,
+    start_time: time | None = None,
+    end_time: time | None = None,
+) -> int:
     """Return rental length in days (non-negative)."""
     if not start_date or not end_date:
         return 0
-    return max((end_date - start_date).days, 0)
+    days = (end_date - start_date).days
+    if start_time and end_time and end_time > start_time:
+        days += 1
+    return max(days, 0)
 
 
 def _to_decimal(value, default="0.00") -> Decimal:
@@ -347,7 +355,7 @@ def calculate_rental_pricing(
     """
     Calculate full rental pricing with surcharges, extras, discounts and prepayment.
     """
-    days = rental_days(start_date, end_date)
+    days = rental_days(start_date, end_date, start_time=start_time, end_time=end_time)
     if not car or days <= 0:
         zero = Decimal("0")
         return PricingBreakdown(

@@ -1038,46 +1038,49 @@
           });
         }
 
-        const profileModal = document.getElementById("customer-profile-modal");
-        const profileTitle = document.getElementById("customer-profile-title");
-        const profileContent = document.getElementById("customer-profile-content");
-        const profileError = document.getElementById("customer-profile-error");
+        const bindProfileModal = () => {
+          const profileModal = document.getElementById("customer-profile-modal");
+          const profileTitle = document.getElementById("customer-profile-title");
+          const profileContent = document.getElementById("customer-profile-content");
+          const profileError = document.getElementById("customer-profile-error");
 
-        function renderProfileField(label, value) {
-          const safeValue = value || "—";
-          return `
-            <div class="col-md-6">
-              <div class="text-muted small">${label}</div>
-              <div class="fw-semibold">${safeValue}</div>
-            </div>
-          `;
-        }
+          if (!profileModal || !profileContent) {
+            return;
+          }
 
-        function renderProfile(data) {
-          if (!profileContent) return;
-          const tags = (data.tags || []).join(", ");
-          const pieces = [
-            renderProfileField("ФИО", data.full_name),
-            renderProfileField("Телефон", data.phone),
-            renderProfileField("Эл. почта", data.email),
-            renderProfileField("Дата рождения", data.birth_date),
-            renderProfileField("Номер ВУ", data.license_number),
-            renderProfileField("Кем выдано ВУ", data.license_issued_by),
-            renderProfileField("Стаж с", data.driving_since),
-            renderProfileField(
-              "Паспорт",
-              [data.passport_series, data.passport_number].filter(Boolean).join(" ").trim()
-            ),
-            renderProfileField("Кем выдан паспорт", data.passport_issued_by),
-            renderProfileField("Дата выдачи паспорта", data.passport_issue_date),
-            renderProfileField("Адрес прописки", data.registration_address),
-            renderProfileField("Скидка, %", data.discount_percent),
-            renderProfileField("Теги", tags),
-          ];
-          profileContent.innerHTML = pieces.join("");
-        }
+          function renderProfileField(label, value) {
+            const safeValue = value || "—";
+            return `
+              <div class="col-md-6">
+                <div class="text-muted small">${label}</div>
+                <div class="fw-semibold">${safeValue}</div>
+              </div>
+            `;
+          }
 
-        if (profileModal) {
+          function renderProfile(data) {
+            const tags = (data.tags || []).join(", ");
+            const pieces = [
+              renderProfileField("ФИО", data.full_name),
+              renderProfileField("Телефон", data.phone),
+              renderProfileField("Эл. почта", data.email),
+              renderProfileField("Дата рождения", data.birth_date),
+              renderProfileField("Номер ВУ", data.license_number),
+              renderProfileField("Кем выдано ВУ", data.license_issued_by),
+              renderProfileField("Стаж с", data.driving_since),
+              renderProfileField(
+                "Паспорт",
+                [data.passport_series, data.passport_number].filter(Boolean).join(" ").trim()
+              ),
+              renderProfileField("Кем выдан паспорт", data.passport_issued_by),
+              renderProfileField("Дата выдачи паспорта", data.passport_issue_date),
+              renderProfileField("Адрес прописки", data.registration_address),
+              renderProfileField("Скидка, %", data.discount_percent),
+              renderProfileField("Теги", tags),
+            ];
+            profileContent.innerHTML = pieces.join("");
+          }
+
           profileModal.addEventListener("show.bs.modal", (event) => {
             const trigger = event.relatedTarget;
             if (!trigger || trigger.classList.contains("disabled")) {
@@ -1092,7 +1095,6 @@
               profileError.classList.add("d-none");
               profileError.textContent = "";
             }
-            if (!profileContent) return;
             profileContent.innerHTML = `<div class="text-muted">Загрузка...</div>`;
             if (!customerId || !template) {
               profileContent.innerHTML = `<div class="text-muted">Клиент не выбран.</div>`;
@@ -1117,6 +1119,12 @@
                 profileContent.innerHTML = "";
               });
           });
+        };
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", bindProfileModal);
+        } else {
+          bindProfileModal();
         }
       })();
     </script>

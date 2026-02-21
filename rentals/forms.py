@@ -26,6 +26,7 @@ DATE_INPUT_FORMATS = ("%d-%m-%Y", "%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y")
 DATE_PLACEHOLDER = "ДД-ММ-ГГГГ"
 DRIVING_SINCE_INPUT_FORMATS = ("%Y", *DATE_INPUT_FORMATS)
 DRIVING_SINCE_PLACEHOLDER = "ГГГГ"
+DRIVING_SINCE_FULL_PLACEHOLDER = "ДД-ММ-ГГГГ"
 
 
 def _configure_date_field(field: forms.DateField):
@@ -36,11 +37,20 @@ def _configure_date_field(field: forms.DateField):
     field.input_formats = DATE_INPUT_FORMATS
 
 
-def _configure_driving_since_field(field: forms.DateField):
+def _is_year_only_input(value: str | None) -> bool:
+    if not value:
+        return False
+    return bool(re.fullmatch(r"\d{4}", value.strip()))
+
+
+def _configure_driving_since_field(field: forms.DateField, *, year_only: bool = True):
     widget = field.widget
     widget.input_type = "text"
-    widget.format = "%Y"
-    widget.attrs.setdefault("placeholder", DRIVING_SINCE_PLACEHOLDER)
+    widget.format = "%Y" if year_only else "%d-%m-%Y"
+    widget.attrs.setdefault(
+        "placeholder",
+        DRIVING_SINCE_PLACEHOLDER if year_only else DRIVING_SINCE_FULL_PLACEHOLDER,
+    )
     field.input_formats = DRIVING_SINCE_INPUT_FORMATS
 
 
@@ -241,7 +251,18 @@ class CustomerForm(StyledModelForm):
             if date_field in self.fields:
                 _configure_date_field(self.fields[date_field])
         if "driving_since" in self.fields:
-            _configure_driving_since_field(self.fields["driving_since"])
+            raw_driving = None
+            if self.is_bound:
+                raw_driving = (
+                    self.data.get(self.add_prefix("driving_since"))
+                    or self.data.get("driving_since")
+                )
+            year_only = (
+                _is_year_only_input(raw_driving)
+                if raw_driving
+                else bool(getattr(self.instance, "driving_since_year_only", False))
+            )
+            _configure_driving_since_field(self.fields["driving_since"], year_only=year_only)
         if "discount_percent" in self.fields:
             widget = self.fields["discount_percent"].widget
             widget.attrs.setdefault("step", "0.1")
@@ -264,7 +285,14 @@ class CustomerForm(StyledModelForm):
         return tags
 
     def save(self, commit=True):
-        instance = super().save(commit=commit)
+        instance = super().save(commit=False)
+        raw_driving = None
+        if self.is_bound:
+            raw_driving = self.data.get(self.add_prefix("driving_since")) or self.data.get("driving_since")
+        year_only = _is_year_only_input(raw_driving)
+        if not self.cleaned_data.get("driving_since"):
+            year_only = False
+        instance.driving_since_year_only = year_only
         raw_tags = self.cleaned_data.get("tags_text", "")
         tags = self._parse_tags(raw_tags)
         if commit:

@@ -283,6 +283,11 @@ class Customer(models.Model):
         null=True,
         help_text="Дата начала стажа вождения (ГГГГ; можно указать полную дату).",
     )
+    driving_since_year_only = models.BooleanField(
+        "Стаж только год",
+        default=False,
+        help_text="Если включено, стаж отображается только годом.",
+    )
     passport_series = models.CharField("Серия паспорта", max_length=10, blank=True, null=True)
     passport_number = models.CharField("Номер паспорта", max_length=20, blank=True, null=True)
     passport_issue_date = models.DateField("Дата выдачи паспорта", blank=True, null=True)

@@ -145,6 +145,19 @@ def _parse_year_or_date(value):
     return _parse_date(text)
 
 
+def _is_year_only_value(value) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, (int, float, Decimal)) and not isinstance(value, bool):
+        try:
+            numeric = int(value)
+        except (TypeError, ValueError):
+            return False
+        return 1000 <= numeric <= 9999
+    text = str(value).strip()
+    return bool(re.fullmatch(r"\d{4}", text))
+
+
 def _clean_status(value):
     value = (value or "").strip().lower()
     valid_statuses = {choice[0] for choice in Rental.STATUS_CHOICES}
@@ -812,6 +825,7 @@ def _normalize_customer_row(row, row_index: int):
         "license_number": license_number,
         "license_issued_by": license_issued_by,
         "driving_since": _parse_year_or_date(driving_since_raw),
+        "driving_since_year_only": _is_year_only_value(driving_since_raw),
         "registration_address": primary_address or None,
         "passport_series": passport_series,
         "passport_number": passport_number,
@@ -1590,7 +1604,11 @@ def export_customers_csv(request):
                 smart_str(customer.phone or ""),
                 smart_str(customer.license_number),
                 smart_str(customer.license_issued_by or ""),
-                customer.driving_since.strftime("%Y") if customer.driving_since else "",
+                (
+                    customer.driving_since.strftime("%Y")
+                    if customer.driving_since and customer.driving_since_year_only
+                    else customer.driving_since.strftime("%d-%m-%Y") if customer.driving_since else ""
+                ),
                 smart_str(customer.passport_series or ""),
                 smart_str(customer.passport_number or ""),
                 customer.passport_issue_date.strftime("%d-%m-%Y") if customer.passport_issue_date else "",
@@ -1907,6 +1925,7 @@ def import_customers_csv(request):
                 "phone",
                 "license_issued_by",
                 "driving_since",
+                "driving_since_year_only",
                 "registration_address",
                 "passport_series",
                 "passport_number",

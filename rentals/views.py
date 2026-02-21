@@ -1455,6 +1455,34 @@ def customer_search(request):
 
 
 @login_required
+@require_POST
+def customer_quick_create(request):
+    form = CustomerForm(request.POST)
+    if not form.is_valid():
+        return JsonResponse({"errors": form.errors}, status=400)
+
+    customer = form.save()
+    if not (customer.full_name or "").strip():
+        customer.full_name = _limit_length(f"Без имени {customer.id}", NAME_MAX_LEN)
+        customer.save(update_fields=["full_name"])
+
+    phone = customer.phone or ""
+    label = f"{customer.full_name}{f' · {phone}' if phone else ''}"
+    return JsonResponse(
+        {
+            "customer": {
+                "id": customer.id,
+                "name": customer.full_name,
+                "phone": phone,
+                "email": customer.email or "",
+                "license_number": customer.license_number,
+                "label": label,
+            }
+        }
+    )
+
+
+@login_required
 def export_cars_csv(request):
     response = HttpResponse(content_type="text/csv")
     filename = "автомобили.csv"

@@ -169,7 +169,14 @@
           </ul>
           <div class="d-flex flex-wrap gap-2">
             <a href="{% url 'rentals:car_create' %}" class="btn btn-primary btn-sm">Добавить авто</a>
-            <a href="{% url 'rentals:customer_create' %}" class="btn btn-outline-primary btn-sm">Добавить клиента</a>
+            <button
+              type="button"
+              class="btn btn-outline-primary btn-sm"
+              data-bs-toggle="modal"
+              data-bs-target="#customer-quick-create-modal"
+            >
+              Добавить клиента
+            </button>
             <a href="{% url 'rentals:rental_create' %}" class="btn btn-outline-secondary btn-sm">Создать аренду</a>
             <a href="{% url 'rentals:contract_template_create' %}" class="btn btn-outline-secondary btn-sm">Новый шаблон</a>
           </div>
@@ -177,6 +184,182 @@
       </div>
     </div>
   </div>
+
+  <div
+    class="modal fade"
+    id="customer-quick-create-modal"
+    tabindex="-1"
+    aria-hidden="true"
+    data-create-url="{% url 'rentals:customer_quick_create' %}"
+  >
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <form id="customer-quick-create-form" novalidate>
+          {% csrf_token %}
+          <div class="modal-header">
+            <h5 class="modal-title" id="customer-quick-create-title">Новый клиент</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-danger d-none" id="customer-quick-create-error"></div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label" for="quick-full-name">ФИО</label>
+                <input type="text" class="form-control" id="quick-full-name" name="full_name">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="quick-phone">Телефон</label>
+                <input type="text" class="form-control" id="quick-phone" name="phone">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="quick-email">Эл. почта</label>
+                <input type="email" class="form-control" id="quick-email" name="email">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="quick-birth-date">Дата рождения</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="quick-birth-date"
+                  name="birth_date"
+                  placeholder="ДД-ММ-ГГГГ"
+                >
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="quick-license-number">Номер ВУ</label>
+                <input type="text" class="form-control" id="quick-license-number" name="license_number">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="quick-license-issued">В.у. выдано</label>
+                <input type="text" class="form-control" id="quick-license-issued" name="license_issued_by">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="quick-driving-since">Стаж с</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="quick-driving-since"
+                  name="driving_since"
+                  placeholder="ГГГГ"
+                >
+              </div>
+              <div class="col-12">
+                <div class="row g-2">
+                  <div class="col-md-4">
+                    <label class="form-label" for="quick-passport-series">Серия паспорта</label>
+                    <input type="text" class="form-control" id="quick-passport-series" name="passport_series">
+                  </div>
+                  <div class="col-md-8">
+                    <label class="form-label" for="quick-passport-number">Номер паспорта</label>
+                    <input type="text" class="form-control" id="quick-passport-number" name="passport_number">
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-8">
+                <label class="form-label" for="quick-passport-issued">Кем выдан паспорт</label>
+                <input type="text" class="form-control" id="quick-passport-issued" name="passport_issued_by">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="quick-passport-date">Дата выдачи</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="quick-passport-date"
+                  name="passport_issue_date"
+                  placeholder="ДД-ММ-ГГГГ"
+                >
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="quick-registration-address">Адрес прописки</label>
+                <textarea class="form-control" id="quick-registration-address" name="registration_address" rows="2"></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+            <button type="submit" class="btn btn-primary" id="customer-quick-create-submit">Сохранить</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const quickCreateModal = document.getElementById("customer-quick-create-modal");
+      const quickCreateForm = document.getElementById("customer-quick-create-form");
+      const quickCreateError = document.getElementById("customer-quick-create-error");
+      const quickCreateSubmit = document.getElementById("customer-quick-create-submit");
+
+      if (!quickCreateModal || !quickCreateForm) return;
+
+      const csrfToken =
+        quickCreateForm.querySelector('input[name="csrfmiddlewaretoken"]')?.value ||
+        document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
+
+      function resetQuickCreateForm() {
+        quickCreateForm.reset();
+        if (quickCreateError) {
+          quickCreateError.classList.add("d-none");
+          quickCreateError.textContent = "";
+        }
+        if (quickCreateSubmit) {
+          quickCreateSubmit.disabled = false;
+        }
+      }
+
+      function setQuickCreateError(message) {
+        if (!quickCreateError) return;
+        quickCreateError.textContent = message;
+        quickCreateError.classList.remove("d-none");
+      }
+
+      quickCreateModal.addEventListener("show.bs.modal", resetQuickCreateForm);
+      quickCreateModal.addEventListener("hidden.bs.modal", resetQuickCreateForm);
+
+      quickCreateForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (quickCreateSubmit) {
+          quickCreateSubmit.disabled = true;
+        }
+        const payload = new FormData(quickCreateForm);
+        const url = quickCreateModal.dataset.createUrl;
+        fetch(url, {
+          method: "POST",
+          body: payload,
+          headers: csrfToken ? { "X-CSRFToken": csrfToken } : {},
+        })
+          .then(async (response) => {
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              throw data;
+            }
+            return data;
+          })
+          .then(() => {
+            bootstrap.Modal.getOrCreateInstance(quickCreateModal).hide();
+            window.location.reload();
+          })
+          .catch((error) => {
+            const errors = error?.errors || {};
+            const messages = [];
+            Object.values(errors).forEach((value) => {
+              if (Array.isArray(value)) {
+                messages.push(...value);
+              } else if (value) {
+                messages.push(String(value));
+              }
+            });
+            setQuickCreateError(messages.join(" ") || "Проверьте данные и попробуйте снова.");
+          })
+          .finally(() => {
+            if (quickCreateSubmit) {
+              quickCreateSubmit.disabled = false;
+            }
+          });
+      });
+    })();
+  </script>
 
   {{ chart_payload|json_script:"dashboard-chart-data" }}
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>

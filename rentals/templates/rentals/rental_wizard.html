@@ -1078,32 +1078,36 @@
           setSecondDriverActive(!isSecondDriverActive);
         });
 
-        const quickCreateModal = document.getElementById("customer-quick-create-modal");
-        const quickCreateForm = document.getElementById("customer-quick-create-form");
-        const quickCreateError = document.getElementById("customer-quick-create-error");
-        const quickCreateTitle = document.getElementById("customer-quick-create-title");
-        const quickCreateSubmit = document.getElementById("customer-quick-create-submit");
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
-        let quickCreateTarget = "customer";
+        function bindQuickCreateModal() {
+          const quickCreateModal = document.getElementById("customer-quick-create-modal");
+          const quickCreateForm = document.getElementById("customer-quick-create-form");
+          const quickCreateError = document.getElementById("customer-quick-create-error");
+          const quickCreateTitle = document.getElementById("customer-quick-create-title");
+          const quickCreateSubmit = document.getElementById("customer-quick-create-submit");
+          const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
+          let quickCreateTarget = "customer";
 
-        function resetQuickCreateForm() {
-          quickCreateForm?.reset();
-          if (quickCreateError) {
-            quickCreateError.classList.add("d-none");
-            quickCreateError.textContent = "";
+          if (!quickCreateModal || !quickCreateForm) {
+            return;
           }
-          if (quickCreateSubmit) {
-            quickCreateSubmit.disabled = false;
+
+          function resetQuickCreateForm() {
+            quickCreateForm.reset();
+            if (quickCreateError) {
+              quickCreateError.classList.add("d-none");
+              quickCreateError.textContent = "";
+            }
+            if (quickCreateSubmit) {
+              quickCreateSubmit.disabled = false;
+            }
           }
-        }
 
-        function setQuickCreateError(message) {
-          if (!quickCreateError) return;
-          quickCreateError.textContent = message;
-          quickCreateError.classList.remove("d-none");
-        }
+          function setQuickCreateError(message) {
+            if (!quickCreateError) return;
+            quickCreateError.textContent = message;
+            quickCreateError.classList.remove("d-none");
+          }
 
-        if (quickCreateModal && quickCreateForm) {
           quickCreateModal.addEventListener("hidden.bs.modal", resetQuickCreateForm);
 
           document.querySelectorAll("[data-quick-create-target]").forEach((button) => {
@@ -1132,10 +1136,18 @@
             }
             const payload = new FormData(quickCreateForm);
             const url = quickCreateModal.dataset.createUrl;
+            const requestHeaders = {
+              "Accept": "application/json",
+              "X-Requested-With": "XMLHttpRequest",
+            };
+            if (csrfToken) {
+              requestHeaders["X-CSRFToken"] = csrfToken;
+            }
             fetch(url, {
               method: "POST",
               body: payload,
-              headers: csrfToken ? { "X-CSRFToken": csrfToken } : {},
+              credentials: "same-origin",
+              headers: requestHeaders,
             })
               .then(async (response) => {
                 const data = await response.json().catch(() => ({}));
@@ -1176,6 +1188,12 @@
                 }
               });
           });
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", bindQuickCreateModal);
+        } else {
+          bindQuickCreateModal();
         }
 
         const bindProfileModal = () => {
@@ -1876,12 +1894,14 @@
         }
 
         function parseTimeMinutes(value) {
-          if (!value) return null;
-          const parts = value.split(":");
-          if (parts.length !== 2) return null;
+          const raw = String(value || "").trim();
+          if (!raw) return null;
+          const parts = raw.split(":");
+          if (parts.length < 2) return null;
           const hours = parseInt(parts[0], 10);
           const minutes = parseInt(parts[1], 10);
           if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+          if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
           return hours * 60 + minutes;
         }
 

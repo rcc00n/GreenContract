@@ -274,7 +274,7 @@ class _DateFormattingProxy:
             return _fmt_time(value)
         if name in self._datetime_fields:
             return _fmt_datetime(value)
-        return value
+        return "" if value is None else value
 
     def __str__(self):
         return str(self._obj)
@@ -340,7 +340,8 @@ class _RentalTemplateProxy:
             return _format_date_range(self._rental.start_date, self._rental.end_date)
         if name == "deal_name":
             return _format_deal_name(self._rental)
-        return getattr(self._rental, name)
+        value = getattr(self._rental, name)
+        return "" if value is None else value
 
 
 def get_contract_context(rental: Rental) -> dict:

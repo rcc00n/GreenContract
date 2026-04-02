@@ -635,6 +635,28 @@
                 <span id="price-summary-total">—</span>
               </div>
             </div>
+            <div class="rental-summary-actions pt-3 mt-3 border-top">
+              <div class="d-flex flex-wrap gap-2">
+                <a href="{% url 'rentals:rental_list' %}" class="btn btn-outline-secondary flex-grow-1">Отмена</a>
+                {% if object and contract_templates %}
+                  <div class="btn-group flex-grow-1">
+                    <button type="button" class="btn btn-outline-primary dropdown-toggle w-100" data-bs-toggle="dropdown">
+                      Договор
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      {% for ct in contract_templates %}
+                        <li>
+                          <button class="dropdown-item" type="submit" name="generate_contract_template_id" value="{{ ct.pk }}">
+                            {{ ct.name }}
+                          </button>
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                {% endif %}
+              </div>
+              <button class="btn btn-primary w-100 mt-2" type="submit">Сохранить аренду</button>
+            </div>
           </div>
         </div>
       </div>
@@ -2154,26 +2176,6 @@
       })();
     </script>
 
-    <div class="d-flex justify-content-end gap-2 pt-3">
-      <a href="{% url 'rentals:rental_list' %}" class="btn btn-outline-secondary">Отмена</a>
-      {% if object and contract_templates %}
-        <div class="btn-group">
-          <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
-            Договор
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end">
-            {% for ct in contract_templates %}
-              <li>
-                <button class="dropdown-item" type="submit" name="generate_contract_template_id" value="{{ ct.pk }}">
-                  {{ ct.name }}
-                </button>
-              </li>
-            {% endfor %}
-          </ul>
-        </div>
-      {% endif %}
-      <button class="btn btn-primary" type="submit">Сохранить аренду</button>
-    </div>
   </form>
 
   <div

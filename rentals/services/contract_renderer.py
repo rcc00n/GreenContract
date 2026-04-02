@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import re
 from decimal import Decimal
-from typing import Iterable
+from typing import Callable, Iterable
 
 from django.conf import settings
 from django.template import engines
@@ -255,14 +255,19 @@ class _DateFormattingProxy:
         date_fields: Iterable[str] = (),
         time_fields: Iterable[str] = (),
         datetime_fields: Iterable[str] = (),
+        field_formatters: dict[str, Callable[[object, object], str]] | None = None,
     ):
         self._obj = obj
         self._date_fields = set(date_fields)
         self._time_fields = set(time_fields)
         self._datetime_fields = set(datetime_fields)
+        self._field_formatters = field_formatters or {}
 
     def __getattr__(self, name):
         value = getattr(self._obj, name)
+        formatter = self._field_formatters.get(name)
+        if formatter is not None:
+            return formatter(self._obj, value)
         if name in self._date_fields:
             return _fmt_date(value)
         if name in self._time_fields:
@@ -312,11 +317,13 @@ class _RentalTemplateProxy:
         self.customer = _DateFormattingProxy(
             rental.customer,
             date_fields={"birth_date", "driving_since", "passport_issue_date"},
+            field_formatters={"driving_since": _format_customer_driving_since},
         )
         self.second_driver = (
             _DateFormattingProxy(
                 rental.second_driver,
                 date_fields={"birth_date", "driving_since", "passport_issue_date"},
+                field_formatters={"driving_since": _format_customer_driving_since},
             )
             if rental.second_driver
             else _EmptyProxy()
@@ -451,6 +458,10 @@ def _fmt_driving_since(value, year_only: bool = False) -> str:
     if year_only:
         return value.strftime("%Y")
     return value.strftime("%d.%m.%Y")
+
+
+def _format_customer_driving_since(customer, value) -> str:
+    return _fmt_driving_since(value, getattr(customer, "driving_since_year_only", False))
 
 
 def _fmt_datetime(value) -> str:

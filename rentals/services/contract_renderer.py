@@ -1,4 +1,6 @@
+from bisect import bisect_right
 from contextlib import contextmanager
+from datetime import date as dt_date, datetime as dt_datetime, time as dt_time
 from functools import lru_cache
 from io import BytesIO
 import logging
@@ -19,7 +21,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 from xhtml2pdf import pisa
 
-from ..models import ContractTemplate, Rental
+from ..models import Car, ContractTemplate, Customer, Rental
 
 logger = logging.getLogger(__name__)
 
@@ -514,6 +516,47 @@ def _fmt_bool(value) -> str:
     return "Да" if bool(value) else "Нет"
 
 
+def _format_placeholder_scalar(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return _fmt_bool(value)
+    if isinstance(value, Decimal):
+        return _fmt_decimal(value)
+    if isinstance(value, dt_datetime):
+        return _fmt_datetime(value)
+    if isinstance(value, dt_date):
+        return _fmt_date(value)
+    if isinstance(value, dt_time):
+        return _fmt_time(value)
+    return str(value)
+
+
+def _build_model_placeholder_values(
+    prefix: str,
+    obj,
+    *,
+    model_class,
+    field_formatters: dict[str, Callable[[object, object], str]] | None = None,
+    skip_fields: set[str] | None = None,
+) -> dict[str, str]:
+    field_formatters = field_formatters or {}
+    skip_fields = skip_fields or set()
+    values: dict[str, str] = {}
+
+    for field in model_class._meta.concrete_fields:
+        if field.is_relation or field.name in skip_fields:
+            continue
+        raw_value = getattr(obj, field.name, None) if obj is not None else None
+        formatter = field_formatters.get(field.name)
+        if formatter is not None and obj is not None:
+            values[f"{prefix}.{field.name}"] = formatter(obj, raw_value)
+            continue
+        values[f"{prefix}.{field.name}"] = _format_placeholder_scalar(raw_value)
+
+    return values
+
+
 def build_placeholder_values(rental: Rental) -> dict[str, str]:
     """Flatten rental/car/customer data into string placeholders."""
     customer = rental.customer
@@ -533,57 +576,30 @@ def build_placeholder_values(rental: Rental) -> dict[str, str]:
         )
 
     values = {
-        # Client
-        "customer.full_name": customer.full_name,
-        "customer.birth_date": _fmt_date(customer.birth_date),
-        "customer.phone": customer.phone,
-        "customer.email": customer.email,
-        "customer.license_number": customer.license_number,
-        "customer.license_issued_by": customer.license_issued_by,
-        "customer.driving_since": _fmt_driving_since(
-            customer.driving_since, getattr(customer, "driving_since_year_only", False)
+        **_build_model_placeholder_values(
+            "customer",
+            customer,
+            model_class=Customer,
+            field_formatters={"driving_since": _format_customer_driving_since},
+            skip_fields={"id"},
         ),
-        "customer.discount_percent": _fmt_decimal(customer.discount_percent),
-        "customer.passport_series": customer.passport_series,
-        "customer.passport_number": customer.passport_number,
-        "customer.passport_issue_date": _fmt_date(customer.passport_issue_date),
-        "customer.passport_issued_by": customer.passport_issued_by,
+        **_build_model_placeholder_values(
+            "second_driver",
+            second_driver,
+            model_class=Customer,
+            field_formatters={"driving_since": _format_customer_driving_since},
+            skip_fields={"id"},
+        ),
+        **_build_model_placeholder_values("car", car, model_class=Car, skip_fields={"id"}),
+        **_build_model_placeholder_values("rental", rental, model_class=Rental, skip_fields={"id"}),
         "customer.address": address_primary,
         "customer.registration_address": address_primary,
         "customer.residence_address": address_primary,
-        # Second driver
-        "second_driver.full_name": second_driver.full_name if second_driver else "",
-        "second_driver.birth_date": _fmt_date(second_driver.birth_date) if second_driver else "",
-        "second_driver.phone": second_driver.phone if second_driver else "",
-        "second_driver.email": second_driver.email if second_driver else "",
-        "second_driver.license_number": second_driver.license_number if second_driver else "",
-        "second_driver.license_issued_by": second_driver.license_issued_by if second_driver else "",
-        "second_driver.driving_since": _fmt_driving_since(
-            second_driver.driving_since, getattr(second_driver, "driving_since_year_only", False)
-        )
-        if second_driver
-        else "",
-        "second_driver.discount_percent": _fmt_decimal(second_driver.discount_percent) if second_driver else "",
-        "second_driver.passport_series": second_driver.passport_series if second_driver else "",
-        "second_driver.passport_number": second_driver.passport_number if second_driver else "",
-        "second_driver.passport_issue_date": _fmt_date(second_driver.passport_issue_date) if second_driver else "",
-        "second_driver.passport_issued_by": second_driver.passport_issued_by if second_driver else "",
         "second_driver.address": address_second,
         "second_driver.registration_address": address_second,
         "second_driver.residence_address": address_second,
-        # Car
-        "car.plate_number": car.plate_number,
-        "car.make": car.make,
-        "car.model": car.model,
-        "car.year": car.year,
-        "car.vin": car.vin,
-        "car.sts_number": car.sts_number,
-        "car.sts_issue_date": _fmt_date(car.sts_issue_date),
-        "car.sts_issued_by": car.sts_issued_by,
         "car.label": str(car),
-        "car.security_deposit": _fmt_decimal(car.security_deposit),
         "car.security_deposit_text": car.security_deposit_text,
-        # Rental
         "rental.contract_number": rental.contract_number or "",
         "rental.start_date": _fmt_date(start_date),
         "rental.end_date": _fmt_date(end_date),
@@ -591,38 +607,13 @@ def build_placeholder_values(rental: Rental) -> dict[str, str]:
         "rental.end_time": _fmt_time(rental.end_time),
         "rental.date_range": date_range,
         "rental.duration_days": duration_days or "",
-        "rental.daily_rate": _fmt_decimal(rental.daily_rate),
-        "rental.total_price": _fmt_decimal(rental.total_price),
-        "rental.balance_due": _fmt_decimal(rental.balance_due),
         "rental.balance_due_text": rental.balance_due_text,
-        "rental.prepayment": _fmt_decimal(rental.prepayment),
         "rental.advance_payment_text": rental.advance_payment_text,
-        "rental.discount_amount": _fmt_decimal(rental.discount_amount),
-        "rental.discount_percent": _fmt_decimal(rental.discount_percent),
         "rental.airport_fee_start": _fmt_decimal(getattr(rental, "airport_fee_start", "")),
         "rental.airport_fee_end": _fmt_decimal(getattr(rental, "airport_fee_end", "")),
-        "rental.car_wash_fee": _fmt_decimal(getattr(rental, "car_wash_fee", "")),
-        "rental.night_fee_start": _fmt_decimal(rental.night_fee_start),
-        "rental.night_fee_end": _fmt_decimal(rental.night_fee_end),
         "rental.delivery_issue_city": _normalize_delivery_city(rental.delivery_issue_city),
-        "rental.delivery_issue_fee": _fmt_decimal(rental.delivery_issue_fee),
         "rental.delivery_return_city": _normalize_delivery_city(rental.delivery_return_city),
-        "rental.delivery_return_fee": _fmt_decimal(rental.delivery_return_fee),
-        "rental.operation_regions": rental.operation_regions,
-        "rental.mileage_limit_km": _fmt_decimal(rental.mileage_limit_km),
-        "rental.child_seat_included": _fmt_bool(rental.child_seat_included),
-        "rental.child_seat_count": rental.child_seat_count,
-        "rental.booster_included": _fmt_bool(rental.booster_included),
-        "rental.booster_count": rental.booster_count,
-        "rental.ski_rack_included": _fmt_bool(rental.ski_rack_included),
-        "rental.ski_rack_count": rental.ski_rack_count,
-        "rental.roof_box_included": _fmt_bool(rental.roof_box_included),
-        "rental.roof_box_count": rental.roof_box_count,
-        "rental.crossbars_included": _fmt_bool(rental.crossbars_included),
-        "rental.crossbars_count": rental.crossbars_count,
-        "rental.equipment_manual_total": _fmt_decimal(rental.equipment_manual_total),
         "rental.deal_name": rental.deal_name,
-        # Meta
         "meta.today": _fmt_date(timezone.localdate()),
         "meta.generated_at": _fmt_datetime(timezone.localtime()),
     }
@@ -653,6 +644,75 @@ def placeholder_token_map(rental: Rental) -> dict[str, str]:
         for token in variants:
             mapping[token] = value
     return mapping
+
+
+def _placeholder_token_values(rental: Rental) -> dict[str, str]:
+    values = build_placeholder_values(rental)
+    token_values = dict(values)
+    token_values.update({key.replace(".", "_"): value for key, value in values.items()})
+    return token_values
+
+
+def _find_docx_placeholder_matches(text: str, token_values: dict[str, str]) -> list[tuple[int, int, str]]:
+    matches: list[tuple[int, int, str]] = []
+    occupied: list[tuple[int, int]] = []
+
+    def overlaps(start: int, end: int) -> bool:
+        return any(start < used_end and end > used_start for used_start, used_end in occupied)
+
+    for match in re.finditer(r"\{\{\s*([^{}]+?)\s*\}\}", text):
+        token = match.group(1).strip()
+        value = token_values.get(token)
+        if value is None:
+            continue
+        matches.append((match.start(), match.end(), value))
+        occupied.append((match.start(), match.end()))
+
+    exact_tokens = sorted(token_values.keys(), key=len, reverse=True)
+    if exact_tokens:
+        exact_pattern = re.compile("|".join(re.escape(token) for token in exact_tokens))
+        for match in exact_pattern.finditer(text):
+            start, end = match.start(), match.end()
+            if overlaps(start, end):
+                continue
+            matches.append((start, end, token_values[match.group(0)]))
+            occupied.append((start, end))
+
+    matches.sort(key=lambda item: item[0])
+    return matches
+
+
+def _replace_placeholder_runs(paragraph, replacements: list[tuple[int, int, str]]):
+    runs = paragraph.runs
+    if not runs or not replacements:
+        return
+
+    run_starts: list[int] = []
+    cursor = 0
+    for run in runs:
+        run_starts.append(cursor)
+        cursor += len(run.text)
+
+    for start, end, value in sorted(replacements, key=lambda item: item[0], reverse=True):
+        start_run = bisect_right(run_starts, start) - 1
+        end_run = bisect_right(run_starts, end - 1) - 1
+        if start_run < 0 or end_run < 0:
+            continue
+
+        start_run_offset = start - run_starts[start_run]
+        end_run_offset = end - run_starts[end_run]
+
+        if start_run == end_run:
+            run = runs[start_run]
+            run.text = f"{run.text[:start_run_offset]}{value}{run.text[end_run_offset:]}"
+            continue
+
+        start_prefix = runs[start_run].text[:start_run_offset]
+        end_suffix = runs[end_run].text[end_run_offset:]
+        runs[start_run].text = f"{start_prefix}{value}"
+        for run_index in range(start_run + 1, end_run):
+            runs[run_index].text = ""
+        runs[end_run].text = end_suffix
 
 
 def placeholder_guide() -> list[dict]:
@@ -975,16 +1035,27 @@ def _build_pdf_overlay(reader: PdfReader, field_values: dict[str, str]) -> bytes
     pdf_canvas.save()
     return output.getvalue()
 
-def _replace_in_paragraphs(paragraphs: Iterable, mapping: dict[str, str]):
-    """Replace placeholders in a list of DOCX paragraphs."""
+def _replace_in_paragraphs(paragraphs: Iterable, token_values: dict[str, str]):
+    """Replace placeholders in DOCX paragraphs without resetting run styles."""
     for paragraph in paragraphs:
         original = paragraph.text
-        updated = original
-        for key, value in mapping.items():
-            if key in updated:
-                updated = updated.replace(key, value)
-        if updated != original:
-            paragraph.text = updated
+        if not original:
+            continue
+        replacements = _find_docx_placeholder_matches(original, token_values)
+        if replacements:
+            _replace_placeholder_runs(paragraph, replacements)
+
+
+def _replace_in_table(table, token_values: dict[str, str]):
+    for row in table.rows:
+        for cell in row.cells:
+            _replace_in_container(cell, token_values)
+
+
+def _replace_in_container(container, token_values: dict[str, str]):
+    _replace_in_paragraphs(container.paragraphs, token_values)
+    for table in container.tables:
+        _replace_in_table(table, token_values)
 
 
 def render_docx(contract_template: ContractTemplate, rental: Rental) -> BytesIO:
@@ -996,17 +1067,20 @@ def render_docx(contract_template: ContractTemplate, rental: Rental) -> BytesIO:
         raise ValueError("Файл шаблона Ворд не загружен.")
     template_bytes = _read_contract_template_bytes(contract_template)
     document = Document(BytesIO(template_bytes))
-    mapping = placeholder_token_map(rental)
+    token_values = _placeholder_token_values(rental)
 
-    _replace_in_paragraphs(document.paragraphs, mapping)
-    for table in document.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                _replace_in_paragraphs(cell.paragraphs, mapping)
+    _replace_in_container(document, token_values)
 
     for section in document.sections:
-        _replace_in_paragraphs(section.header.paragraphs, mapping)
-        _replace_in_paragraphs(section.footer.paragraphs, mapping)
+        for container in (
+            section.header,
+            section.first_page_header,
+            section.even_page_header,
+            section.footer,
+            section.first_page_footer,
+            section.even_page_footer,
+        ):
+            _replace_in_container(container, token_values)
 
     output = BytesIO()
     document.save(output)

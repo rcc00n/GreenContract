@@ -558,6 +558,14 @@ main.container {
 }
 
 @media (min-width: 1200px) {
+  .rental-form-layout {
+    align-items: stretch !important;
+  }
+
+  .rental-form-sidebar {
+    align-self: stretch;
+  }
+
   .rental-summary-card {
     position: sticky;
     top: 1rem;

@@ -430,9 +430,18 @@ body {
   cursor: pointer;
 }
 
+.city-picker-trigger [data-city-label] {
+  min-width: 0;
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .city-picker-caret {
   color: var(--text-secondary);
   font-size: 0.85rem;
+  flex: 0 0 auto;
 }
 
 .city-picker-menu {
@@ -459,7 +468,7 @@ body {
 
 .city-picker-options {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 6px;
   max-height: 220px;
   overflow-y: auto;
@@ -503,6 +512,14 @@ body {
 
 main.container {
   padding-bottom: 3rem;
+}
+
+main.rental-form-page-main {
+  box-sizing: border-box;
+  width: min(1800px, calc(100vw - 20px));
+  max-width: none;
+  margin-inline: auto;
+  padding-inline: clamp(0.5rem, 1.2vw, 1.25rem);
 }
 
 .card {
@@ -550,6 +567,15 @@ main.container {
   min-width: 0;
 }
 
+.rental-form-layout {
+  --bs-gutter-x: clamp(1rem, 1.1vw, 1.4rem);
+}
+
+.rental-form-main > .card > .card-body,
+.rental-summary-card > .card-body {
+  padding: clamp(1rem, 1vw, 1.35rem);
+}
+
 .rental-summary-card {
   border: 1px solid color-mix(in srgb, var(--border-subtle) 80%, transparent);
   background:
@@ -567,6 +593,11 @@ main.container {
   }
 
   .rental-form-sidebar {
+    width: clamp(360px, 22vw, 410px);
+    flex: 0 0 clamp(360px, 22vw, 410px);
+  }
+
+  .rental-form-sidebar {
     align-self: stretch;
   }
 
@@ -580,6 +611,11 @@ main.container {
   .rental-summary-actions .btn,
   .rental-summary-actions .btn-group {
     width: 100%;
+  }
+
+  main.rental-form-page-main {
+    width: calc(100vw - 12px);
+    padding-inline: 0.35rem;
   }
 }
 

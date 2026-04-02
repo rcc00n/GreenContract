@@ -9,15 +9,15 @@
           <span class="badge text-bg-info">Мастер</span>
         {% endif %}
       </div>
-      <p class="text-muted small mb-0">Выберите даты, тариф и статус аренды.</p>
+      <p class="text-muted small mb-0">Выберите даты аренды и параметры расчёта.</p>
     </div>
     <a href="{% url 'rentals:rental_list' %}" class="btn btn-outline-secondary">Назад к списку</a>
   </div>
 
   <form method="post" novalidate>
     {% csrf_token %}
-    <div class="row g-4 align-items-start">
-      <div class="col-12">
+    <div class="row g-4 align-items-start rental-form-layout">
+      <div class="col-12 col-xl-8 col-xxl-9 rental-form-main">
         <div class="card shadow-sm h-100">
           <div class="card-body">
             {% if form.non_field_errors %}
@@ -345,29 +345,54 @@
                 </div>
               </div>
 
-              <div class="col-lg-3 col-md-6">
-                <label class="form-label" for="{{ form.unique_daily_rate.id_for_label }}">Уникальный тариф</label>
-                {{ form.unique_daily_rate }}
-                <div class="form-text">Перебивает тариф машины на все дни.</div>
-                {% for error in form.unique_daily_rate.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-              </div>
-              <div class="col-lg-3 col-md-6">
-                <label class="form-label" for="{{ form.daily_rate.id_for_label }}">Суточный тариф</label>
-                {{ form.daily_rate }}
-                <div class="form-text">Автозаполнение по тарифу автомобиля.</div>
-                {% for error in form.daily_rate.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-              </div>
-              <div class="col-lg-3 col-md-6">
-                <label class="form-label" for="{{ form.total_price.id_for_label }}">Итоговая сумма</label>
-                {{ form.total_price }}
-                <div class="form-text">Сумма договора после доп. услуг и скидок.</div>
-                {% for error in form.total_price.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-              </div>
-              <div class="col-lg-3 col-md-6">
-                <label class="form-label" for="{{ form.balance_due.id_for_label }}">К оплате после предоплаты</label>
-                {{ form.balance_due }}
-                <div class="form-text">Учитывает предоплату.</div>
-                {% for error in form.balance_due.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              <div class="col-12">
+                <div class="border rounded p-3 bg-light">
+                  <div class="fw-semibold mb-2">Тариф, скидки и предоплата</div>
+                  <div class="row g-3">
+                    <div class="col-lg-3 col-md-6">
+                      <label class="form-label" for="{{ form.unique_daily_rate.id_for_label }}">Уникальный тариф</label>
+                      {{ form.unique_daily_rate }}
+                      <div class="form-text">Перебивает тариф машины на все дни.</div>
+                      {% for error in form.unique_daily_rate.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                      <label class="form-label" for="{{ form.daily_rate.id_for_label }}">Суточный тариф</label>
+                      {{ form.daily_rate }}
+                      <div class="form-text">Автозаполнение по тарифу автомобиля.</div>
+                      {% for error in form.daily_rate.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                      <label class="form-label" for="{{ form.discount_amount.id_for_label }}">Скидка суммой</label>
+                      {{ form.discount_amount }}
+                      <div class="form-text">Фиксированная скидка в рублях.</div>
+                      {% for error in form.discount_amount.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                      <label class="form-label" for="{{ form.discount_percent.id_for_label }}">Скидка %</label>
+                      {{ form.discount_percent }}
+                      <div class="form-text">Применяется к суточному тарифу после фиксированной скидки. Доп. услуги без скидки.</div>
+                      {% for error in form.discount_percent.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-lg-4 col-md-6">
+                      <label class="form-label" for="{{ form.total_price.id_for_label }}">Итоговая сумма</label>
+                      {{ form.total_price }}
+                      <div class="form-text">Сумма договора после доп. услуг и скидок.</div>
+                      {% for error in form.total_price.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-lg-4 col-md-6">
+                      <label class="form-label" for="{{ form.prepayment.id_for_label }}">Предоплата</label>
+                      {{ form.prepayment }}
+                      <div class="form-text">Вычитается из суммы к оплате.</div>
+                      {% for error in form.prepayment.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-lg-4 col-md-6">
+                      <label class="form-label" for="{{ form.balance_due.id_for_label }}">К оплате после предоплаты</label>
+                      {{ form.balance_due }}
+                      <div class="form-text">Учитывает предоплату.</div>
+                      {% for error in form.balance_due.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div class="col-12">
@@ -546,44 +571,30 @@
                 </div>
               </div>
 
-              <div class="col-12">
-                <div class="border rounded p-3 bg-light">
-                  <div class="fw-semibold mb-2">Скидки, предоплата и статус</div>
-                  <div class="row g-3">
-                    <div class="col-md-4">
-                      <label class="form-label" for="{{ form.discount_amount.id_for_label }}">Скидка суммой</label>
-                      {{ form.discount_amount }}
-                      <div class="form-text">Фиксированная скидка в рублях.</div>
-                      {% for error in form.discount_amount.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-                    </div>
-                    <div class="col-md-4">
-                      <label class="form-label" for="{{ form.discount_percent.id_for_label }}">Скидка %</label>
-                      {{ form.discount_percent }}
-                      <div class="form-text">Применяется к суточному тарифу после фиксированной скидки. Доп. услуги без скидки.</div>
-                      {% for error in form.discount_percent.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-                    </div>
-                    <div class="col-md-4">
-                      <label class="form-label" for="{{ form.prepayment.id_for_label }}">Предоплата</label>
-                      {{ form.prepayment }}
-                      <div class="form-text">Вычитается из суммы к оплате.</div>
-                      {% for error in form.prepayment.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-                    </div>
-                    <div class="col-md-4">
-                      <label class="form-label" for="{{ form.status.id_for_label }}">Статус</label>
-                      {{ form.status }}
-                      {% for error in form.status.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              {% if object and form.status %}
+                <div class="col-12">
+                  <div class="border rounded p-3 bg-light">
+                    <div class="fw-semibold mb-2">Статус аренды</div>
+                    <div class="row g-3">
+                      <div class="col-lg-4 col-md-6">
+                        <label class="form-label" for="{{ form.status.id_for_label }}">Статус</label>
+                        {{ form.status }}
+                        {% for error in form.status.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              {% elif form.status %}
+                <div class="d-none" aria-hidden="true">{{ form.status }}</div>
+              {% endif %}
             </div>
 
           </div>
         </div>
       </div>
 
-      <div class="col-12">
-        <div class="card shadow-sm" id="price-summary" role="alert">
+      <div class="col-12 col-xl-4 col-xxl-3 rental-form-sidebar">
+        <div class="card shadow-sm rental-summary-card" id="price-summary" role="alert">
           <div class="card-body">
             <div class="d-flex align-items-center gap-2 mb-3">
               <div class="spinner-border spinner-border-sm text-primary d-none" id="price-spinner" role="status">
